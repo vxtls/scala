@@ -93,7 +93,7 @@ public class Erasure extends GenTransformer implements Modifiers {
         super(global);
 	this.definitions = global.definitions;
         this.primitives = global.primitives;
-        this.forMSIL = global.target == global.TARGET_MSIL;
+        this.forMSIL = false;
     }
 
     //########################################################################
@@ -107,59 +107,67 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Transforms the given tree. */
     public Tree transform(Tree tree) {
-        switch (tree) {
-
-	case ClassDef(_, _, _, _, _, Template(_, Tree[] body)):
+        if (tree instanceof Tree.ClassDef) {
+            Tree.ClassDef classDef = (Tree.ClassDef)tree;
+            Tree[] body = classDef.impl.body;
             Symbol clasz = tree.symbol();
             TreeList members = new TreeList(transform(body));
             checkOverloadedTermsOf(clasz);
             addBridges(clasz, members);
             return gen.ClassDef(clasz, members.toArray());
-
-	case ValDef(_, _, _, Tree rhs):
+        } else if (tree instanceof Tree.ValDef) {
+            Tree rhs = ((Tree.ValDef)tree).rhs;
             Symbol field = tree.symbol();
 	    if (rhs != Tree.Empty) rhs = transform(rhs, field.nextType());
 	    return gen.ValDef(field, rhs);
-
-	case DefDef(_, _, _, _, _, Tree rhs):
+        } else if (tree instanceof Tree.DefDef) {
+            Tree rhs = ((Tree.DefDef)tree).rhs;
             Symbol method = tree.symbol();
             if (rhs != Tree.Empty)
                 rhs = transform(rhs, method.nextType().resultType());
 	    return gen.DefDef(method, rhs);
-
-        case LabelDef(_, Ident[] params, Tree body):
+        } else if (tree instanceof Tree.LabelDef) {
+            Tree.LabelDef labelDef = (Tree.LabelDef)tree;
+            Ident[] params = labelDef.params;
+            Tree body = labelDef.rhs;
             Symbol label = tree.symbol();
             body = transform(body, label.nextType().resultType());
 	    return gen.LabelDef(label, Tree.symbolOf(params), body);
-
-	case Assign(Tree lhs, Tree rhs):
+        } else if (tree instanceof Tree.Assign) {
+            Tree.Assign assign = (Tree.Assign)tree;
+            Tree lhs = assign.lhs;
+            Tree rhs = assign.rhs;
 	    lhs = transform(lhs);
 	    rhs = transform(rhs, lhs.type);
 	    return gen.Assign(tree.pos, lhs, rhs);
-
-	case Return(Tree expr):
+        } else if (tree instanceof Tree.Return) {
+            Tree expr = ((Tree.Return)tree).expr;
             Symbol method = tree.symbol();
             Type type = method.nextType().resultType();
 	    return gen.Return(tree.pos, method, transform(expr, type));
-
-        case New(Template(Tree[] base, Tree[] body)):
+        } else if (tree instanceof Tree.New) {
+            Tree.New newTree = (Tree.New)tree;
+            Tree[] base = newTree.templ.parents;
+            Tree[] body = newTree.templ.body;
             assert base.length == 1 && body.length == 0: tree;
             if (tree.getType().symbol() == definitions.ARRAY_CLASS) {
-                switch (base[0]) {
-                case Apply(_, Tree[] args):
+                if (base[0] instanceof Tree.Apply) {
+                    Tree[] args = ((Tree.Apply)base[0]).args;
                     assert args.length == 1: tree;
                     Type element = getArrayElementType(tree.getType()).erasure();
                     Tree size = transform(args[0]);
                     return genNewUnboxedArray(tree.pos, element, size);
-                default:
-                    throw Debug.abort("illegal case", tree);
                 }
+                throw Debug.abort("illegal case", tree);
             }
 	    return gen.New(tree.pos, transform(base[0]));
-
-	case Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs):
-            fun = transform(fun);
-            vargs = transform(vargs);
+        } else if (tree instanceof Tree.Apply
+                   && ((Tree.Apply)tree).fun instanceof Tree.TypeApply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+            Tree fun = transform(typeApply.fun);
+            Tree[] targs = typeApply.args;
+            Tree[] vargs = transform(apply.args);
             Symbol symbol = fun.symbol();
             if (symbol == definitions.ANY_AS) {
                 assert targs.length == 1 && vargs.length == 0: tree;
@@ -172,40 +180,48 @@ public class Erasure extends GenTransformer implements Modifiers {
                 return gen.mkIsInstanceOf(tree.pos, getQualifier(fun), type);
             }
             return genApply(tree.pos, fun, vargs);
-
-	case Apply(Tree fun, Tree[] vargs):
-            fun = transform(fun);
-            vargs = transform(vargs);
-            switch (fun) {
-            case Select(Apply(Tree bfun, Tree[] bargs), _):
+        } else if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree fun = transform(apply.fun);
+            Tree[] vargs = transform(apply.args);
+            if (fun instanceof Tree.Select
+                && ((Tree.Select)fun).qualifier instanceof Tree.Apply) {
+                Tree.Apply boxedApply = (Tree.Apply)((Tree.Select)fun).qualifier;
+                Tree bfun = boxedApply.fun;
+                Tree[] bargs = boxedApply.args;
                 Symbol bsym = bfun.symbol();
-                if (primitives.getPrimitive(bsym) != Primitive.BOX) break;
-                assert bargs.length == 1: fun;
-                switch (primitives.getPrimitive(fun.symbol())) {
-                case COERCE:
-                    assert vargs.length == 0: tree;
-                    Tree value = bargs[0];
-                    return coerce(value, fun.type().resultType());
-                case LENGTH:
-                    assert vargs.length == 0: tree;
-                    Tree array = bargs[0];
-                    return genUnboxedArrayLength(tree.pos, array);
-                case APPLY:
-                    assert vargs.length == 1: tree;
-                    Tree array = bargs[0];
-                    Tree index = vargs[0];
-                    return genUnboxedArrayGet(tree.pos, array, index);
-                case UPDATE:
-                    assert vargs.length == 2: tree;
-                    Tree array = bargs[0];
-                    Tree index = vargs[0];
-                    Tree value = vargs[1];
-                    return genUnboxedArraySet(tree.pos, array, index, value);
+                if (primitives.getPrimitive(bsym) == Primitive.BOX) {
+                    assert bargs.length == 1: fun;
+                    switch (primitives.getPrimitive(fun.symbol())) {
+                    case COERCE: {
+                        assert vargs.length == 0: tree;
+                        Tree value = bargs[0];
+                        return coerce(value, fun.type().resultType());
+                    }
+                    case LENGTH: {
+                        assert vargs.length == 0: tree;
+                        Tree array = bargs[0];
+                        return genUnboxedArrayLength(tree.pos, array);
+                    }
+                    case APPLY: {
+                        assert vargs.length == 1: tree;
+                        Tree array = bargs[0];
+                        Tree index = vargs[0];
+                        return genUnboxedArrayGet(tree.pos, array, index);
+                    }
+                    case UPDATE: {
+                        assert vargs.length == 2: tree;
+                        Tree array = bargs[0];
+                        Tree index = vargs[0];
+                        Tree value = vargs[1];
+                        return genUnboxedArraySet(tree.pos, array, index, value);
+                    }
+                    }
                 }
             }
             return genApply(tree.pos, fun, vargs);
-
-	case Select(Tree qualifier, _):
+        } else if (tree instanceof Tree.Select) {
+            Tree qualifier = ((Tree.Select)tree).qualifier;
             Symbol symbol = tree.symbol();
             Type prefix = qualifier.type().baseType(symbol.owner()).erasure();
             assert prefix != Type.NoType: tree + " -- " + Debug.show(symbol);
@@ -215,20 +231,16 @@ public class Erasure extends GenTransformer implements Modifiers {
             // Might end up with "box(unbox(...))". That's needed by backend.
             if (isUnboxedType(prefix)) qualifier = box(qualifier, true);
 	    return gen.Select(tree.pos, qualifier, symbol);
-
-	case Ident(_):
+        } else if (tree instanceof Tree.Ident) {
             Symbol symbol = tree.symbol();
 	    if (symbol == definitions.ZERO) return gen.mkNullLit(tree.pos);
             return gen.Ident(tree.pos, symbol);
-
-        case Block(_):
-	case If(_, _, _):
-        case Switch(_, _, _, _):
+        } else if (tree instanceof Tree.Block
+                   || tree instanceof Tree.If
+                   || tree instanceof Tree.Switch) {
             return transform(tree, tree.getType().fullErasure());
-
-        default:
-            return super.transform(tree);
         }
+        return super.transform(tree);
     }
 
     //########################################################################
@@ -250,49 +262,52 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Transforms the given tree with given prototype. */
     private Tree transform(Tree tree, Type pt) {
-        switch (tree) {
-
-        case Block(Tree[] stats):
+        if (tree == Tree.Empty) {
+            return transform(gen.mkDefaultValue(tree.pos, pt), pt);
+        } else if (tree instanceof Tree.Block) {
+            Tree[] stats = ((Tree.Block)tree).stats;
             if (stats.length == 0) return transformUnit(tree.pos, pt);
             stats = Tree.cloneArray(stats);
             for (int i = 0; i < stats.length - 1; i++)
                 stats[i] = transform(stats[i]);
             stats[stats.length - 1] = transform(stats[stats.length - 1], pt);
             return gen.Block(tree.pos, stats);
-
-	case If(Tree cond, Tree thenp, Tree elsep):
+        } else if (tree instanceof Tree.If) {
+            Tree.If ifTree = (Tree.If)tree;
+            Tree cond = ifTree.cond;
+            Tree thenp = ifTree.thenp;
+            Tree elsep = ifTree.elsep;
 	    cond = transform(cond, UNBOXED_BOOLEAN);
 	    thenp = transform(thenp, pt);
 	    elsep = transform(elsep, pt);
 	    return gen.If(tree.pos, cond, thenp, elsep, pt);
-
-        case Switch(Tree test, int[] tags, Tree[] bodies, Tree otherwise):
+        } else if (tree instanceof Tree.Switch) {
+            Tree.Switch switchTree = (Tree.Switch)tree;
+            Tree test = switchTree.test;
+            int[] tags = switchTree.tags;
+            Tree[] bodies = switchTree.bodies;
+            Tree otherwise = switchTree.otherwise;
 	    test = transform(test, UNBOXED_INT);
             bodies = transform(bodies, pt);
             otherwise = transform(otherwise, pt);
             return gen.Switch(tree.pos, test, tags, bodies, otherwise, pt);
-
-        case Return(_):
+        } else if (tree instanceof Tree.Return) {
             Tree value = transform(gen.mkDefaultValue(tree.pos, pt), pt);
             return gen.mkBlock(new Tree[] {transform(tree), value});
-
-	case Typed(Tree expr, _): // !!!
-	    return transform(expr, pt);
-
-        case LabelDef(_, _, _):
-	case Assign(_, _):
-        case New(_):
-        case Apply(_, _):
-        case Super(_, _):
-        case This(_):
-        case Select(_, _):
-        case Ident(_):
-        case Literal(_):
+        } else if (tree instanceof Tree.Typed) { // !!!
+            return transform(((Tree.Typed)tree).expr, pt);
+        } else if (tree instanceof Tree.LabelDef
+                   || tree instanceof Tree.Assign
+                   || tree instanceof Tree.New
+                   || tree instanceof Tree.Apply
+                   || tree instanceof Tree.Super
+                   || tree instanceof Tree.This
+                   || tree instanceof Tree.Select
+                   || tree instanceof Tree.Ident
+                   || tree instanceof Tree.Literal) {
             return coerce(transform(tree), pt);
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        throw Debug.abort("illegal case", tree);
     }
 
     /** Transforms Unit literal with given prototype. */
@@ -305,6 +320,14 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Coerces the given tree to the given type. */
     private Tree coerce(Tree tree, Type pt) {
+        if (pt.isSameAs(UNBOXED_UNIT)) {
+            if (tree.type() == Type.ErrorType) return tree;
+            if (tree.type().isSameAs(UNBOXED_UNIT)
+                || isSubType(tree.type(), definitions.UNIT_TYPE())) {
+                return tree.type().isSameAs(UNBOXED_UNIT) ? tree : unbox(tree, pt);
+            }
+            return gen.mkBlock(new Tree[]{tree, gen.mkUnitLit(tree.pos)});
+        }
         if (isSubType(tree.type(), pt)) {
             if (tree.type().symbol() == definitions.ARRAY_CLASS) {
                 if (pt.symbol() != definitions.ARRAY_CLASS) {
@@ -348,11 +371,11 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Boxes the given tree. */
     private Tree box(Tree tree, boolean force) {
-        switch (tree) {
-        case Apply(Tree fun, Tree[] args):
-            if (primitives.getPrimitive(fun.symbol()) == Primitive.UNBOX) {
-                assert args.length == 1: tree;
-                if (!force) return args[0];
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            if (primitives.getPrimitive(apply.fun.symbol()) == Primitive.UNBOX) {
+                assert apply.args.length == 1: tree;
+                if (!force) return apply.args[0];
             }
         }
         Symbol symbol = primitives.getBoxValueSymbol(tree.getType());
@@ -364,11 +387,11 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Unboxes the given tree to the given type. */
     private Tree unbox(Tree tree, Type pt) {
-        switch (tree) {
-        case Apply(Tree fun, Tree[] args):
-            if (primitives.getPrimitive(fun.symbol()) == Primitive.BOX) {
-                assert args.length == 1: tree;
-                return args[0];
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            if (primitives.getPrimitive(apply.fun.symbol()) == Primitive.BOX) {
+                assert apply.args.length == 1: tree;
+                return apply.args[0];
             }
         }
         Symbol symbol = primitives.getUnboxValueSymbol(pt);
@@ -395,8 +418,8 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Generates an application with given function and arguments. */
     private Tree genApply(int pos, Tree fun, Tree[] args) {
-        switch (fun.getType()) {
-        case MethodType(Symbol[] params, Type result):
+        if (fun.getType() instanceof Type.MethodType) {
+            Symbol[] params = ((Type.MethodType)fun.getType()).vparams;
             Tree[] args1 = args;
             for (int i = 0; i < args.length; i++) {
                 Tree arg = args[i];
@@ -408,9 +431,8 @@ public class Erasure extends GenTransformer implements Modifiers {
                 args1[i] = arg1;
             }
             return gen.mkApply_V(pos, fun, args1);
-        default:
-            throw Debug.abort("illegal type " + fun.getType() + " for " + fun);
         }
+        throw Debug.abort("illegal type " + fun.getType() + " for " + fun);
     }
 
     /**
@@ -418,8 +440,8 @@ public class Erasure extends GenTransformer implements Modifiers {
      * of given type.
      */
     private Tree genNewUnboxedArray(int pos, Type element, Tree size) {
-        switch (element) {
-        case UnboxedType(int kind): return genNewUnboxedArray(pos, kind, size);
+        if (element instanceof Type.UnboxedType) {
+            return genNewUnboxedArray(pos, ((Type.UnboxedType)element).tag, size);
         }
         if (global.target == global.TARGET_INT) {
             int levels = 0;
@@ -490,12 +512,10 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Returns the qualifier of the given tree. */
     private Tree getQualifier(Tree tree) {
-        switch (tree) {
-        case Select(Tree qualifier, _):
-            return qualifier;
-        default:
-            throw Debug.abort("no qualifier for tree", tree);
+        if (tree instanceof Tree.Select) {
+            return ((Tree.Select)tree).qualifier;
         }
+        throw Debug.abort("no qualifier for tree", tree);
     }
 
     /** Are the given erased types in a subtyping relation? */
@@ -516,67 +536,62 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Is the given type an unboxed type? */
     private boolean isUnboxedType(Type type) {
-	switch (type) {
-	case UnboxedType(_)     : return true;
-	case UnboxedArrayType(_): return true;
-	default                 : return false;
-	}
+	return type instanceof Type.UnboxedType || type instanceof Type.UnboxedArrayType;
     }
 
     /** Is the given type an unboxed simple type? */
     private boolean isUnboxedSimpleType(Type type) {
-	switch (type) {
-	case UnboxedType(_)     : return true;
-	default                 : return false;
-	}
+	return type instanceof Type.UnboxedType;
     }
 
     /** Is the given type an unboxed array type? */
     private boolean isUnboxedArrayType(Type type) {
-	switch (type) {
-	case UnboxedArrayType(_): return true;
-	default                 : return false;
-	}
+	return type instanceof Type.UnboxedArrayType;
     }
 
     /** Returns the boxed version of the given unboxed type. */
     private Type boxUnboxedType(Type type) {
-	switch (type) {
-	case UnboxedType(TypeTags.UNIT):
-            return definitions.UNIT_CLASS.type();
-	case UnboxedType(TypeTags.BOOLEAN):
-            return definitions.BOOLEAN_CLASS.type();
-	case UnboxedType(TypeTags.BYTE):
-            return definitions.BYTE_CLASS.type();
-	case UnboxedType(TypeTags.SHORT):
-            return definitions.SHORT_CLASS.type();
-	case UnboxedType(TypeTags.CHAR):
-            return definitions.CHAR_CLASS.type();
-	case UnboxedType(TypeTags.INT):
-            return definitions.INT_CLASS.type();
-	case UnboxedType(TypeTags.LONG):
-            return definitions.LONG_CLASS.type();
-	case UnboxedType(TypeTags.FLOAT):
-            return definitions.FLOAT_CLASS.type();
-	case UnboxedType(TypeTags.DOUBLE):
-            return definitions.DOUBLE_CLASS.type();
-	case UnboxedArrayType(Type element):
+	if (type instanceof Type.UnboxedType) {
+            switch (((Type.UnboxedType)type).tag) {
+            case TypeTags.UNIT:
+                return definitions.UNIT_CLASS.type();
+            case TypeTags.BOOLEAN:
+                return definitions.BOOLEAN_CLASS.type();
+            case TypeTags.BYTE:
+                return definitions.BYTE_CLASS.type();
+            case TypeTags.SHORT:
+                return definitions.SHORT_CLASS.type();
+            case TypeTags.CHAR:
+                return definitions.CHAR_CLASS.type();
+            case TypeTags.INT:
+                return definitions.INT_CLASS.type();
+            case TypeTags.LONG:
+                return definitions.LONG_CLASS.type();
+            case TypeTags.FLOAT:
+                return definitions.FLOAT_CLASS.type();
+            case TypeTags.DOUBLE:
+                return definitions.DOUBLE_CLASS.type();
+            default:
+                break;
+            }
+	} else if (type instanceof Type.UnboxedArrayType) {
+            Type element = ((Type.UnboxedArrayType)type).elemtp;
             return Type.appliedType(
                 definitions.ARRAY_CLASS.type(), new Type[] {element});
-	default:
-            throw Debug.abort("illegal case", type);
 	}
+        throw Debug.abort("illegal case", type);
     }
 
     /** Returns the element type of the given array type. */
     private Type getArrayElementType(Type type) {
-        switch (type) {
-        case TypeRef(_, Symbol symbol, Type[] args):
-            if (symbol != definitions.ARRAY_CLASS) break;
-            assert args.length == 1: type;
-            return args[0];
-        case UnboxedArrayType(Type element):
-            return element;
+        if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            if (typeRef.sym == definitions.ARRAY_CLASS) {
+                assert typeRef.args.length == 1: type;
+                return typeRef.args[0];
+            }
+        } else if (type instanceof Type.UnboxedArrayType) {
+            return ((Type.UnboxedArrayType)type).elemtp;
         }
         throw Debug.abort("non-array type", type);
     }
@@ -592,8 +607,8 @@ public class Erasure extends GenTransformer implements Modifiers {
         for (SymbolIterator si = clasz.members().iterator(); si.hasNext(); ) {
             Symbol symbol = si.next();
             if (!symbol.isTerm()) continue;
-            switch (symbol.info()) {
-            case OverloadedType(Symbol[] symbols, _):
+            if (symbol.info() instanceof Type.OverloadedType) {
+                Symbol[] symbols = ((Type.OverloadedType)symbol.info()).alts;
                 Type[] types = new Type[symbols.length];
                 for (int i = 0; i < symbols.length; i++) {
                     types[i] = symbols[i].nextType();
@@ -660,8 +675,10 @@ public class Erasure extends GenTransformer implements Modifiers {
 	// check that there is no overloaded symbol with same erasure as bridge
 	// todo: why only check for overloaded?
 	Symbol overSym = owner.members().lookup(sym.name);
-	switch (overSym.nextType()) {
-	case OverloadedType(Symbol[] alts, Type[] alttypes):
+	if (overSym.nextType() instanceof Type.OverloadedType) {
+            Type.OverloadedType overloadedType = (Type.OverloadedType)overSym.nextType();
+            Symbol[] alts = overloadedType.alts;
+            Type[] alttypes = overloadedType.alttypes;
 	    for (int i = 0; i < alts.length; i++) {
 		if (sym != alts[i] && isSameAs(bridgeType, alttypes[i])) {
 		    unit.error(sym.pos, "overlapping overloaded alternatives; " +
@@ -672,8 +689,10 @@ public class Erasure extends GenTransformer implements Modifiers {
 	    }
 	}
 
-	switch (bridgeType) {
-	case MethodType(Symbol[] params, Type restp):
+	if (bridgeType instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)bridgeType;
+            Symbol[] params = methodType.vparams;
+            Type restp = methodType.result;
 	    // assign to bridge symbol its bridge type
 	    // where owner of all parameters is bridge symbol itself.
 	    Symbol[] params1 = new Symbol[params.length];
@@ -696,8 +715,10 @@ public class Erasure extends GenTransformer implements Modifiers {
 	Symbol bridgeSym = method.cloneSymbol(owner);
 	bridgeSym.flags = bridgeSym.flags & ~JAVA | SYNTHETIC | DEFERRED;
 	//bridgeSym.setOwner(owner);
-	switch (bridgeType) {
-	case MethodType(Symbol[] params, Type restp):
+	if (bridgeType instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)bridgeType;
+            Symbol[] params = methodType.vparams;
+            Type restp = methodType.result;
 	    // assign to bridge symbol its bridge type
 	    // where owner of all parameters is bridge symbol itself.
 	    Symbol[] params1 = new Symbol[params.length];
@@ -784,8 +805,7 @@ public class Erasure extends GenTransformer implements Modifiers {
         int length = members.length();
         if (!clasz.isInterface()) {
             for (int i = 0; i < length; i++) {
-                switch (members.get(i)) {
-                case DefDef(_, _, _, _, _, Tree rhs):
+                if (members.get(i) instanceof Tree.DefDef) {
                     addBridgeMethodsTo(members.get(i).symbol());
                 }
             }
@@ -795,16 +815,15 @@ public class Erasure extends GenTransformer implements Modifiers {
         members.append(bridges);
         if (bridges.length() > 0) {
             Type info = clasz.nextInfo();
-            switch (info) {
-            case CompoundType(Type[] parts, Scope members_):
-                members_ = members_.cloneScope();
+            if (info instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)info;
+                Scope members_ = compoundType.members.cloneScope();
                 for (int i = 0; i < bridges.length(); i++) {
                     Tree bridge = (Tree)bridges.get(i);
                     members_.enterOrOverload(bridge.symbol());
                 }
-                clasz.updateInfo(Type.compoundType(parts, members_, info.symbol()));
-                break;
-            default:
+                clasz.updateInfo(Type.compoundType(compoundType.parts, members_, info.symbol()));
+            } else {
                 throw Debug.abort("class = " + Debug.show(clasz) + ", " +
                     "info = " + Debug.show(info));
             }

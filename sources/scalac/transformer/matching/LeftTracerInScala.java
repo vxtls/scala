@@ -3,7 +3,7 @@ package scalac.transformer.matching ;
 import scalac.*;
 import scalac.ast.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 import scalac.util.Name;
 import scalac.util.Names;
 
@@ -214,8 +214,7 @@ public class LeftTracerInScala extends TracerInScala {
                                  defs.BOOLEAN_TYPE() );
 
         if( CollectVariableTraverser.containsBinding( pat )) {
-            switch( pat ) {
-            case Sequence(Tree[] pats):
+            if (pat instanceof Sequence) {
                 return gen.mkBooleanLit(cf.pos, true);
             }
         }

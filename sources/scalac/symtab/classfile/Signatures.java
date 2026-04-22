@@ -12,7 +12,7 @@ import scalac.*;
 import scalac.symtab.*;
 import scalac.util.*;
 import java.util.*;
-import Type.*;
+import scalac.symtab.Type.*;
 
 public class Signatures {
 

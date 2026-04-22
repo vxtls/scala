@@ -35,10 +35,10 @@ class ImportList {
     }
 
     Tree importPrefix() {
-	switch (tree) {
-	case Import(Tree expr, _): return expr;
-	default: throw new ApplicationError();
+	if (tree instanceof Tree.Import) {
+	    return ((Tree.Import)tree).expr;
 	}
+	throw new ApplicationError();
     }
 
     Type importType() {
@@ -52,8 +52,8 @@ class ImportList {
     Symbol importedSymbol(Name name) {
 	Type t = this.importType();
 	boolean renamed = false;
-	switch (tree) {
-	case Import(Tree expr, Name[] selectors):
+	if (tree instanceof Tree.Import) {
+	    Name[] selectors = ((Tree.Import)tree).selectors;
 	    for (int i = 0; i < selectors.length; i = i + 2) {
 		if (i + 1 < selectors.length && name.toTermName() == selectors[i + 1]) {
 		    if (name.isTypeName())
@@ -67,8 +67,7 @@ class ImportList {
 		}
 	    }
 	    return Symbol.NONE;
-	default:
-	    throw new ApplicationError();
 	}
+	throw new ApplicationError();
     }
 }

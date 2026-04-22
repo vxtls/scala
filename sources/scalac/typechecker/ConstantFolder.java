@@ -14,6 +14,7 @@ package scalac.typechecker;
 
 import scalac.util.*;
 import scalac.ast.*;
+import scalac.ast.Tree.*;
 import scalac.symtab.*;
 import scalac.symtab.Type.*;
 
@@ -67,8 +68,8 @@ class ConstantFolder implements /*imports*/ TypeTags {
             else
                 throw Debug.abort("illegal case", ltype + " - " + rtype);
 	    Object value = null;
-	    switch (optype.unbox()) {
-	    case UnboxedType(INT):
+	    Type unboxed = optype.unbox();
+	    if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == INT) {
 		if (op == Names.ADD)
 		    value = new Integer(left.intValue() + right.intValue());
 		else if (op == Names.SUB)
@@ -103,8 +104,7 @@ class ConstantFolder implements /*imports*/ TypeTags {
 		    value = new Integer(left.intValue() >>> right.intValue());
 		else if (op == Names.ASR)
 		    value = new Integer(left.intValue() >> right.intValue());
-		break;
-	    case UnboxedType(LONG):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == LONG) {
 		if (op == Names.ADD)
 		    value = new Long(left.longValue() + right.longValue());
 		else if (op == Names.SUB)
@@ -139,8 +139,7 @@ class ConstantFolder implements /*imports*/ TypeTags {
 		    value = new Long(left.longValue() >>> right.intValue());
 		else if (op == Names.ASR)
 		    value = new Long(left.longValue() >> right.intValue());
-		break;
-	    case UnboxedType(FLOAT):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == FLOAT) {
 		if (op == Names.ADD)
 		    value = new Float(left.floatValue() + right.floatValue());
 		else if (op == Names.SUB)
@@ -163,8 +162,7 @@ class ConstantFolder implements /*imports*/ TypeTags {
 		    value = new Boolean(left.floatValue() <= right.floatValue());
 		else if (op == Names.GE)
 		    value = new Boolean(left.floatValue() >= right.floatValue());
-		break;
-	    case UnboxedType(DOUBLE):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == DOUBLE) {
 		if (op == Names.ADD)
 		    value = new Double(left.doubleValue() + right.doubleValue());
 		else if (op == Names.SUB)
@@ -187,8 +185,7 @@ class ConstantFolder implements /*imports*/ TypeTags {
 		    value = new Boolean(left.doubleValue() <= right.doubleValue());
 		else if (op == Names.GE)
 		    value = new Boolean(left.doubleValue() >= right.doubleValue());
-		break;
-	    case UnboxedType(BOOLEAN):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == BOOLEAN) {
 		if (op == Names.EQ)
 		    value = new Boolean(left.booleanValue() == right.booleanValue());
 		else if (op == Names.NE)
@@ -199,8 +196,7 @@ class ConstantFolder implements /*imports*/ TypeTags {
 		    value = new Boolean(left.booleanValue() & right.booleanValue());
 		else if (op == Names.XOR)
 		    value = new Boolean(left.booleanValue() ^ right.booleanValue());
-		break;
-	    default:
+	    } else {
 		if (optype.symbol() == ana.definitions.JAVA_STRING_CLASS &&
 		    op == Names.ADD)
 		    value = left.stringValue() + right.stringValue();
@@ -217,39 +213,34 @@ class ConstantFolder implements /*imports*/ TypeTags {
     Type foldUnary(int pos, ConstantType od, Name op) {
 	try {
 	    Object value = null;
-	    switch (od.deconst().unbox()) {
-	    case UnboxedType(INT):
+	    Type unboxed = od.deconst().unbox();
+	    if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == INT) {
 		if (op == Names.ADD)
 		    value = new Integer(od.intValue());
 		else if (op == Names.SUB)
 		    value = new Integer(-od.intValue());
 		else if (op == Names.NOT)
 		    value = new Integer(~od.intValue());
-		break;
-	    case UnboxedType(LONG):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == LONG) {
 		if (op == Names.ADD)
 		    value = new Long(od.longValue());
 		else if (op == Names.SUB)
 		    value = new Long(-od.longValue());
 		else if (op == Names.NOT)
 		    value = new Long(~od.longValue());
-		break;
-	    case UnboxedType(FLOAT):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == FLOAT) {
 		if (op == Names.ADD)
 		    value = new Float(od.floatValue());
 		else if (op == Names.SUB)
 		    value = new Float(-od.floatValue());
-		break;
-	    case UnboxedType(DOUBLE):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == DOUBLE) {
 		if (op == Names.ADD)
 		    value = new Double(od.doubleValue());
 		else if (op == Names.SUB)
 		    value = new Double(-od.doubleValue());
-		break;
-	    case UnboxedType(BOOLEAN):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == BOOLEAN) {
 		if (op == Names.ZNOT)
 		    value = new Boolean(!od.booleanValue());
-		break;
 	    }
 	    return (value != null) ? Type.constantType(value) : Type.NoType;
         } catch (ArithmeticException e) {
@@ -263,31 +254,23 @@ class ConstantFolder implements /*imports*/ TypeTags {
     Type foldAsInstanceOf(int pos, ConstantType od, Type argtype) {
 	try {
 	    Object value = null;
-	    switch (argtype.unbox()) {
-	    case UnboxedType(BYTE):
+	    Type unboxed = argtype.unbox();
+	    if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == BYTE) {
 		value = new Byte((byte)od.intValue());
-		break;
-	    case UnboxedType(CHAR):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == CHAR) {
 		value = new Character((char)od.intValue());
-		break;
-	    case UnboxedType(SHORT):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == SHORT) {
 		value = new Short((short)od.intValue());
-		break;
-	    case UnboxedType(INT):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == INT) {
 		value = new Integer(od.intValue());
-		break;
-	    case UnboxedType(LONG):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == LONG) {
 		value = new Long(od.longValue());
-		break;
-	    case UnboxedType(FLOAT):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == FLOAT) {
 		value = new Float(od.longValue());
-		break;
-	    case UnboxedType(DOUBLE):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == DOUBLE) {
 		value = new Double(od.doubleValue());
-		break;
-	    case UnboxedType(BOOLEAN):
+	    } else if (unboxed instanceof Type.UnboxedType && ((Type.UnboxedType)unboxed).tag == BOOLEAN) {
 		value = new Boolean(od.booleanValue());
-		break;
 	    }
 	    return (value != null) ? new ConstantType(argtype, value)
 		: Type.NoType;
@@ -301,8 +284,11 @@ class ConstantFolder implements /*imports*/ TypeTags {
      */
     Tree tryToFold(Tree tree) {
 	Type ctp = Type.NoType;
-	switch (tree) {
-	case Apply(Select(Tree qual, Name op), Tree[] args):
+	if (tree instanceof Apply &&
+	    ((Apply)tree).fun instanceof Select) {
+	    Tree qual = ((Select)((Apply)tree).fun).qualifier;
+	    Name op = ((Select)((Apply)tree).fun).selector;
+	    Tree[] args = ((Apply)tree).args;
 	    if (qual.type instanceof ConstantType) {
 		if (args.length == 0)
 		    ctp = foldUnary(
@@ -315,27 +301,26 @@ class ConstantFolder implements /*imports*/ TypeTags {
 			(ConstantType)(args[0].type),
 			op);
 	    }
-	    break;
-	case TypeApply(Select(Tree qual, Name op), Tree[] targs):
+	} else if (tree instanceof TypeApply &&
+		   ((TypeApply)tree).fun instanceof Select) {
+	    Tree qual = ((Select)((TypeApply)tree).fun).qualifier;
+	    Name op = ((Select)((TypeApply)tree).fun).selector;
+	    Tree[] targs = ((TypeApply)tree).args;
 		if (qual.type instanceof Type.ConstantType &&
 		    op == Names.asInstanceOf)
 		    ctp = foldAsInstanceOf(
 			tree.pos,
 			(ConstantType)qual.type,
 			targs[0].type);
-		break;
 	}
-	switch (ctp) {
-	case ConstantType(Type base, Object value):
+	if (ctp instanceof ConstantType) {
+	    Object value = ((ConstantType)ctp).value;
 	    return ana.make.Literal(tree.pos, value).setType(ctp);
-	default:
-	    return tree;
 	}
+	return tree;
     }
 
 }
-
-
 
 
 

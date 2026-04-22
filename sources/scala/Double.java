@@ -13,9 +13,13 @@ package scala;
 public abstract class Double  extends AnyVal {
 
     public final double  value;
+    public final double  $plus;
+    public final double  $minus;
 
     public Double (double  value) {
         this.value = value;
+        this.$plus = +value;
+        this.$minus = -value;
     }
 
     public boolean equals(java.lang.Object other) {

@@ -8,6 +8,7 @@ object Main {
 
   // included in JDK1.4, but cannot resolve relative sysIDs
   final val DEFAULT_PARSER_NAME = "org.apache.crimson.parser.XMLReaderImpl" ;
+  final val JDK_PARSER_NAME = "com.sun.org.apache.xerces.internal.parsers.SAXParser";
   //         better               "org.apache.xerces.parsers.SAXParser" ;
 
   final val DECL_HANDLER = "http://xml.org/sax/properties/declaration-handler";
@@ -69,8 +70,7 @@ object Main {
   }
 
   private def parse( sysID:String, myH:MainHandler ) = {
-    val parser:XMLReader  =
-      XMLReaderFactory.createXMLReader( DEFAULT_PARSER_NAME );
+    val parser:XMLReader  = createXMLReader;
 
     try   { parser.setProperty( DECL_HANDLER, myH ); }
     catch { case e:SAXException => e.printStackTrace(System.err); }
@@ -88,6 +88,20 @@ object Main {
       }
     }
 
+  }
+
+  private def createXMLReader: XMLReader = {
+    try {
+      XMLReaderFactory.createXMLReader( DEFAULT_PARSER_NAME )
+    } catch {
+      case _: Exception =>
+        try {
+          XMLReaderFactory.createXMLReader( JDK_PARSER_NAME )
+        } catch {
+          case _: Exception =>
+            XMLReaderFactory.createXMLReader()
+        }
+    }
   }
 
 } //object main

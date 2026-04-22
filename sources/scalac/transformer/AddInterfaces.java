@@ -78,28 +78,26 @@ public class AddInterfaces extends GenTransformer {
 
     /** Transforms the given symbol. */
     public Symbol getSymbolFor(Tree tree) {
-        switch (tree) {
-        case Return(_):
+        if (tree instanceof Tree.Return) {
             return member;
-        case This(_):
-        case Super(_, _):
+        } else if (tree instanceof Tree.This || tree instanceof Tree.Super) {
             return clasz;
-        case Select(Super(_, _), _):
+        } else if (tree instanceof Tree.Select
+                   && ((Tree.Select)tree).qualifier instanceof Tree.Super) {
             Symbol symbol = tree.symbol();
             if (symbol.isInitializer()) return getClassMember(symbol);
             return getClassMember(symbol, true);
-        case Select(_, _):
+        } else if (tree instanceof Tree.Select) {
             Symbol symbol = tree.symbol();
             if (symbol.isInitializer()) return getClassMember(symbol);
             return symbol;
-        case Ident(_):
+        } else if (tree instanceof Tree.Ident) {
             Symbol symbol = tree.symbol();
             if (symbol.isInitializer()) return getClassMember(symbol);
             if (symbol.isParameter()) return getClassVParam(symbol);
             return symbol;
-        default:
-            return tree.symbol();
         }
+        return tree.symbol();
     }
 
     /** Transforms the given type. */
@@ -119,16 +117,16 @@ public class AddInterfaces extends GenTransformer {
 
     /** Transforms the given tree. */
     public Tree transform(Tree tree) {
-        switch (tree) {
-        case ValDef(_, _, _, _):
-        case LabelDef(_, _, _):
+        if (tree instanceof Tree.ValDef || tree instanceof Tree.LabelDef) {
             Symbol symbol = tree.symbol();
             if (symbol.owner() != member) {
                 symbol.setOwner(member);
                 symbol.updateInfo(transform(symbol.info()));
             }
             return super.transform(tree);
-        case Select(Tree qualifier, _):
+        } else if (tree instanceof Tree.Select) {
+            Tree.Select select = (Tree.Select)tree;
+            Tree qualifier = select.qualifier;
             Type prefix = qualifier.type();
             qualifier = transform(qualifier);
             Symbol symbol = getSymbolFor(tree);
@@ -140,9 +138,8 @@ public class AddInterfaces extends GenTransformer {
                 }
             }
             return gen.Select(tree.pos, qualifier, symbol);
-        default:
-            return super.transform(tree);
         }
+        return super.transform(tree);
     }
 
     //#########################################################################
@@ -150,13 +147,14 @@ public class AddInterfaces extends GenTransformer {
 
     /** Transforms the given template and adds it to given list. */
     private void template(TreeList trees, Tree tree) {
-        switch (tree) {
-        case Empty:
+        if (tree == Tree.Empty) {
             return;
-        case PackageDef(_, _):
+        } else if (tree instanceof Tree.PackageDef) {
             trees.append(super.transform(tree));
             return;
-        case ClassDef(_, _, _, _, _, Template(_, Tree[] body)):
+        } else if (tree instanceof Tree.ClassDef) {
+            Tree.ClassDef classDef = (Tree.ClassDef)tree;
+            Tree[] body = classDef.impl.body;
             TreeList list = new TreeList(transform(body));
             this.clasz = tree.symbol();
             Map methods = new HashMap();
@@ -175,14 +173,13 @@ public class AddInterfaces extends GenTransformer {
             this.classSubst = null;
             this.clasz = null;
             return;
-        case DefDef(_, _, _, _, _, _):
+        } else if (tree instanceof Tree.DefDef) {
             return;
-        case ValDef(_, _, _, _):
+        } else if (tree instanceof Tree.ValDef) {
             if (tree.symbol().owner().isPackage()) trees.append(tree);
             return;
-        default:
-            throw Debug.abort("illegal tree", tree);
         }
+        throw Debug.abort("illegal tree", tree);
     }
 
     /**
@@ -191,10 +188,10 @@ public class AddInterfaces extends GenTransformer {
      * dropped.
      */
     private void member(Map methods, Tree tree) {
-        switch (tree) {
-        case ClassDef(_, _, _, _, _, _):
+        if (tree instanceof Tree.ClassDef) {
             return;
-        case DefDef(_, _, _, _, _, Tree rhs):
+        } else if (tree instanceof Tree.DefDef) {
+            Tree rhs = ((Tree.DefDef)tree).rhs;
             if (rhs == Tree.Empty) return;
             Symbol symbol = tree.symbol();
             this.member = getClassMember(symbol);
@@ -211,12 +208,12 @@ public class AddInterfaces extends GenTransformer {
             }
             this.member = null;
             return;
-        case ValDef(_, _, _, Tree rhs):
+        } else if (tree instanceof Tree.ValDef) {
+            Tree rhs = ((Tree.ValDef)tree).rhs;
             assert rhs == Tree.Empty: tree;
             return;
-        default:
-            throw Debug.abort("illegal tree", tree);
         }
+        throw Debug.abort("illegal tree", tree);
     }
 
     /**

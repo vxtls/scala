@@ -8,33 +8,28 @@
 
 package scalac.atree;
 
-import scalac.util.Debug;
-
 /** This class represents a method invocation style. */
 public class AInvokeStyle {
 
     //########################################################################
     // Public Cases
 
-    public case New;
-    public case Static;
-    public case Dynamic;
+    private final String name;
+
+    private AInvokeStyle(String name) {
+        this.name = name;
+    }
+
+    public static final AInvokeStyle New = new AInvokeStyle("new");
+    public static final AInvokeStyle Static = new AInvokeStyle("static");
+    public static final AInvokeStyle Dynamic = new AInvokeStyle("dynamic");
 
     //########################################################################
     // Public Methods
 
     /** Returns a string representation of this style. */
     public String toString() {
-        switch (this) {
-        case New:
-            return "new";
-        case Static:
-            return "static";
-        case Dynamic:
-            return "dynamic";
-        default:
-            throw Debug.abort("unknown case", this);
-        }
+        return name;
     }
 
     //########################################################################

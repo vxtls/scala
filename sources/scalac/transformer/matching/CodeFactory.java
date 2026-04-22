@@ -14,8 +14,8 @@ import scalac.*;
 import scalac.ast.*;
 import scalac.util.*;
 import scalac.symtab.*;
-import PatternNode.*;
-import Tree.*;
+import scalac.transformer.matching.PatternNode.*;
+import scalac.ast.Tree.*;
 
 class CodeFactory extends PatternTool {
 
@@ -95,12 +95,10 @@ class CodeFactory extends PatternTool {
 
 	Type tpe1 = tpe.widen().baseType( defs.ITERATOR_CLASS );
 
-	switch( tpe1 ) {
-	case TypeRef(_,_,Type[] args):
-	    return args[ 0 ];
-	default:
-	    throw new ApplicationError("arg "+tpe+" not subtype of Iterator[ A ]");
+	if (tpe1 instanceof Type.TypeRef) {
+	    return ((Type.TypeRef)tpe1).args[ 0 ];
 	}
+	throw new ApplicationError("arg "+tpe+" not subtype of Iterator[ A ]");
 
     }
 
@@ -151,32 +149,32 @@ class CodeFactory extends PatternTool {
 
      // unused
        public Tree Negate(Tree tree) {
-       switch (tree) {
-       case Literal(Object value):
+       if (tree instanceof Literal) {
+       Object value = ((Literal)tree).value;
        return gen.mkBooleanLit(tree.pos, !((Boolean)value).booleanValue());
        }
        return gen.mkApply__(gen.Select(tree, defs.BOOLEAN_NOT()));
        }
 
     protected Tree And(Tree left, Tree right) {
-        switch (left) {
-	case Literal(Object value):
+        if (left instanceof Literal) {
+	    Object value = ((Literal)left).value;
 	    return ((Boolean)value).booleanValue() ? right : left;
         }
-        switch (right) {
-	case Literal(Object value):
+        if (right instanceof Literal) {
+	    Object value = ((Literal)right).value;
 	    if (((Boolean)value).booleanValue()) return left;
         }
         return gen.mkApply_V(gen.Select(left, defs.BOOLEAN_AND()), new Tree[]{right});
     }
 
     protected Tree Or(Tree left, Tree right) {
-        switch (left) {
-	case Literal(Object value):
+        if (left instanceof Literal) {
+	    Object value = ((Literal)left).value;
 	    return ((Boolean)value).booleanValue() ? left : right;
         }
-        switch (right) {
-	case Literal(Object value):
+        if (right instanceof Literal) {
+	    Object value = ((Literal)right).value;
 	    if (!((Boolean)value).booleanValue()) return left;
         }
         return gen.mkApply_V(gen.Select(left, defs.BOOLEAN_OR()), new Tree[]{right});

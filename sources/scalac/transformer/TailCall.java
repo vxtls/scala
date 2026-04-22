@@ -14,7 +14,7 @@ import scalac.*;
 import scalac.util.*;
 import scalac.ast.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 /** A Tail Call transformer
  *
@@ -101,9 +101,13 @@ public class TailCall extends Transformer {
 
 
     public Tree transform(Tree tree) {
-        switch (tree) {
-
-	case DefDef(int mods, Name name, AbsTypeDef[] tparams, ValDef[][] vparams, Tree tpe, Tree rhs): {
+        if (tree instanceof DefDef) {
+            DefDef defDef = (DefDef)tree;
+            Name name = defDef.name;
+            AbsTypeDef[] tparams = defDef.tparams;
+            ValDef[][] vparams = defDef.vparams;
+            Tree tpe = defDef.tpe;
+            Tree rhs = defDef.rhs;
 	    AbsTypeDef[] newTparams  = tail_transform(tparams,false);
 	    ValDef[][] newVparams = tail_transform(vparams,false);
 	    Tree newTpe   = tail_transform(tpe,false);
@@ -138,10 +142,14 @@ public class TailCall extends Transformer {
 	    }
 	}
 
-	case Apply(Tree fun, Tree[] args): {
+	if (tree instanceof Apply) {
+            Apply apply = (Apply)tree;
+            Tree fun = apply.fun;
+            Tree[] args = apply.args;
 	    if (state.inTailPosition) {  // This is a tail-call
-		switch (fun) {
-		case Select(Tree qual, Name name):
+		if (fun instanceof Select) {
+                    Select select = (Select)fun;
+                    Tree qual = select.qualifier;
 		    if (state.currentFunction == fun.symbol()) { // Is is self-recursive?
 			// Make sure that function is from the same instance of the class as we are in.
 			// If it is an Object (Module) we don't necessarily have a THIS, so we compare
@@ -163,12 +171,9 @@ public class TailCall extends Transformer {
 			    }
 			}
 		    }
-		    break;
+                }
 		    // TODO: Handle the case of Apply(TypeApply(T))
 		    // Have to check that the type T is the same as currentFunction.type()
-		default:
-		    break;
-		}
 	    }
 	    // Call not in tail-pos: recurse over the arguments.
 	    Tree[] newArgs = tail_transform(args,false);
@@ -178,32 +183,49 @@ public class TailCall extends Transformer {
 
 	}
 
-
-	case ClassDef(int mods, Name name, AbsTypeDef[] tparams,
-		      ValDef[][] vparams, Tree tpe, Template impl): {
+	if (tree instanceof ClassDef) {
+            ClassDef classDef = (ClassDef)tree;
+            AbsTypeDef[] tparams = classDef.tparams;
+            ValDef[][] vparams = classDef.vparams;
+            Tree tpe = classDef.tpe;
+            Template impl = classDef.impl;
 	    return copy.ClassDef(tree, tree.symbol(),tparams,vparams,tpe,
 				 transform_class(impl,tree.symbol()));
 	}
 
 
-        case AbsTypeDef(int mods, Name name, Tree rhs, Tree lobound):
+        if (tree instanceof AbsTypeDef) {
+            AbsTypeDef absTypeDef = (AbsTypeDef)tree;
+            Tree rhs = absTypeDef.rhs;
+            Tree lobound = absTypeDef.lobound;
 	    return copy.AbsTypeDef(tree, tree.symbol(),
 				   tail_transform(rhs,false),
 				   tail_transform(lobound,false));
+        }
 
-       case CaseDef(Tree pat, Tree guard, Tree body):
-            return copy.CaseDef(tree,
-				tail_transform(pat,false),
-				tail_transform(guard,false),
-				transform(body));
+       if (tree instanceof CaseDef) {
+            CaseDef caseDef = (CaseDef)tree;
+            Tree pat = caseDef.pat;
+            Tree guard = caseDef.guard;
+            Tree body = caseDef.body;
+            caseDef.pat = tail_transform(pat,false);
+            caseDef.guard = tail_transform(guard,false);
+            caseDef.body = transform(body);
+            return tree;
+       }
 
 
-       case Template(Tree[] parents, Tree[] body):
+       if (tree instanceof Template) {
+           Template template = (Template)tree;
+           Tree[] parents = template.parents;
+           Tree[] body = template.body;
 	   return copy.Template(tree, tree.symbol(),
 				tail_transform(parents,false),
 				transform(body));
+       }
 
-	case Block(Tree[] stats): {
+	if (tree instanceof Block) {
+            Tree[] stats = ((Block)tree).stats;
 	    int last = stats.length-1;
 	    // All statements except the last will not be tail-calls
 	    for (int i = 0; i < last; i++) {
@@ -236,41 +258,58 @@ public class TailCall extends Transformer {
 	}
 
 
-        case Sequence(Tree[] trees):
+        if (tree instanceof Sequence) {
+            Tree[] trees = ((Sequence)tree).trees;
             return copy.Sequence(tree, tail_transform(trees,false));
+        }
 
 
 
-        case Assign(Tree lhs, Tree rhs):
+        if (tree instanceof Assign) {
+            Assign assign = (Assign)tree;
+            Tree lhs = assign.lhs;
+            Tree rhs = assign.rhs;
             return copy.Assign(tree,
 			       tail_transform(lhs,false),
 			       tail_transform(rhs,false));
+        }
 
 
-	case If(Tree cond, Tree thenp, Tree elsep): {
+	if (tree instanceof If) {
+            If ifTree = (If)tree;
+            Tree cond = ifTree.cond;
+            Tree thenp = ifTree.thenp;
+            Tree elsep = ifTree.elsep;
             return copy.If(tree, tail_transform(cond,false),
 			   transform(thenp),
 			   transform(elsep));
 	}
 
-	case New(Template templ):
+	if (tree instanceof New) {
+            Template templ = ((New)tree).templ;
 	    // At the moment we assume that the call to the constructor can not be
 	    // a tailcall.
             return copy.New(tree, tail_transform(templ,false));
+        }
 
-        case Typed(Tree expr, Tree tpe):
+        if (tree instanceof Typed) {
+            Typed typed = (Typed)tree;
+            Tree expr = typed.expr;
+            Tree tpe = typed.tpe;
             return copy.Typed(tree,
 			      transform(expr),
 			      tail_transform(tpe,false));
+        }
 
-        case TypeApply(Tree fun, Tree[] args):
+        if (tree instanceof TypeApply) {
+            TypeApply typeApply = (TypeApply)tree;
+            Tree fun = typeApply.fun;
+            Tree[] args = typeApply.args;
             return copy.TypeApply(tree,
 				  tail_transform(fun,false),
 				  tail_transform(args,false));
-
-        default:
-            return super.transform(tree);
         }
+        return super.transform(tree);
     }
 
     public Tree transform_new(Tree tree) {
@@ -345,20 +384,16 @@ public class TailCall extends Transformer {
     private Ident[] to_ident(Tree[] tree) {
 	Ident[] ids = new Ident[tree.length];
 	for (int i = 0; i < tree.length; i++) {
-	    switch (tree[i]) {
-	    case AbsTypeDef(int mods, Name name, Tree bound, Tree lobound):
+	    if (tree[i] instanceof AbsTypeDef) {
 		Ident arg = new ExtIdent(tree[i].symbol());
 		arg.setType(tree[i].getType());
 		ids[i]= arg;
-		break;
-
-	    case ValDef(int mods, Name name, Tree tpe, Tree.Empty):
+            } else if (tree[i] instanceof ValDef &&
+                       ((ValDef)tree[i]).rhs == Tree.Empty) {
 		Ident arg = new ExtIdent(tree[i].symbol());
 		arg.setType(tree[i].getType());
 		ids[i]= arg;
-		break;
-
-	    default:
+            } else {
 		Debug.abort("bad parameter: " + tree[i]);
 	    }
 	}

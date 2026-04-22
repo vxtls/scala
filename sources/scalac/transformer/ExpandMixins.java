@@ -36,7 +36,7 @@ import scalac.symtab.Type;
 import scalac.util.Name;
 import scalac.util.Debug;
 
-public class ClassExpander {
+class ClassExpander {
 
     //########################################################################
     // Private Fields
@@ -99,8 +99,11 @@ public class ClassExpander {
     /** Inlines the ith mixin with given type, interface and body. */
     public void inlineMixin(int i, Type type, Symbol iface, Template impl) {
         assert 0 < i && i < state : "state = " + state + ", i = " + i;
-        switch (parents[i]) {
-        case TypeRef(Type prefix, Symbol mixin, Type[] args):
+        if (parents[i] instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)parents[i];
+            Type prefix = typeRef.pre;
+            Symbol mixin = typeRef.sym;
+            Type[] args = typeRef.args;
             // relpace "This/Super(mixin)" by "This/Super(clasz)"
             map.insertSymbol(mixin, clasz);
             // owner of inlined value parameters and constructor is "clasz"
@@ -116,17 +119,16 @@ public class ClassExpander {
             template.parents[i] = gen.mkPrimaryConstr(constr.pos, parents[i]);
             state = i;
             return;
-        default:
-            throw Debug.abort("invalid base class type", parents[i]);
         }
+        throw Debug.abort("invalid base class type", parents[i]);
     }
 
     public Template getTemplate() {
         assert 0 < state : "state = " + state;
         Transformer superFixer = new Transformer(global) {
             public Tree transform(Tree tree) {
-                switch (tree) {
-                case Select(Super(_, _), _):
+                if (tree instanceof Tree.Select
+                    && ((Tree.Select)tree).qualifier instanceof Tree.Super) {
                     Symbol symbol = map.lookupSymbol(tree.symbol());
                     if (symbol != null) {
                         Tree qualifier = gen.This(tree.pos, clasz);
@@ -217,8 +219,8 @@ superFixer.transform(template.body))));
         }
 
         public Symbol getSymbolFor(Tree tree) {
-            switch (tree) {
-            case Select(Super(_, _), _):
+            if (tree instanceof Tree.Select
+                && ((Tree.Select)tree).qualifier instanceof Tree.Super) {
                 if (tree.symbol().isInitializer()) return tree.symbol();
                 // !!! check
                 global.nextPhase();
@@ -226,25 +228,23 @@ superFixer.transform(template.body))));
                 global.prevPhase();
                 assert !symbol.isNone(): tree;
                 return symbol;
-            case Super(_, _):
-            case This(_):
+            } else if (tree instanceof Tree.Super || tree instanceof Tree.This) {
                 return clasz;
-            default:
-                return super.getSymbolFor(tree);
             }
+            return super.getSymbolFor(tree);
         }
 
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case DefDef(_, _, _, _, _, _):
+            if (tree instanceof Tree.DefDef) {
                 if (getSymbolFor(tree).isInitializer()) initializer = true;
                 tree = super.transform(tree);
                 initializer = false;
                 return tree;
-            case Apply(Select(Super(_, _), _), _):
+            } else if (tree instanceof Tree.Apply
+                       && ((Tree.Apply)tree).fun instanceof Tree.Select
+                       && ((Tree.Select)((Tree.Apply)tree).fun).qualifier instanceof Tree.Super) {
                 if (TreeInfo.methSymbol(tree).isInitializer() && !initializer)
                     return Tree.Empty;
-                break;
             }
             if (tree.hasSymbol() && tree.symbol().isParameter()) {
                 Symbol symbol = getSymbolFor(tree);
@@ -268,18 +268,17 @@ superFixer.transform(template.body))));
             this.parent = clasz.parents()[0];
         }
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case ClassDef(_, _, _, _, _, _):
+            if (tree instanceof Tree.ClassDef) {
                 return tree;
-            case Select(Super(_, _), _):
+            } else if (tree instanceof Tree.Select
+                       && ((Tree.Select)tree).qualifier instanceof Tree.Super) {
                 Tree qualifier = ((Tree.Select)tree).qualifier;
                 qualifier = gen.Super(qualifier.pos, clasz);
                 Symbol symbol = tree.symbol().overridingSymbol(parent);
                 assert !symbol.isNone(): tree + " -- " + parent  + " -- " + Debug.show(clasz.parents()) + " -- " + Debug.show(clasz);
                 return gen.Select(tree.pos, qualifier, symbol);
-            default:
-                return super.transform(tree);
             }
+            return super.transform(tree);
         }
     }
 

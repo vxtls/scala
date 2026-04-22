@@ -64,12 +64,11 @@ public class ExpressionCompiler {
     // Private Methods - declare
 
     private void declare(Tree tree, CodeBuffer buffer) {
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return;
-
-        case ValDef(_, _, _, Tree body):
+        }
+        if (tree instanceof Tree.ValDef) {
+            Tree body = ((Tree.ValDef)tree).rhs;
             Symbol symbol = tree.symbol();
             Variable variable = Variable.Local(context.push());
             context.insertVariable(symbol, variable);
@@ -78,11 +77,8 @@ public class ExpressionCompiler {
                 compute(body) : Code.Literal(constants.zero(symbol.type()));
             buffer.append(Code.Store(Code.Self, variable, value));
             return;
-
-        default:
-            buffer.append(compute(tree));
-            return;
         }
+        buffer.append(compute(tree));
     }
 
     //########################################################################
@@ -95,9 +91,10 @@ public class ExpressionCompiler {
     }
 
     private Code compute(Tree tree) {
-        switch (tree) {
-
-        case LabelDef(_, Tree.Ident[] params, Tree body):
+        if (tree instanceof Tree.LabelDef) {
+            Tree.LabelDef labelDef = (Tree.LabelDef)tree;
+            Tree.Ident[] params = labelDef.params;
+            Tree body = labelDef.rhs;
             Symbol symbol = tree.symbol();
             Variable[] vars = new Variable[params.length];
             for (int i = 0; i < params.length; i++) {
@@ -110,8 +107,9 @@ public class ExpressionCompiler {
             }
             context.insertLabel(symbol);
             return Code.Label(symbol, vars, compute(body));
-
-        case Block(Tree[] stats):
+        }
+        if (tree instanceof Tree.Block) {
+            Tree[] stats = ((Tree.Block)tree).stats;
             if (stats.length == 0) return Code.Literal(constants.literal());
             // !!! assert stats.length > 0;
             CodeBuffer buffer = new CodeBuffer();
@@ -121,27 +119,35 @@ public class ExpressionCompiler {
             Code value = compute(stats[stats.length - 1]);
             context.stacksize(stacksize);
             return buffer.code(value);
-
-        case Assign(Tree lhs, Tree rhs):
-            return store(lhs, lhs.symbol(), compute(rhs));
-
-        case If(Tree cond, Tree thenp, Tree elsep):
-            return Code.If(compute(cond), compute(thenp),
+        }
+        if (tree instanceof Tree.Assign) {
+            Tree.Assign assign = (Tree.Assign)tree;
+            return store(assign.lhs, assign.lhs.symbol(), compute(assign.rhs));
+        }
+        if (tree instanceof Tree.If) {
+            Tree.If branch = (Tree.If)tree;
+            return Code.If(compute(branch.cond), compute(branch.thenp),
                 // !!! can we remove this test ?
-                elsep == Tree.Empty ? Code.Literal(constants.literal()) : compute(elsep));
-
-        case Switch(Tree test, int[] tags, Tree[] bodies, Tree otherwise):
+                branch.elsep == Tree.Empty ? Code.Literal(constants.literal()) : compute(branch.elsep));
+        }
+        if (tree instanceof Tree.Switch) {
+            Tree.Switch switchTree = (Tree.Switch)tree;
             return Code.Switch(
-                compute(test), tags, compute(bodies), compute(otherwise));
-
-        case New(Tree.Template(Tree[] bases, Tree[] body)): // !!!
+                compute(switchTree.test), switchTree.tags, compute(switchTree.bodies), compute(switchTree.otherwise));
+        }
+        if (tree instanceof Tree.New) { // !!!
+            Tree.New newTree = (Tree.New)tree;
+            Tree.Template templateTree = newTree.templ;
+            Tree[] bases = templateTree.parents;
+            Tree[] body = templateTree.body;
             assert bases.length == 1 : Debug.show(tree);
             assert body.length == 0 : Debug.show(tree);
             Symbol symbol = new scalac.symtab.TermSymbol(tree.pos, Name.fromString("new"), Symbol.NONE, 0); // !!!
             Variable variable = Variable.Local(context.push());
             Code code = compute(bases[0]);
-            switch (context.lookupTemplate(tree.getType().symbol())) {
-            case Global(ScalaTemplate template):
+            Template template = context.lookupTemplate(tree.getType().symbol());
+            if (template instanceof Template.Global) {
+                ScalaTemplate scalaTemplate = ((Template.Global)template).template;
                 assert code instanceof Code.Invoke : Debug.show(code);
                 Code.Invoke invoke = (Code.Invoke)code;
                 // !!! correct ?
@@ -150,45 +156,42 @@ public class ExpressionCompiler {
                 context.insertVariable(symbol, variable);
                 code = Code.Block(
                     new Code[] {
-                        Code.Store(Code.Null, variable, Code.Create(template)),
+                        Code.Store(Code.Null, variable, Code.Create(scalaTemplate)),
                         invoke},
                     Code.Load(Code.Null, variable));
             }
             return code;
-
-        case Apply(TypeApply(Tree tfun, Tree[] targs), Tree[] vargs):
-            assert vargs.length == 0 : Debug.show(tree);
-            return tapply(tfun, tfun.symbol(), targs);
-
-        case Apply(Tree vfun, Tree[] vargs):
-            return vapply(vfun, vfun.symbol(), vargs);
-
-        case This(_):
-            return Code.Self;
-
-        case Literal(Object value):
-            return Code.Literal(value);
-
-        default:
-            return load(tree, tree.symbol());
         }
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            if (apply.fun instanceof Tree.TypeApply) {
+                Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+                assert apply.args.length == 0 : Debug.show(tree);
+                return tapply(typeApply.fun, typeApply.fun.symbol(), typeApply.args);
+            }
+            return vapply(apply.fun, apply.fun.symbol(), apply.args);
+        }
+        if (tree instanceof Tree.This) {
+            return Code.Self;
+        }
+        if (tree instanceof Tree.Literal) {
+            return Code.Literal(((Tree.Literal)tree).value);
+        }
+        return load(tree, tree.symbol());
     }
 
     private Code object(Tree tree) {
-        switch (tree) {
-
-        case Select(Super(_, _), _):
-            return Code.Self;
-
-        case Select(Tree expr, _):
-            return compute(expr);
-
-        case Ident(_):
-            return Code.Self;
-
-        default:
-            throw Debug.abort("illegal tree", tree);
+        if (tree instanceof Tree.Select) {
+            Tree.Select select = (Tree.Select)tree;
+            if (select.qualifier instanceof Tree.Super) {
+                return Code.Self;
+            }
+            return compute(select.qualifier);
         }
+        if (tree instanceof Tree.Ident) {
+            return Code.Self;
+        }
+        throw Debug.abort("illegal tree", tree);
     }
 
     //########################################################################
@@ -209,17 +212,13 @@ public class ExpressionCompiler {
             assert expect != null : trees[0];
             // !!! System.out.println("!!! IS " + expect);
             Template template = context.lookupTemplate(expect);
-            switch (template) {
-
-            case Global(_) :
+            if (template instanceof Template.Global) {
                 return Code.IsScala(object, expect);
-
-            case JavaClass(Class clasz):
-                return Code.IsJava(object, clasz);
-
-            default:
-                throw Debug.abort("illegal template", template);
             }
+            if (template instanceof Template.JavaClass) {
+                return Code.IsJava(object, ((Template.JavaClass)template).clasz);
+            }
+            throw Debug.abort("illegal template", template);
         }
         throw Debug.abort("unknown method", symbol);
     }
@@ -255,19 +254,18 @@ public class ExpressionCompiler {
         {
             function = symbol.name == plus_N ? Function.Pos : Function.Neg;
         }
-        switch (target) {
-        case Select(Super(_, _), _):
+        if (target instanceof Tree.Select &&
+            ((Tree.Select)target).qualifier instanceof Tree.Super)
+        {
             Template template = context.lookupTemplate(symbol.owner());
-            switch (template) {
-            case Global(ScalaTemplate template_):
+            if (template instanceof Template.Global) {
+                ScalaTemplate template_ = ((Template.Global)template).template;
                 function = Function.Global(template_.getMethod(symbol));
-                break;
-
-            case JavaClass(Class clasz):
-                if (symbol.isInitializer()) break;
-                throw Debug.abort("!!! illegal super on java class", symbol);
-
-            default:
+            } else if (template instanceof Template.JavaClass) {
+                if (!symbol.isInitializer()) {
+                    throw Debug.abort("!!! illegal super on java class", symbol);
+                }
+            } else {
                 throw Debug.abort("illegal template", template);
             }
         }

@@ -12,8 +12,8 @@ package scalac.transformer.matching;
 import scalac.ast.Traverser;
 
 import scalac.ast.Tree;
-import Tree.Ident;
-import Tree.Bind;
+import scalac.ast.Tree.Ident;
+import scalac.ast.Tree.Bind;
 
 import scalac.util.Name;
 import scalac.util.FreshNameCreator;

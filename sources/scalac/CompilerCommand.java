@@ -165,7 +165,7 @@ public class CompilerCommand extends CommandParser {
             "assembly files", "."),
 
         this.target = new ChoiceOptionParser(this,
-            "target", "Specify which bakend to use (jvm, msil)",
+            "target", "Specify which backend to use (jvm; msil unsupported)",
             "target", Global.TARGETS, Global.TARGET_JVM),
 
         this.noimports = new BooleanOptionParser(this,

@@ -112,16 +112,16 @@ public class SymbolCloner {
 
     /** Clones the given type. */
     public Type cloneType(Type type) {
-        switch (type) {
-        case PolyType(Symbol[] tparams, Type result):
-            Symbol[] clones = cloneSymbols(tparams);
-            Type clone = Type.PolyType(clones, cloneType(result));
-            return Type.getSubst(tparams, clones).applyParams(clone);
-        case MethodType(Symbol[] vparams, Type result):
-            return Type.MethodType(cloneSymbols(vparams), cloneType(result));
-        default:
-            return type;
+        if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)type;
+            Symbol[] clones = cloneSymbols(polyType.tparams);
+            Type clone = Type.PolyType(clones, cloneType(polyType.result));
+            return Type.getSubst(polyType.tparams, clones).applyParams(clone);
+        } else if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            return Type.MethodType(cloneSymbols(methodType.vparams), cloneType(methodType.result));
         }
+        return type;
     }
 
     //########################################################################

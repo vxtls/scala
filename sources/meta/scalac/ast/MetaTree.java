@@ -48,13 +48,28 @@ public class MetaTree extends AbstractTreeExpander {
             "- introduced by: " + node.start.name,
             "- eliminated by: " + node.stop.name,
         });
-        node.printDecl(writer.print("public case "), null, false);
-        if (node.fields != null) {
-            writer.lbrace();
+        if (node.fields == null) {
+            writer.print("public static final class ").print(node.name)
+                .print(" extends Tree").lbrace();
+            writer.print("private ").print(node.name).print("()").lbrace();
+            writer.rbrace();
+            writer.rbrace();
+            writer.print("public static final ").print(node.name).print(" ")
+                .print(node.name).print(" = new ").print(node.name)
+                .println("();");
+        } else {
+            writer.print("public static class ").print(node.name)
+                .print(" extends Tree").lbrace();
+            node.printFieldDecls(writer);
+            if (node.fields.length > 0) writer.println();
+            node.printDecl(writer.print("public "), null, false).lbrace();
+            for (int i = 0; i < node.fields.length; i++) {
+                writer.println("this." + node.fields[i].name + " = " +
+                    node.fields[i].name + ";");
+            }
             writer.println("assert CheckTreeNodes.instance.checkNode(this);");
             writer.rbrace();
-        } else {
-            writer.println(";");
+            writer.rbrace();
         }
         if (node == tree.n_Empty)
             writer.print("static { " + node + ".type = Type.NoType; }");
@@ -62,25 +77,38 @@ public class MetaTree extends AbstractTreeExpander {
     }
 
     private String description(TreeKind kind) {
-        switch (kind) {
-        case Any : return "this tree is of any kind";
-        case Type: return "this tree is a type";
-        case Term: return "this tree is a term";
-        case Dual: return "this tree is a type or a term";
-        case Test: return "this tree is a type or a term " +
-                       "(determined by the kind of the name field)";
-        case None: return "this tree is neither a type nor a term";
-        default  : throw new Error(kind.getClass().getName());
+        if (kind == TreeKind.Any) {
+            return "this tree is of any kind";
         }
+        if (kind == TreeKind.Type) {
+            return "this tree is a type";
+        }
+        if (kind == TreeKind.Term) {
+            return "this tree is a term";
+        }
+        if (kind == TreeKind.Dual) {
+            return "this tree is a type or a term";
+        }
+        if (kind == TreeKind.Test) {
+            return "this tree is a type or a term " +
+                   "(determined by the kind of the name field)";
+        }
+        if (kind == TreeKind.None) {
+            return "this tree is neither a type nor a term";
+        }
+        throw new Error(kind.getClass().getName());
     }
 
     private String description(TreeSymbol symbol) {
-        switch (symbol) {
-        case NoSym           : return "this tree has no symbol";
-        case HasSym(_, false): return "this tree references a symbol";
-        case HasSym(_, true ): return "this tree defines a symbol";
-        default              : throw new Error(symbol.getClass().getName());
+        if (symbol == TreeSymbol.NoSym) {
+            return "this tree has no symbol";
         }
+        if (symbol instanceof TreeSymbol.HasSym) {
+            return ((TreeSymbol.HasSym)symbol).isDef
+                ? "this tree defines a symbol"
+                : "this tree references a symbol";
+        }
+        throw new Error(symbol.getClass().getName());
     }
 
     public void printIsKind() {
@@ -92,46 +120,41 @@ public class MetaTree extends AbstractTreeExpander {
         writer.println("/** Returns true if this tree is a " +
             kind.toString().toLowerCase() + ". */");
         writer.print("public boolean is" + kind + "()").lbrace();
-        writer.println("switch (this) {");
-
-        for (int i = 0; i < nodes.length; i++)
-            if (nodes[i].kind != TreeKind.Test && nodes[i].kind.isA(kind))
-                nodes[i].printCase(writer, true).println();
-        writer.indent().println("return true;").undent();
+        boolean hasCase = false;
+        for (int i = 0; i < nodes.length; i++) {
+            if (nodes[i].kind == TreeKind.Test || !nodes[i].kind.isA(kind))
+                continue;
+            writer.print(hasCase ? "else if (" : "if (");
+            nodes[i].printInstanceTest(writer, "this").println(")");
+            writer.indent().println("return true;").undent();
+            hasCase = true;
+        }
 
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i].kind != TreeKind.Test) continue;
-            writer.print("case " + nodes[i].name + "(");
-            for (int j = 0; j < nodes[i].fields.length; j++) {
-                if (j > 0) writer.print(", ");
-                switch (nodes[i].fields[j].type) {
-                case TreeType.Name(Test):
-                    writer.print(nodes[i].fields[j].type + " name");
-                    break;
-                default:
-                    writer.print("_");
-                    break;
-                }
-            }
-            writer.println("):");
-            writer.indent().print("return ");
-            switch (kind) {
-            case TreeKind.Type:
-                writer.print("name.isTypeName() && (symbol() == null || !symbol().isConstructor()) || name == Name.ERROR");
-                break;
-            case TreeKind.Term:
-                writer.print("name.isTermName() || (symbol() != null && symbol().isConstructor())");
-                break;
-            default:
+            TreeField field = nodes[i].getTestField();
+            writer.print(hasCase ? "else if (" : "if (");
+            nodes[i].printInstanceTest(writer, "this").print(")").lbrace();
+            writer.print(nodes[i].name).print(" node = (").print(nodes[i].name)
+                .println(")this;");
+            field.print(writer, true).print(" = node.").print(field.name)
+                .println(";");
+            writer.print("return ");
+            if (kind == TreeKind.Type) {
+                writer.print(field.name).print(".isTypeName() && (symbol() == null || !symbol().isConstructor()) || ")
+                    .print(field.name).print(" == Name.ERROR");
+            } else if (kind == TreeKind.Term) {
+                writer.print(field.name).print(".isTermName() || (symbol() != null && symbol().isConstructor())");
+            } else {
                 throw new Error("unexpected kind " + kind);
             }
-            writer.println(";").undent();
+            writer.println(";");
+            writer.rbrace();
+            hasCase = true;
         }
 
-	writer.println("default:");
+        if (hasCase) writer.println("else");
         writer.indent().println("return false;").undent();
-
-        writer.println("}");
         writer.rbrace();
         writer.println();
     }

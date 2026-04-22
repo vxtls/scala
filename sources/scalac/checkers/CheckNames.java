@@ -27,8 +27,8 @@ public class CheckNames extends Checker {
     }
 
     public void check(Tree tree) {
-	switch (tree) {
-	case ClassDef(_, Name name, _, _, _, _):
+	if (tree instanceof Tree.ClassDef) {
+	    Name name = ((Tree.ClassDef)tree).name;
 	    verify(tree,
 		   name.isTypeName(),
 		   "name kinds",
@@ -41,7 +41,6 @@ public class CheckNames extends Checker {
 		   "name kinds",
 		   "the class constructor " + Debug.show(constr)
 		   + " should have a type name");
-	    break;
 	}
     }
 }

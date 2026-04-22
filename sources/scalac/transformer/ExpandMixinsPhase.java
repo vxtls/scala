@@ -79,26 +79,27 @@ public class ExpandMixinsPhase extends Phase {
         // if (!symbol.isJava() && symbol.isClass() && !symbol.isInterface())
         //     type = getExpandedTemplate(symbol).type();
         if (symbol.isClass() && !symbol.isInterface()) {
-            switch (type) {
-            case CompoundType(Type[] parents, Scope members):
+            if (type instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)type;
+                Type[] parents = compoundType.parts;
+                Scope members = compoundType.members;
                 Type[] types = parents;
                 for (int i = 1; i < parents.length; i++) {
-                    switch (parents[i]) {
-                    case TypeRef(Type prefix, Symbol parent, Type[] args):
-                        if (parent.isInterface()) continue;
+                    if (parents[i] instanceof Type.TypeRef) {
+                        Type.TypeRef typeRef = (Type.TypeRef)parents[i];
+                        if (typeRef.sym.isInterface()) continue;
                         if (types == parents) types = Type.cloneArray(parents);
-                        parent = (Symbol)interfaces.get(parent);
+                        Symbol parent = (Symbol)interfaces.get(typeRef.sym);
                         assert parent != null: parents[i];
-                        types[i] = Type.TypeRef(prefix, parent, args);
+                        types[i] = Type.TypeRef(typeRef.pre, parent, typeRef.args);
                         continue;
-                    default:
+                    } else {
                         throw Debug.abort("illegal case", parents[i]);
                     }
                 }
                 if (types != parents)
                     type = Type.compoundType(types, members, symbol);
-                break;
-            default:
+            } else {
                 throw Debug.abort("illegal case", type);
             }
         }
@@ -143,14 +144,14 @@ public class ExpandMixinsPhase extends Phase {
 
     private class Collector extends Traverser {
         public void traverse(Tree tree) {
-            switch(tree) {
-            case ClassDef(_, _, _, _, _, Template template):
+            if (tree instanceof Tree.ClassDef) {
+                Template template = ((Tree.ClassDef)tree).impl;
                 Symbol clasz = tree.symbol();
                 if (!clasz.isInterface()) templates.put(clasz, template);
                 traverse(template.body);
                 return;
-            case PackageDef(_, Template(_, Tree[] body)):
-                traverse(body);
+            } else if (tree instanceof Tree.PackageDef) {
+                traverse(((Tree.PackageDef)tree).impl.body);
                 return;
             }
         }
@@ -171,18 +172,15 @@ public class ExpandMixinsPhase extends Phase {
                 super.apply(unit);
         }
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case ClassDef(_, _, _, _, _, _):
+            if (tree instanceof Tree.ClassDef) {
                 Symbol clasz = tree.symbol();
                 if (clasz.isInterface()) return super.transform(tree);
                 return gen.ClassDef(clasz, getExpandedTemplate(clasz));
-            case PackageDef(_, _):
+            } else if (tree instanceof Tree.PackageDef
+                       || tree instanceof Tree.Template) {
                 return super.transform(tree);
-            case Template(_, _):
-                return super.transform(tree);
-            default:
-                return tree;
             }
+            return tree;
         }
     }
 

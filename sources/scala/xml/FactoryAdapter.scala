@@ -41,6 +41,7 @@ abstract class FactoryAdapter
 
   /** Default parser name - included in JDK1.4 */
   val DEFAULT_PARSER_NAME   = "org.apache.crimson.parser.XMLReaderImpl";
+  val JDK_PARSER_NAME       = "com.sun.org.apache.xerces.internal.parsers.SAXParser";
   //val DEFAULT_PARSER_NAME   = "org.apache.xerces.parsers.SAXParser";
 
   /** Namespaces feature id (http://xml.org/sax/features/namespaces). */
@@ -80,6 +81,31 @@ abstract class FactoryAdapter
    * @return a new Text node.
    */
   def createText( text:String ):Text; // abstract
+
+  private def createXMLReader: XMLReader = {
+    try {
+      XMLReaderFactory.createXMLReader(DEFAULT_PARSER_NAME);
+    } catch {
+      case (_:Exception) => {
+        try {
+          XMLReaderFactory.createXMLReader(JDK_PARSER_NAME);
+        } catch {
+          case (_:Exception) => {
+            try {
+              XMLReaderFactory.createXMLReader();
+            } catch {
+              case (_:Exception) => {
+                System.err.println("error: Unable to instantiate parser (" +
+                                   DEFAULT_PARSER_NAME + ")");
+                System.exit(-1);
+                null:XMLReader
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 
   //
   // ContentHandler methods
@@ -278,15 +304,7 @@ abstract class FactoryAdapter
 
         // use default parser
         // create parser
-        try {
-             parser = XMLReaderFactory.createXMLReader(DEFAULT_PARSER_NAME);
-        } catch {
-	  case ( e:Exception ) => {
-            System.err.println("error: Unable to instantiate parser (" +
-                               DEFAULT_PARSER_NAME + ")");
-            System.exit(-1);
-          }
-	}
+        parser = createXMLReader;
 
         // set parser features
         try {

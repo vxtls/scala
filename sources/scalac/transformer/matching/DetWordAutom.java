@@ -1,7 +1,7 @@
 package scalac.transformer.matching ;
 
 import scalac.ast.Tree ;
-import Tree.* ;
+import scalac.ast.Tree.* ;
 
 import java.util.* ;
 
@@ -360,20 +360,19 @@ public class DetWordAutom  {
      */
     Integer delta( int i, Label label ) {
 	Integer target;
-	switch( label ) {
-	case DefaultLabel:
+	if (label == Label.DefaultLabel) {
 	    if( !hasDefault( i ) )
 		return null;
 	    return (Integer) defaultq( i ) ;
-	case SimpleLabel( _ ):
-	case TreeLabel( _ ):
+	}
+	if (label instanceof Label.SimpleLabel ||
+            label instanceof Label.TreeLabel) {
 	    return (Integer) deltaq[ i ].get( label ) ;
 	    /*case Pair( Integer state, Label lab ):
 	      return state;
 	    */
-	default:
-	    throw new ApplicationError("whut's this: label="+label+", class "+label.getClass());
 	}
+	throw new ApplicationError("whut's this: label="+label+", class "+label.getClass());
     }
 
     Integer delta( Integer i, Label label ) {
@@ -944,25 +943,34 @@ public class DetWordAutom  {
     static class Cartesian {
 	/** Int x TreeSet[ Int ]
 	 */
-	case Npair(Integer nstate, TreeSet nset);
+	public static class Npair extends Cartesian {
+	    public Integer nstate;
+	    public TreeSet nset;
+
+	    public Npair(Integer nstate, TreeSet nset) {
+		this.nstate = nstate;
+		this.nset = nset;
+	    }
+	}
 
 	public boolean equals( Object that ) {
-	    if( !(that instanceof Cartesian ))
+	    if( !(that instanceof Npair ))
 		return false;
-	    switch( this ) {
-	    case Npair( Integer nstate, TreeSet nset ):
-		switch((Cartesian) that) {
-		case Npair( Integer _nstate, TreeSet _nset ):
-		    return ((nstate == _nstate)
-			    &&( nset == _nset ));
-		}
+	    if (this instanceof Npair && that instanceof Npair) {
+		Integer nstate = ((Npair)this).nstate;
+		TreeSet nset = ((Npair)this).nset;
+		Integer _nstate = ((Npair)that).nstate;
+		TreeSet _nset = ((Npair)that).nset;
+		return ((nstate == _nstate)
+			&&( nset == _nset ));
 	    }
 	    return false;
 	}
 
 	public String toString() {
-	    switch( this ) {
-	    case Npair( Integer nstate, TreeSet nset ):
+	    if (this instanceof Npair) {
+		Integer nstate = ((Npair)this).nstate;
+		TreeSet nset = ((Npair)this).nset;
 		//Integer dstate = (Integer) indexMap.get( nset );
 		return "<n"+nstate.toString()+" in "+nset /*+" = d"+dstate*/+">";
 	    }
@@ -971,8 +979,9 @@ public class DetWordAutom  {
 
 	public String toString( HashMap indexMap ) {
 	    //assert indexMap != null;
-	    switch( this ) {
-	    case Npair( Integer nstate, TreeSet nset ):
+	    if (this instanceof Npair) {
+		Integer nstate = ((Npair)this).nstate;
+		TreeSet nset = ((Npair)this).nset;
 		assert nstate!=null;
 		Integer dstate = (Integer) indexMap.get( nset );
 		return "<n"+nstate.toString()+" in "+nset +" = d"+dstate +">";
@@ -987,19 +996,19 @@ public class DetWordAutom  {
 	public int compare( Object o1, Object o2 ) {
 	    if(( o1 instanceof Cartesian.Npair )&&
 	       ( o2 instanceof Cartesian.Npair ))
-		switch((Cartesian) o1) {
-		case Npair( Integer nstate, TreeSet nset ):
-		    switch( (Cartesian) o2 ) {
-		    case Npair( Integer _nstate, TreeSet _nset ):
-			int res = nstate.compareTo( _nstate );
+	    {
+		Integer nstate = ((Cartesian.Npair)o1).nstate;
+		TreeSet nset = ((Cartesian.Npair)o1).nset;
+		Integer _nstate = ((Cartesian.Npair)o2).nstate;
+		TreeSet _nset = ((Cartesian.Npair)o2).nset;
+		int res = nstate.compareTo( _nstate );
 
-			////System.out.println("nstate"+nstate+" <> _nstate "+ _nstate+" res"+res);
-			if( res != 0 )
-			    return res;
-			else
-			    return super.compare( nset, _nset );
-		    }
-		}
+		////System.out.println("nstate"+nstate+" <> _nstate "+ _nstate+" res"+res);
+		if( res != 0 )
+		    return res;
+		else
+		    return super.compare( nset, _nset );
+	    }
 	    throw new ApplicationError( "illegal arg. to compare. "
 					+o1.getClass()+" "+o2.getClass());
 	}

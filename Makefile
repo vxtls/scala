@@ -10,11 +10,14 @@ ROOT			 = .
 
 include $(ROOT)/Makefile.import
 
+export SCALA_JAVA_EXEC := $(JAVA)
+
 ##############################################################################
 # Variables
 
 # project sources
 PROJECT_SOURCES		+= $(LAMPLIB_SOURCES)
+PROJECT_SOURCES		+= $(FJBG_SOURCES)
 PROJECT_SOURCES		+= $(META_SOURCES)
 PROJECT_SOURCES		+= $(SCALACBOOT_SOURCES)
 PROJECT_SOURCES		+= $(SCALAC_SOURCES)
@@ -29,6 +32,7 @@ PROJECT_SOURCES		+= $(SCALATEST_SOURCES)
 # scala scripts wrapper
 SCRIPTS_PREFIX		 = $(PROJECT_BINARYDIR)
 SCRIPTS_WRAPPER		 = $(SCRIPTS_PREFIX)/.scala_wrapper
+SCRIPTS_WRAPPER_TEMPLATE	 = $(PROJECT_SOURCEDIR)/bin/.scala_wrapper.tmpl
 SCRIPTS_WRAPPER_LINKS	+= $(SCRIPTS_WRAPPER_ALIASES:%=$(SCRIPTS_PREFIX)/%)
 SCRIPTS_WRAPPER_ALIASES	+= scala
 SCRIPTS_WRAPPER_ALIASES	+= scala-debug
@@ -57,6 +61,17 @@ TUPLE_PREFIX		 = $(LIBRARY_ROOT)
 TUPLE_FILES		+= $(filter $(TUPLE_PREFIX)/Tuple%.scala,$(LIBRARY_SOURCES))
 TUPLE_TEMPLATE		 = $(TUPLE_PREFIX)/Tuple.scala.tmpl
 
+# fjbg bytecode library
+FJBG_ROOT		 = $(PROJECT_ROOT)/third_party/fjbg
+FJBG_SRC_ROOT		 = $(FJBG_ROOT)/src
+FJBG_SOURCES		+= $(wildcard $(FJBG_SRC_ROOT)/ch/epfl/lamp/fjbg/*.java)
+FJBG_SOURCES		+= $(wildcard $(FJBG_SRC_ROOT)/ch/epfl/lamp/util/*.java)
+FJBG_JC_FILES		+= $(FJBG_SOURCES)
+FJBG_JC_OUTPUTDIR	 = $(FJBG_HOME)/classes
+FJBG_JAR_ARCHIVE	 = $(FJBG_JARFILE)
+FJBG_JAR_INPUTDIR	 = $(FJBG_JC_OUTPUTDIR)
+FJBG_JAR_FILES		+= ch
+
 # lamp library
 LAMPLIB_ROOT		 = $(PROJECT_SOURCEDIR)/ch/epfl/lamp
 LAMPLIB_LIST		+= $(call READLIST,$(PROJECT_LISTDIR)/lamplib.lst)
@@ -79,7 +94,8 @@ SCALAC_ROOT		 = $(PROJECT_SOURCEDIR)/scala/tools/scalac
 SCALAC_LIST		+= $(call READLIST,$(PROJECT_LISTDIR)/scalac.lst)
 SCALAC_SOURCES		+= $(SCALAC_LIST:%=$(SCALAC_ROOT)/%)
 SCALAC_JC_FILES		+= $(SCALACBOOT_SOURCES)
-SCALAC_JC_CLASSPATH	 = $(PROJECT_CLASSPATH):$(MSIL_JARFILE):$(FJBG_JARFILE)
+SCALAC_JC_CLASSPATH	 = $(PROJECT_CLASSPATH):$(FJBG_JARFILE)
+SCALAC_JC_PREREQS	 = $(FJBG_JARFILE)
 SCALAC_SC_FILES		+= $(SCALAC_SOURCES)
 SCALAC_SC_CLASSPATH	 = $(SCALAC_JC_CLASSPATH)
 SCALAC_SC_BOOTCLASSPATH	 = $(LIBRARY_SC_BOOTCLASSPATH)
@@ -90,7 +106,7 @@ LIBRARY_ROOT		 = $(PROJECT_SOURCEDIR)/scala
 LIBRARY_LIST		+= $(call READLIST,$(PROJECT_LISTDIR)/library.lst)
 LIBRARY_SOURCES		+= $(LIBRARY_LIST:%=$(LIBRARY_ROOT)/%)
 LIBRARY_JC_FILES	+= $(filter %.java,$(LIBRARY_SOURCES))
-LIBRARY_JC_FLAGS	+= $(JC_FLAGS) -scala-hack
+LIBRARY_JC_FLAGS	+= $(JC_FLAGS)
 LIBRARY_SC_FILES	+= $(filter %.scala,$(LIBRARY_SOURCES))
 LIBRARY_SC_BOOTCLASSPATH = $(PROJECT_OUTPUTDIR):$(PROJECT_SOURCEDIR):$(JRE_JARFILE)
 LIBRARY_SDC_FLAGS	+= -windowtitle "Scala Library Documentation"
@@ -140,6 +156,7 @@ SCALA4ANT_LIST		+= AntTask.java
 SCALA4ANT_SOURCES	+= $(SCALA4ANT_LIST:%=$(SCALA4ANT_ROOT)/%)
 SCALA4ANT_JC_FILES	+= $(SCALA4ANT_SOURCES)
 SCALA4ANT_JC_CLASSPATH	 = $(PROJECT_CLASSPATH):$(ANT_JARFILE)
+SCALA4ANT_JC_PREREQS	 = $(ANT_JARFILE)
 
 # scalatest
 SCALATEST_ROOT		 = $(PROJECT_SOURCEDIR)/scala/tools/scalatest
@@ -161,8 +178,11 @@ TOOLS_JAR_FILES		+= scala/tools/scalap
 TOOLS_JAR_FILES		+= scala/tools/scalatest
 TOOLS_JAR_FILES		+= scalac
 
+# generated test outputs
+TEST_FILEDIR		 = $(PROJECT_ROOT)/test/files
+
 # java compilation
-JC_COMPILER		 = PICO
+JC_COMPILER		 = JAVAC
 JC_OUTPUTDIR		 = $(PROJECT_OUTPUTDIR)
 JC_CLASSPATH		 = $(PROJECT_CLASSPATH)
 
@@ -187,6 +207,8 @@ all		: scalatest
 force		: fastclean
 	@$(make) all
 
+fjbg		: $(FJBG_JARFILE)
+
 fastclean	:
 	$(RM) .latest-*
 	@if [ -f .generated ]; then $(call RUN,$(RM) `$(CAT) .generated`); fi
@@ -196,12 +218,27 @@ clean		: fastclean
 	$(RM) -r $(PROJECT_APIDOCDIR)
 	$(RM) -r $(PROJECT_OUTPUTDIR)
 	$(RM) -r $(PROJECT_BOOTSTRAPDIR)
+	$(RM) -r $(FJBG_JC_OUTPUTDIR)
+	$(RM) $(FJBG_JARFILE)
+	$(RM) $(SCRIPTS_WRAPPER_LINKS)
+	$(RM) $(SCRIPTS_WRAPPER)
+	@if [ -d $(TEST_FILEDIR) ]; then \
+	    test_outputs=`find $(TEST_FILEDIR) -depth \( \
+	        -type f \( \
+	            -name '*-int.log' -o \
+	            -name '*-jvm.log' -o \
+	            -name '*-pos.log' -o \
+	            -name '*-neg.log' -o \
+	            -name '*-xml.log' \
+	        \) -o \
+	        -type d -name '*.obj' \
+	    \) -print`; \
+	    if [ -n "$$test_outputs" ]; then rm -rf $$test_outputs; fi; \
+	fi
 
 distclean	: clean
 	$(RM) $(LIBRARY_JAR_ARCHIVE)
 	$(RM) $(TOOLS_JAR_ARCHIVE)
-	$(RM) $(SCRIPTS_WRAPPER_LINKS)
-	$(RM) $(SCRIPTS_WRAPPER)
 
 sources		: lamplib
 sources		: meta
@@ -219,7 +256,6 @@ bootstrap	: .latest-bootstrap
 scripts		: $(SCRIPTS_WRAPPER_LINKS)
 library		: .latest-$(boot)library-jc
 library		: .latest-$(boot)library-sc
-library-msil	: .latest-$(boot)library-sc-msil
 scalac		: .latest-$(boot)scalac-jc
 scalac		: .latest-$(boot)scalac-sc
 interpreter	: .latest-interpreter-jc
@@ -239,6 +275,7 @@ library-doc	: .latest-library-sdc
 .PHONY		: lamplib
 .PHONY		: meta
 .PHONY		: generate
+.PHONY		: fjbg
 .PHONY		: bootstrap
 .PHONY		: scripts
 .PHONY		: scalac
@@ -289,6 +326,11 @@ cvs-fix-perms		:
 ##############################################################################
 # Targets
 
+.latest-fjbg-jar	: $(FJBG_JC_FILES)
+	@$(make) jc target=FJBG FJBG_JC_FILES='$?'
+	@$(make) jar target=FJBG
+	touch $@
+
 .latest%lamplib-jc	: $(LAMPLIB_JC_FILES)
 	@$(make) jc target=LAMPLIB LAMPLIB_JC_FILES='$?'
 	touch $@
@@ -307,10 +349,18 @@ cvs-fix-perms		:
 	    meta.GenerateAll $(PROJECT_SOURCEDIR) .generated)
 	touch $@
 
-.latest-bootstrap	:
+.latest-bootstrap	: $(FJBG_JARFILE)
+.latest-bootstrap	: $(LAMPLIB_SOURCES)
+.latest-bootstrap	: $(SCALACBOOT_SOURCES)
+.latest-bootstrap	: $(LIBRARY_SOURCES)
+.latest-bootstrap	: $(SCALAC_SOURCES)
+.latest-bootstrap	: $(SCRIPTS_WRAPPER_TEMPLATE)
+.latest-bootstrap	: $(PROJECT_ROOT)/Makefile
+.latest-bootstrap	: $(PROJECT_ROOT)/Makefile.config
+.latest-bootstrap	: $(wildcard $(PROJECT_ROOT)/Makefile.private)
 	$(MKDIR) -p $(PROJECT_BOOTSTRAPDIR)
 	$(MKDIR) -p $(PROJECT_BOOTSTRAPDIR)/bin
-	$(CP) $(SCRIPTS_WRAPPER).tmpl $(PROJECT_BOOTSTRAPDIR)/bin/
+	$(CP) $(SCRIPTS_WRAPPER_TEMPLATE) $(PROJECT_BOOTSTRAPDIR)/bin/.scala_wrapper.tmpl
 	@$(make) \
 	    INSTALL_PREFIX=$(PROJECT_BOOTSTRAPDIR) \
 	    PROJECT_BINARYDIR=$(PROJECT_BOOTSTRAPDIR)/bin \
@@ -327,21 +377,20 @@ cvs-fix-perms		:
 	@$(make) jc target=SCALAC SCALAC_JC_FILES='$?'
 	touch $@
 
+.latest%scalac-jc	: $(FJBG_JARFILE)
+
+$(FJBG_JARFILE)		: .latest-fjbg-jar
+
 .latest%scalac-sc	: $(SCALAC_SC_FILES)
 	@$(make) sc target=SCALAC SCALAC_SC_FILES='$?'
 	touch $@
 
 .latest%library-jc	: $(LIBRARY_JC_FILES)
-	@$(make) jc target=LIBRARY LIBRARY_JC_FILES='$(subst $$,$$$$,$?)'
+	@$(make) jc target=LIBRARY LIBRARY_JC_FILES='$(subst $$,$$$$,$(filter %.java,$?))'
 	touch $@
 
 .latest%library-sc	: $(LIBRARY_SC_FILES)
-	@$(make) sc target=LIBRARY LIBRARY_SC_FILES='$(subst $$,$$$$,$?)'
-	touch $@
-
-.latest-$(boot)library-sc-msil	: $(LIBRARY_SC_FILES)
-	@$(make) sc target=LIBRARY SC_TARGET="msil"\
-	SC_FLAGS="-r $(PROJECT_LIBRARYDIR)" LIBRARY_SC_FILES='$(subst $$,$$$$,$?)'
+	@$(make) sc target=LIBRARY LIBRARY_SC_FILES='$(subst $$,$$$$,$(filter %.scala,$?))'
 	touch $@
 
 .latest-library-sdc	: $(LIBRARY_SDC_FILES)
@@ -395,13 +444,12 @@ $(SCRIPTS_WRAPPER)	: MACRO_RUNTIME_SOURCES   ?= $(PROJECT_SOURCEDIR)
 $(SCRIPTS_WRAPPER)	: MACRO_RUNTIME_CLASSES   ?= $(PROJECT_OUTPUTDIR)
 $(SCRIPTS_WRAPPER)	: MACRO_TOOLS_CLASSES     ?= $(PROJECT_OUTPUTDIR)
 $(SCRIPTS_WRAPPER)	: MACRO_FJBG_CLASSES      ?= $(FJBG_JARFILE)
-$(SCRIPTS_WRAPPER)	: MACRO_MSIL_CLASSES      ?= $(MSIL_JARFILE)
 $(SCRIPTS_WRAPPER)	: MACRO_JAVA_ARGS         ?= -enableassertions
 $(SCRIPTS_WRAPPER)	: $(VERSION_FILE)
 $(SCRIPTS_WRAPPER)	: $(PROJECT_ROOT)/Makefile
 $(SCRIPTS_WRAPPER)	: $(PROJECT_ROOT)/Makefile.config
-$(SCRIPTS_WRAPPER)	: $(PROJECT_ROOT)/Makefile.private
-$(SCRIPTS_WRAPPER)	: $(SCRIPTS_WRAPPER).tmpl
+$(SCRIPTS_WRAPPER)	: $(wildcard $(PROJECT_ROOT)/Makefile.private)
+$(SCRIPTS_WRAPPER)	: $(SCRIPTS_WRAPPER_TEMPLATE)
 	$(RM) $@
 	@$(ECHO) "Generating file $@ $(PROJECT_ROOT)"
 	@$(SED) \
@@ -410,9 +458,8 @@ $(SCRIPTS_WRAPPER)	: $(SCRIPTS_WRAPPER).tmpl
 	    $(call SCRIPTS_WRAPPER_MACRO,RUNTIME_CLASSES) \
 	    $(call SCRIPTS_WRAPPER_MACRO,TOOLS_CLASSES) \
 	    $(call SCRIPTS_WRAPPER_MACRO,FJBG_CLASSES) \
-	    $(call SCRIPTS_WRAPPER_MACRO,MSIL_CLASSES) \
 	    $(call SCRIPTS_WRAPPER_MACRO,JAVA_ARGS) \
-	    $@.tmpl > $@
+	    $(SCRIPTS_WRAPPER_TEMPLATE) > $@
 	@macros=`$(SED) -n -es'@.*{#\(.*\)#}.*@\1@p' < $@`; \
 	if [ -n "$$macros" ]; then \
 	    $(ECHO) "error: there are undefined macros: $$macros"; \

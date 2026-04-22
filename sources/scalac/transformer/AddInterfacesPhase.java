@@ -90,13 +90,12 @@ public class AddInterfacesPhase extends Phase {
                 // class symbols instead of interface symbols.
                 newParents = new Type[oldParents.length];
                 for (int i = 0; i < oldParents.length; ++i) {
-                    switch (oldParents[i]) {
-                    case TypeRef(Type pre, Symbol oldSym, Type[] args):
-                        newParents[i] = !needInterface(oldSym)
+                    if (oldParents[i] instanceof Type.TypeRef) {
+                        Type.TypeRef typeRef = (Type.TypeRef)oldParents[i];
+                        newParents[i] = !needInterface(typeRef.sym)
                             ? oldParents[i]
-                            : Type.typeRef(pre, getClassSymbol(oldSym), args);
-                        break;
-                    default:
+                            : Type.typeRef(typeRef.pre, getClassSymbol(typeRef.sym), typeRef.args);
+                    } else {
                         throw Debug.abort("illegal case", oldParents[i]);
                     }
                 }
@@ -104,16 +103,15 @@ public class AddInterfacesPhase extends Phase {
 
             return Type.compoundType(newParents, newMembers, sym);
         } else if (sym.isThisSym() && hasInterfaceSymbol(sym.owner())) {
-            switch (tp) {
-            case TypeRef(_, _, _):
+            if (tp instanceof Type.TypeRef) {
                 return sym.owner().nextType();
-            case CompoundType(Type[] parents, Scope members):
-                parents = Type.cloneArray(parents);
+            } else if (tp instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)tp;
+                Type[] parents = Type.cloneArray(compoundType.parts);
                 parents[parents.length - 1] = sym.owner().nextType();
-                return Type.compoundType(parents, members, tp.symbol());
-            default:
-                throw Debug.abort("illegal case", tp +" -- "+ Debug.show(sym));
+                return Type.compoundType(parents, compoundType.members, tp.symbol());
             }
+            throw Debug.abort("illegal case", tp +" -- "+ Debug.show(sym));
         } else
             return tp;
     }
@@ -132,14 +130,13 @@ public class AddInterfacesPhase extends Phase {
     }
 
     protected Type removeValueParams(Type tp) {
-        switch (tp) {
-        case MethodType(Symbol[] vparams, Type result):
-            return new Type.MethodType(Symbol.EMPTY_ARRAY, result);
-        case PolyType(Symbol[] tps, Type result):
-            return new Type.PolyType(tps, removeValueParams(result));
-        default:
-            throw Debug.abort("illegal case", tp);
+        if (tp instanceof Type.MethodType) {
+            return new Type.MethodType(Symbol.EMPTY_ARRAY, ((Type.MethodType)tp).result);
+        } else if (tp instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)tp;
+            return new Type.PolyType(polyType.tparams, removeValueParams(polyType.result));
         }
+        throw Debug.abort("illegal case", tp);
     }
 
     protected Name uniqueName(Symbol sym) {
@@ -283,12 +280,11 @@ public class AddInterfacesPhase extends Phase {
             int oldParentsCount = oldClassParents.length;
             Type[] newClassParents = new Type[oldParentsCount + 1];
             for (int i = 0; i < oldParentsCount; ++i) {
-                switch (oldClassParents[i]) {
-                case TypeRef(Type pre, Symbol sym, Type[] args):
-                    Type newTp = Type.typeRef(pre, getClassSymbol(sym), args);
+                if (oldClassParents[i] instanceof Type.TypeRef) {
+                    Type.TypeRef typeRef = (Type.TypeRef)oldClassParents[i];
+                    Type newTp = Type.typeRef(typeRef.pre, getClassSymbol(typeRef.sym), typeRef.args);
                     newClassParents[i] = classSubst.apply(newTp);
-                    break;
-                default:
+                } else {
                     throw Debug.abort("unexpected type for parent", oldClassParents[i]);
                 }
             }
