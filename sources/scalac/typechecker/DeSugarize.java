@@ -14,7 +14,7 @@ import scalac.util.*;
 import scalac.symtab.*;
 import scalac.ast.*;
 import scalac.ast.printer.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 /** A transformer for removing syntactic sugar. This transformer does
  *  not need any type or symbol-table information.
@@ -88,35 +88,36 @@ public class DeSugarize implements Kinds, Modifiers {
     /** extract variables from a pattern
      */
     void getVariables(Tree tree, ArrayList vars) {
-	switch(tree) {
-	case Ident(Name name):
+	if (tree instanceof Ident) {
+	    Name name = ((Ident)tree).name;
 	    if (name.isVariable() && name != Names.PATTERN_WILDCARD) vars.add(name);
-	    break;
-	case Typed(Tree expr, Tree type):
+	} else if (tree instanceof Typed) {
+	    Tree expr = ((Typed)tree).expr;
 	    getVariables(expr, vars);
-	    break;
-	case Apply(Tree fn, Tree[] args):
-	    switch (fn) {
-	    case Apply(_, _): getVariables(fn, vars);
+	} else if (tree instanceof Apply) {
+	    Tree fn = ((Apply)tree).fun;
+	    Tree[] args = ((Apply)tree).args;
+	    if (fn instanceof Apply) {
+		getVariables(fn, vars);
 	    }
 	    for (int i = 0; i < args.length; i++)
 		getVariables(args[i], vars);
-	    break;
-	case Sequence(Tree[] elems):
+	} else if (tree instanceof Sequence) {
+	    Tree[] elems = ((Sequence)tree).trees;
 	    for (int i = 0; i < elems.length; i++)
 		getVariables(elems[i], vars);
-	    break;
-	case Literal( _ ):
-	    break;
-	case Bind( Name name, Tree t ):
+	} else if (tree instanceof Literal) {
+	    return;
+	} else if (tree instanceof Bind) {
+	    Name name = ((Bind)tree).name;
+	    Tree t = ((Bind)tree).rhs;
 	    if (name.isVariable() && name != Names.PATTERN_WILDCARD) vars.add(name);
 	    getVariables( t, vars );
-	    break;
-	case Alternative( Tree ts[] ):
+	} else if (tree instanceof Alternative) {
+	    Tree[] ts = ((Alternative)tree).trees;
 	    for (int i = 0; i < ts.length; i++)
 		getVariables( ts[i], vars );
-	    break;
-	default:
+	} else {
 	    throw new ApplicationError ("illegal pattern", tree);
 	}
     }
@@ -126,8 +127,9 @@ public class DeSugarize implements Kinds, Modifiers {
     /**  (T_1, ..., T_N) => T  ==>  scala.FunctionN[T_1, ..., T_N, +T]
      */
     public Tree FunType(Tree tree) {
-	switch(tree) {
-	case FunType(Tree[] argtpes, Tree restpe):
+	if (tree instanceof FunType) {
+	    Tree[] argtpes = ((FunType)tree).argtpes;
+	    Tree restpe = ((FunType)tree).restpe;
 	    Tree[] types = new Tree[argtpes.length + 1];
 	    System.arraycopy(argtpes, 0, types, 0, argtpes.length);
 	    types[argtpes.length] = restpe;
@@ -136,9 +138,8 @@ public class DeSugarize implements Kinds, Modifiers {
 		    make.Ident(tree.pos, Names.scala),
 		    Name.fromString("Function" + argtpes.length).toTypeName()),
 		types);
-	default:
-	    throw new ApplicationError("function type expected", tree);
 	}
+	throw new ApplicationError("function type expected", tree);
     }
 
     public Tree mkTuple(int pos, Tree[] trees) {
@@ -155,13 +156,13 @@ public class DeSugarize implements Kinds, Modifiers {
     /** Convert method to function type.
      */
     Type meth2fun(Type tp) {
-	switch (tp) {
-	case MethodType(Symbol[] params, Type restype):
+	if (tp instanceof Type.MethodType) {
+	    Symbol[] params = ((Type.MethodType)tp).vparams;
+	    Type restype = ((Type.MethodType)tp).result;
 	    return global.definitions.FUNCTION_TYPE(
 		Symbol.type(params), meth2fun(restype));
-	default:
-	    return tp;
 	}
+	return tp;
     }
 
     /** If `pt' is a matching function type insert missing parameters
@@ -169,8 +170,9 @@ public class DeSugarize implements Kinds, Modifiers {
      *  else return AnyType.
      */
     public Type preFunction(ValDef[] vparams, Type pt) {
-	switch (pt) {
-	case TypeRef(Type pre, Symbol psym, Type[] ptargs):
+	if (pt instanceof Type.TypeRef) {
+	    Type[] ptargs = ((Type.TypeRef)pt).args;
+	    Symbol psym = ((Type.TypeRef)pt).sym;
 	    if (psym.fullName().startsWith(Names.scala_Function) &&
 		ptargs.length == vparams.length + 1) {
 		for (int i = 0; i < vparams.length; i++)
@@ -187,11 +189,13 @@ public class DeSugarize implements Kinds, Modifiers {
 	}
 
     public Tree isDefinedAtVisitor(Tree tree) {
-	switch (tree) {
-	case Visitor(CaseDef[] cases):
+	if (tree instanceof Visitor) {
+	    CaseDef[] cases = ((Visitor)tree).cases;
 	    CaseDef lastCase = cases[cases.length - 1];
-	    switch (lastCase) {
-	    case CaseDef(Ident(Name name), Tree.Empty, Tree expr):
+	    if (lastCase.pat instanceof Ident &&
+		((Ident)lastCase.pat).name.isVariable() &&
+		lastCase.guard == Tree.Empty) {
+		Name name = ((Ident)lastCase.pat).name;
 		if (name.isVariable())
 		    return make.Visitor(tree.pos,
 			new CaseDef[]{
@@ -202,24 +206,21 @@ public class DeSugarize implements Kinds, Modifiers {
 	    }
 	    CaseDef[] cases1 = new CaseDef[cases.length + 1];
 	    for (int i = 0; i < cases.length; i++) {
-		switch (cases[i]) {
-		case CaseDef(Tree pat, Tree guard, _):
-		    cases1[i] = (CaseDef) make.CaseDef(
-			cases[i].pos,
-			pat.duplicate(),
-			guard.duplicate(),
-			gen.mkBooleanLit(tree.pos, true));
+		CaseDef caseDef = cases[i];
+		cases1[i] = (CaseDef) make.CaseDef(
+		    caseDef.pos,
+		    caseDef.pat.duplicate(),
+		    caseDef.guard.duplicate(),
+		    gen.mkBooleanLit(tree.pos, true));
 		}
-	    }
 	    cases1[cases.length] = (CaseDef) make.CaseDef(
 		tree.pos,
 		gen.Ident(tree.pos, global.definitions.PATTERN_WILDCARD),
 		Tree.Empty,
 		gen.mkBooleanLit(tree.pos, false));
 	    return make.Visitor(tree.pos, cases1);
-	default:
-	    throw new ApplicationError("visitor expected", tree);
 	}
+	throw new ApplicationError("visitor expected", tree);
     }
 
     /** match => this.match
@@ -227,17 +228,19 @@ public class DeSugarize implements Kinds, Modifiers {
      *  IMPORTANT: tree is already attributed and attributes need to be preserved.
      */
     public Tree postMatch(Tree tree, Symbol currentclazz) {
-	switch (tree) {
-	case Ident(Name name):
+	if (tree instanceof Ident) {
+	    Name name = ((Ident)tree).name;
 	    return
 		make.Select(tree.pos,
 		    gen.This(tree.pos, currentclazz),
 		    name).setSymbol(tree.symbol()).setType(tree.type);
-	case TypeApply(Tree fn, Tree[] args):
-	    return copy.TypeApply(tree, postMatch(fn, currentclazz), args);
-	default:
-	    return tree;
 	}
+	if (tree instanceof TypeApply) {
+	    Tree fn = ((TypeApply)tree).fun;
+	    Tree[] args = ((TypeApply)tree).args;
+	    return copy.TypeApply(tree, postMatch(fn, currentclazz), args);
+	}
+	return tree;
     }
 
     /** { cases }   ==>   (x => x.match {cases})
@@ -245,8 +248,7 @@ public class DeSugarize implements Kinds, Modifiers {
      *  no type for parameter x
      */
     public Tree Visitor(Tree tree) {
-        switch(tree) {
-	case Visitor(CaseDef[] cases):
+        if (tree instanceof Visitor) {
 	    Name x = getvar();
 	    ValDef param = (ValDef) make.ValDef(
 		tree.pos, PARAM, x, Tree.Empty, Tree.Empty);
@@ -256,23 +258,22 @@ public class DeSugarize implements Kinds, Modifiers {
 		make.Select(tree.pos, xuse, Names.match),
 		new Tree[]{tree});
 	    return make.Function(tree.pos, new ValDef[]{param}, body);
-	default:
-	    throw new ApplicationError("visitor expected", tree);
 	}
+	throw new ApplicationError("visitor expected", tree);
     }
 
     /** e = e'   ==>   e_=(e')
      */
     public Tree Assign(int pos, Tree lhs, Tree rhs) {
 	Tree lhs1;
-	switch (lhs) {
-	case Ident(Name name):
+	if (lhs instanceof Ident) {
+	    Name name = ((Ident)lhs).name;
 	    lhs1 = make.Ident(lhs.pos, setterName(name));
-	    break;
-	case Select(Tree qual, Name name):
+	} else if (lhs instanceof Select) {
+	    Tree qual = ((Select)lhs).qualifier;
+	    Name name = ((Select)lhs).selector;
 	    lhs1 = make.Select(lhs.pos, qual, setterName(name));
-	    break;
-	default:
+	} else {
 	    throw new ApplicationError();
 	}
 	return make.Apply(pos, lhs1, new Tree[]{rhs});
@@ -281,17 +282,18 @@ public class DeSugarize implements Kinds, Modifiers {
     /** e(args) = e'  ==>  e.update(args ; e')
      */
     public Tree Update(Tree tree) {
-	switch(tree) {
-	case Assign(Apply(Tree fn, Tree[] args), Tree rhs):
+	if (tree instanceof Assign && ((Assign)tree).lhs instanceof Apply) {
+	    Tree fn = ((Apply)((Assign)tree).lhs).fun;
+	    Tree[] args = ((Apply)((Assign)tree).lhs).args;
+	    Tree rhs = ((Assign)tree).rhs;
 	    // e.update
 	    Tree update = make.Select(fn.pos, fn, Names.update);
 	    Tree[] args1 = new Tree[args.length + 1];
 	    System.arraycopy(args, 0, args1, 0, args.length);
 	    args1[args.length] = rhs;
 	    return make.Apply(tree.pos, update, args1);
-	default:
-	    throw new ApplicationError();
 	}
+	throw new ApplicationError();
     }
 
     /** make a set of trees share the same documentation comment as a
@@ -310,28 +312,24 @@ public class DeSugarize implements Kinds, Modifiers {
     public Tree[] Statements(Tree[] stats, boolean isLocal) {
 	boolean change = false;
 	for (int i = 0; i < stats.length && !change; i++) {
-	    switch (stats[i]) {
-	    case PatDef(_, _, _):
+	    if (stats[i] instanceof PatDef) {
 		change = true;
-		break;
-	    case ValDef(int mods, _, _, _):
+	    } else if (stats[i] instanceof ValDef) {
+		int mods = ((ValDef)stats[i]).mods;
 		change = !isLocal;
 	    }
 	}
 	if (change) {
 	    TreeList ts = new TreeList();
 	    for (int i = 0; i < stats.length; i++) {
-		switch (stats[i]) {
-		case PatDef(_, _, _):
+		if (stats[i] instanceof PatDef) {
 		    ts.append(Statements(this.PatDef(stats[i]), isLocal));
-		    break;
-		case ValDef(_, _, _, _):
+		} else if (stats[i] instanceof ValDef) {
 		    if (!isLocal) {
 			ts.append(this.ValDef(stats[i]));
 		    } else
 			ts.append(stats[i]);
-		    break;
-		default:
+		} else {
 		    ts.append(stats[i]);
 		}
 	    }
@@ -365,19 +363,30 @@ public class DeSugarize implements Kinds, Modifiers {
      *
      */
     public Tree[] PatDef(Tree tree) {
-	switch(tree) {
-
-	case PatDef(int mods, Ident(Name name), Tree rhs):
+	if (tree instanceof PatDef &&
+	    ((PatDef)tree).pat instanceof Ident) {
+	    int mods = ((PatDef)tree).mods;
+	    Name name = ((Ident)((PatDef)tree).pat).name;
+	    Tree rhs = ((PatDef)tree).rhs;
 	    // val x = e     ==>  val x = e
 	    return shareComment(new Tree[]{
 		make.ValDef(tree.pos, mods, name, Tree.Empty, rhs)}, tree);
-
-	case PatDef(int mods, Typed(Ident(Name name), Tree type), Tree rhs):
+	}
+	if (tree instanceof PatDef &&
+	    ((PatDef)tree).pat instanceof Typed &&
+	    ((Typed)((PatDef)tree).pat).expr instanceof Ident) {
+	    int mods = ((PatDef)tree).mods;
+	    Name name = ((Ident)((Typed)((PatDef)tree).pat).expr).name;
+	    Tree type = ((Typed)((PatDef)tree).pat).tpe;
+	    Tree rhs = ((PatDef)tree).rhs;
 	    // val x: T = e  ==> val x: T = e
 	    return shareComment(new Tree[]{
 		make.ValDef(tree.pos, mods, name, type, rhs)}, tree);
-
-	case PatDef(int mods, Tree pat, Tree rhs):
+	}
+	if (tree instanceof PatDef) {
+	    int mods = ((PatDef)tree).mods;
+	    Tree pat = ((PatDef)tree).pat;
+	    Tree rhs = ((PatDef)tree).rhs;
 	    int pos = tree.pos;
 	    ArrayList varlist = new ArrayList();
 	    getVariables(pat, varlist);
@@ -423,14 +432,16 @@ public class DeSugarize implements Kinds, Modifiers {
 		print(pat, "patdef", new Block(res));//debug
 		return shareComment(res, tree);
 	    }
-	default:
-	    throw new ApplicationError("pattern definition expected", tree);
 	}
+	throw new ApplicationError("pattern definition expected", tree);
     }
 
     public Tree[] ValDef(Tree tree) {
-	switch (tree) {
-	case ValDef(int mods, Name name, Tree tpe, Tree rhs):
+	if (tree instanceof ValDef) {
+	    int mods = ((ValDef)tree).mods;
+	    Name name = ((ValDef)tree).name;
+	    Tree tpe = ((ValDef)tree).tpe;
+	    Tree rhs = ((ValDef)tree).rhs;
 	    Name valname = Name.fromString(name + "$");
 	    Tree valdef1 = copy.ValDef(
 		tree, (mods & (DEFERRED | MUTABLE | CASEACCESSOR | MODUL)) | PRIVATE,
@@ -462,9 +473,8 @@ public class DeSugarize implements Kinds, Modifiers {
 		if ((mods1 & DEFERRED) != 0) return shareComment(new Tree[]{getter, setter}, tree);
 		else return shareComment(new Tree[]{valdef1, getter, setter}, tree);
 	    }
-	default:
-	    throw new ApplicationError();
 	}
+	throw new ApplicationError();
     }
 
     /** Expand partial function applications of type `type'.
@@ -496,23 +506,25 @@ public class DeSugarize implements Kinds, Modifiers {
      *  of the function application `tree'
      */
     public Tree liftoutPrefix(Tree tree, TreeList defs) {
-	switch (tree) {
-	case Ident(_):
+	if (tree instanceof Ident) {
 	    return tree;
-
-	case Select(Tree qual, _):
+	}
+	if (tree instanceof Select) {
+	    Tree qual = ((Select)tree).qualifier;
 	    return copy.Select(tree, liftout(qual, defs)).setType(null);
-
-	case TypeApply(Tree fn, Tree[] args):
+	}
+	if (tree instanceof TypeApply) {
+	    Tree fn = ((TypeApply)tree).fun;
+	    Tree[] args = ((TypeApply)tree).args;
 	    return copy.TypeApply(tree, liftoutPrefix(fn, defs), args).setType(null);
-
-	case Apply(Tree fn, Tree[] args):
+	}
+	if (tree instanceof Apply) {
+	    Tree fn = ((Apply)tree).fun;
+	    Tree[] args = ((Apply)tree).args;
 	    return copy.Apply(tree, liftoutPrefix(fn, defs), liftout(args, defs))
 		.setType(null);
-
-	default:
-	    throw new ApplicationError();
 	}
+	throw new ApplicationError();
     }
 
     public Tree[] liftout(Tree[] trees, TreeList defs) {
@@ -547,8 +559,8 @@ public class DeSugarize implements Kinds, Modifiers {
      */
 
       public Tree IdentPattern( Tree tree ) {
-            switch( tree ) {
-            case Ident( Name name ):
+            if (tree instanceof Ident) {
+                Name name = ((Ident)tree).name;
 		if( name == Names.PATTERN_WILDCARD )
                     throw new ApplicationError("nothing to desugarize");
 		return make.Bind( tree.pos,
@@ -556,9 +568,8 @@ public class DeSugarize implements Kinds, Modifiers {
 				  gen.Ident( tree.pos,
                                              global.definitions.PATTERN_WILDCARD ))
                     .setType( tree.type );
-            default:
-		throw new ApplicationError("ident expected");
             }
+	    throw new ApplicationError("ident expected");
       }
 
     /**  in patterns x:T  => x @ _ : T
@@ -567,43 +578,43 @@ public class DeSugarize implements Kinds, Modifiers {
      */
 
     public Tree TypedPattern( Tree.Typed t ) {
-        switch( t ) {
-        case Typed(Ident(Name name), Tree tpe):
+        if (t.expr instanceof Ident) {
+            Name name = ((Ident)t.expr).name;
+            Tree tpe = t.tpe;
             return make.Bind(t.pos,
                              name,
                              make.Typed(t.pos,
                                         gen.Ident( t.pos,
                                                    global.definitions.PATTERN_WILDCARD ),
                                         tpe));
-        default:
-            throw new ApplicationError("unexpected Typed node");
         }
+        throw new ApplicationError("unexpected Typed node");
     }
 
 
     /** f, (syms_1)...(syms_n)T    ==>    f(ps_1)...(ps_n)
      */
     Tree toApply(Tree tree, Type type) {
-	switch(type) {
-	case MethodType(Symbol[] vparams, Type restpe):
+	if (type instanceof Type.MethodType) {
+	    Symbol[] vparams = ((Type.MethodType)type).vparams;
+	    Type restpe = ((Type.MethodType)type).result;
 	    Tree res = make.Apply(tree.pos, tree, toIdents(vparams));
 	    return toApply(res, restpe);
-	default:
-	    return tree;
 	}
+	return tree;
     }
 
     /** e, (syms_1)...(syms_n)T    ==>    (ps_1 => ... => ps_n => e)
      */
     Tree toFunction(Tree tree, Type type) {
-	switch(type) {
-	case MethodType(Symbol[] vparams, Type restpe):
+	if (type instanceof Type.MethodType) {
+	    Symbol[] vparams = ((Type.MethodType)type).vparams;
+	    Type restpe = ((Type.MethodType)type).result;
 	    return //this.Function(
 		make.Function(tree.pos, toVparams(vparams), toFunction(tree, restpe));
 	    //restpe);
-	default:
-	    return tree;
 	}
+	return tree;
     }
 
     /** Extract value parameters from type.

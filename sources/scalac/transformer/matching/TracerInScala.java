@@ -3,7 +3,7 @@ package scalac.transformer.matching ;
 import scalac.*;
 import scalac.ast.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 import scalac.util.Name;
 import scalac.util.Names;
 
@@ -30,4 +30,3 @@ public class TracerInScala extends Autom2Scala {
     }
 
 }
-

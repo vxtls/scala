@@ -14,8 +14,8 @@ import scalac.*;
 import scalac.util.*;
 import ch.epfl.lamp.util.Position;
 import scalac.symtab.*;
-import Symbol.*;
-import Type.*;
+import scalac.symtab.Symbol.*;
+import scalac.symtab.Type.*;
 
 public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 
@@ -211,34 +211,36 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 		break;
 	    default:
 		assert isSymbolEntry(n) : n;
-		Name name = readNameRef();
+		Name symName = readNameRef();
 		if (global.debug)
-		    global.log("reading " + name + " at " + n);
+		    global.log("reading " + symName + " at " + n);
 		owner = readSymbolRef();
 		if (entries[n] == null) {
 		    int flags = readNat();
 		    int inforef = readNat();
 		    switch (tag) {
-		    case TYPEsym:
+		    case TYPEsym: {
 			entries[n] = sym = new AbsTypeSymbol(
-			    Position.NOPOS, name, owner, flags);
+			    Position.NOPOS, symName, owner, flags);
 			sym.setFirstInfo(getType(inforef));
 			sym.setLoBound(readTypeRef());
 			break;
+		    }
 
-		    case ALIASsym:
+		    case ALIASsym: {
 			entries[n] = sym = new AliasTypeSymbol(
-			    Position.NOPOS, name, owner, flags);
+			    Position.NOPOS, symName, owner, flags);
 			sym.setFirstInfo(getType(inforef));
 			Symbol constr = readSymbolRef();
 			break;
+		    }
 
-		    case CLASSsym:
+		    case CLASSsym: {
 			entries[n] = sym = new ClassSymbol(
-			    Position.NOPOS, name, owner, flags);
+			    Position.NOPOS, symName, owner, flags);
 			Symbol clr = ((flags & MODUL) == 0) ? classroot
 			    : moduleroot.moduleClass();
-			if (name == clr.name && owner == clr.owner()) {
+			if (symName == clr.name && owner == clr.owner()) {
 			    if (global.debug) global.log("overwriting " + clr);
 			    sym.copyTo(clr);
 			    entries[n] = sym = clr;
@@ -251,24 +253,25 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 			for (int i = 0; i < alts.length; i++)
 			    ((TermSymbol)alts[i]).makeConstructor((ClassSymbol)sym);
 			break;
+		    }
 
-		    case VALsym:
+		    case VALsym: {
 			if (bp < end) {
 			    Symbol tsym = readSymbolRef();
-			    if (name == Names.CONSTRUCTOR) {
+			    if (symName == Names.CONSTRUCTOR) {
 				entries[n] = sym = tsym.allConstructors();
 				sym.flags = flags;
 			    } else {
-				assert (flags & MODUL) != 0 : name;
+				assert (flags & MODUL) != 0 : symName;
 				entries[n] = sym = new TermSymbol(
-				    Position.NOPOS, name, owner, flags)
+				    Position.NOPOS, symName, owner, flags)
 				    .makeModule((ClassSymbol) tsym);
 			    }
 			} else {
 			    entries[n] = sym = new TermSymbol(
-				Position.NOPOS, name, owner, flags);
+				Position.NOPOS, symName, owner, flags);
 			}
-			if (name == moduleroot.name && owner == moduleroot.owner()) {
+			if (symName == moduleroot.name && owner == moduleroot.owner()) {
 			    if (global.debug)
 				global.log("overwriting " + moduleroot);
 			    sym.copyTo(moduleroot);
@@ -277,6 +280,7 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 			Type tp = getType(inforef);
 			sym.setFirstInfo(tp.setOwner(sym));
 			break;
+		    }
 
 		    default:
 			throw new BadSignature(this);
@@ -328,30 +332,33 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 	    case NOtpe:
 		tpe = Type.NoType;
 		break;
-	    case THIStpe:
+	    case THIStpe: {
 		Symbol sym = readSymbolRef();
 		tpe = (sym.kind == NONE) ? Type.localThisType
 		    : Type.ThisType(sym);
 		break;
+	    }
 	    case SINGLEtpe:
 		tpe = Type.singleType(readTypeRef(), readSymbolRef());
 		break;
-	    case CONSTANTtpe:
+	    case CONSTANTtpe: {
 		Type base = readTypeRef();
 		Object value = readValueRef(base);
 		tpe = new Type.ConstantType(base, value);
 		break;
+	    }
 	    case TYPEREFtpe:
 		tpe = Type.TypeRef(
 		    readTypeRef(), readSymbolRef(), readTypeRefs(end));
 		break;
-	    case COMPOUNDtpe:
+	    case COMPOUNDtpe: {
 		Symbol[] clazzs = readSymbolRefs(end);
                 assert clazzs.length == 1;
 		Type[] parents = readTypeRefs(end);
                 tpe = Type.compoundType(parents, new Scope(), clazzs[0]);
 		break;
-	    case METHODtpe:
+	    }
+	    case METHODtpe: {
 		Type restype = readTypeRef();
 		int bp1 = bp;
 		Type[] argtypes = readTypeRefs(end);
@@ -367,11 +374,13 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 		}
 		tpe = Type.MethodType(params, restype);
 		break;
-	    case POLYtpe:
+	    }
+	    case POLYtpe: {
 		Type restype = readTypeRef();
 		tpe = Type.PolyType(readSymbolRefs(end), restype);
 		break;
-	    case OVERLOADEDtpe:
+	    }
+	    case OVERLOADEDtpe: {
 		int bp0 = bp;
 		Symbol[] alts = readSymbolRefs(end);
 		int bp1 = bp;
@@ -383,6 +392,7 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 		    alttypes[i] = alttypes[i].setOwner(alts[i]);
 		tpe = Type.OverloadedType(alts, alttypes);
 		break;
+	    }
 	    case FLAGGEDtpe:
 		readNat(); // skip flags
 		tpe = readTypeRef();
@@ -459,30 +469,34 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
     }
 
     Object readValueRef(Type base) {
-	switch (base.unbox()) {
-	case UnboxedType(BYTE):
-	    return new Byte((byte)readNumberRef());
-	case UnboxedType(SHORT):
-	    return new Short((short)readNumberRef());
-	case UnboxedType(INT):
-	    return new Integer((int)readNumberRef());
-	case UnboxedType(CHAR):
-	    return new Character((char)readNumberRef());
-	case UnboxedType(LONG):
-	    return new Long(readNumberRef());
-	case UnboxedType(FLOAT):
-	    return new Float(Float.intBitsToFloat((int)readNumberRef()));
-	case UnboxedType(DOUBLE):
-	    return new Float(Double.longBitsToDouble(readNumberRef()));
-	case UnboxedType(BOOLEAN):
-	    return new Boolean(readNumberRef() == 0 ? false : true);
-	default:
-	    if (base.symbol() == Global.instance.definitions.JAVA_STRING_CLASS)
-		return readNameRef().toString();
-	    else
-		throw new ApplicationError("bad constant base type: " + base);
+	Type unboxed = base.unbox();
+	if (unboxed instanceof Type.UnboxedType) {
+	    switch (((Type.UnboxedType)unboxed).tag) {
+	    case BYTE:
+		return new Byte((byte)readNumberRef());
+	    case SHORT:
+		return new Short((short)readNumberRef());
+	    case INT:
+		return new Integer((int)readNumberRef());
+	    case CHAR:
+		return new Character((char)readNumberRef());
+	    case LONG:
+		return new Long(readNumberRef());
+	    case FLOAT:
+		return new Float(Float.intBitsToFloat((int)readNumberRef()));
+	    case DOUBLE:
+		return new Double(Double.longBitsToDouble(readNumberRef()));
+	    case BOOLEAN:
+		return new Boolean(readNumberRef() != 0);
+	    default:
+		break;
+	    }
 	}
-    }
+	if (base.symbol() == Global.instance.definitions.JAVA_STRING_CLASS)
+	    return readNameRef().toString();
+	else
+	    throw new ApplicationError("bad constant base type: " + base);
+	}
 
     public static class BadSignature extends java.lang.Error {
 	public BadSignature(UnPickle outer, String msg) {
@@ -559,4 +573,3 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 	}
     }
 }
-

@@ -11,17 +11,11 @@
 
 package scala;
 
-/** @meta class [?T] extends java.lang.Object;
- */
-public class Ref extends java.lang.Object {
+public class Ref<T> extends java.lang.Object {
 
-    /** @meta field ?T;
-     */
-    public java.lang.Object elem = null;
+    public T elem = null;
 
-    /** @meta constr (?T);
-     */
-    public Ref(java.lang.Object x) {
+    public Ref(T x) {
 	elem = x;
     }
 }

@@ -1425,12 +1425,12 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 	if (pt.symbol() == definitions.UNIT_CLASS) {
 	  return gen.Block(NewArray.Tree(tree, gen.mkUnitLit(tree.pos)));
 	} else if (infer.isCompatible(tree.getType(), pt)) {
-	  val coerceMeth: Symbol = tree.getType().lookup(Names.coerce);
+	  val coerceMeth: Symbol = infer.coerceMethod(tree.getType(), pt);
 	  if (coerceMeth != Symbol.NONE) {
 	    val coerceType: Type = checkAccessible(
 	      tree.pos, coerceMeth, tree.getType().memberType(coerceMeth),
 	      tree, tree.getType());
-	    val tree1 = make.Select(tree.pos, tree, Names.coerce)
+	    val tree1 = make.Select(tree.pos, tree, coerceMeth.name)
 	    .setSymbol(coerceMeth)
 	    .setType(coerceType);
 	    return adapt(tree1, mode, pt);

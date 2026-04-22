@@ -99,30 +99,113 @@ public class TextTreePrinter implements TreePrinter {
     }
 
     public static class SymbolUsage {
-        public case Definition;
-        public case Use;
+        private SymbolUsage() {
+        }
+
+        public static final SymbolUsage Definition = new SymbolUsage();
+        public static final SymbolUsage Use = new SymbolUsage();
     }
 
-    public static class Text {
-        public case None;
-        public case Space;
-        public case Newline;
-        public case Simple(String str);
-        public case Literal(String str);
-        public case Keyword(String name);
-        public case Identifier(Symbol symbol, Name name, SymbolUsage usage);
-        public case Sequence(Text[] elements);
+    public static abstract class Text {
+        private Text() {
+        }
+
+        public static final class SimpleText extends Text {
+            public final String str;
+
+            public SimpleText(String str) {
+                this.str = str;
+            }
+        }
+
+        public static final class LiteralText extends Text {
+            public final String str;
+
+            public LiteralText(String str) {
+                this.str = str;
+            }
+        }
+
+        public static final class KeywordText extends Text {
+            public final String name;
+
+            public KeywordText(String name) {
+                this.name = name;
+            }
+        }
+
+        public static final class IdentifierText extends Text {
+            public final Symbol symbol;
+            public final Name name;
+            public final SymbolUsage usage;
+
+            public IdentifierText(Symbol symbol, Name name, SymbolUsage usage) {
+                this.symbol = symbol;
+                this.name = name;
+                this.usage = usage;
+            }
+        }
+
+        public static final class SequenceText extends Text {
+            public final Text[] elements;
+
+            public SequenceText(Text[] elements) {
+                this.elements = elements;
+            }
+        }
+
+        private static final class NoneText extends Text {
+        }
+
+        private static final class SpaceText extends Text {
+        }
+
+        private static final class NewlineText extends Text {
+        }
+
+        public static final Text None = new NoneText();
+        public static final Text Space = new SpaceText();
+        public static final Text Newline = new NewlineText();
+
+        public static Text Simple(String str) {
+            return new SimpleText(str);
+        }
+
+        public static Text Literal(String str) {
+            return new LiteralText(str);
+        }
+
+        public static Text Keyword(String name) {
+            return new KeywordText(name);
+        }
+
+        public static Text Identifier(Symbol symbol, Name name, SymbolUsage usage) {
+            return new IdentifierText(symbol, name, usage);
+        }
+
+        public static Text Sequence(Text[] elements) {
+            return new SequenceText(elements);
+        }
     }
 
     protected void print(Text text) {
-        switch (text) {
-        case None : break;
-        case Space : printString(" "); break;
-        case Newline : printNewLine(); break;
-        case Simple(String str) : printString(str); break;
-        case Literal(String str) : printString(str); break;
-        case Keyword(String name) : printString(name); break;
-        case Identifier(Symbol sym, Name name, SymbolUsage usage) :
+        if (text == Text.None) {
+            return;
+        } else if (text == Text.Space) {
+            printString(" ");
+        } else if (text == Text.Newline) {
+            printNewLine();
+        } else if (text instanceof Text.SimpleText) {
+            printString(((Text.SimpleText) text).str);
+        } else if (text instanceof Text.LiteralText) {
+            printString(((Text.LiteralText) text).str);
+        } else if (text instanceof Text.KeywordText) {
+            printString(((Text.KeywordText) text).name);
+        } else if (text instanceof Text.IdentifierText) {
+            Text.IdentifierText identifier = (Text.IdentifierText) text;
+            Symbol sym = identifier.symbol;
+            Name name = identifier.name;
+            SymbolUsage usage = identifier.usage;
             if (sym != null) {
                 if (usage == SymbolUsage.Use)
                     printString(sym.simpleName().toString());
@@ -133,8 +216,8 @@ public class TextTreePrinter implements TreePrinter {
             } else {
                 printString(name.toString());
             }
-            break;
-        case Sequence(Text[] elements) : print(elements); break;
+        } else if (text instanceof Text.SequenceText) {
+            print(((Text.SequenceText) text).elements);
         }
     }
 
@@ -245,320 +328,248 @@ public class TextTreePrinter implements TreePrinter {
     }
 
     public TreePrinter print(Tree tree) {
-        switch (tree) {
-        case Bad():
+        if (tree instanceof Tree.Bad) {
             print(TXT_ERROR);
-            break;
-
-        case Empty:
+        } else if (tree == Tree.Empty) {
             print(TXT_EMPTY);
-            break;
-
-        case ClassDef(int mods, // :
-                      Name name,
-                      Tree.AbsTypeDef[] tparams,
-                      Tree.ValDef[][] vparams,
-                      Tree tpe,
-                      Tree.Template impl):
-            printModifiers(mods);
-            print((mods & Modifiers.INTERFACE) != 0
-                  ? KW_INTERFACE
-                  : KW_CLASS);
+        } else if (tree instanceof Tree.ClassDef) {
+            Tree.ClassDef classDef = (Tree.ClassDef) tree;
+            printModifiers(classDef.mods);
+            print((classDef.mods & Modifiers.INTERFACE) != 0 ? KW_INTERFACE : KW_CLASS);
             print(Text.Space);
-            printSymbolDefinition(tree.symbol(), name);
-            printParams(tparams);
-            printParams(vparams);
-            printOpt(TXT_COLON, tpe, false);
-            printTemplate(tree.symbol(), KW_EXTENDS, impl, true);
-            break;
-
-        case PackageDef(Tree packaged, Tree.Template impl):
+            printSymbolDefinition(tree.symbol(), classDef.name);
+            printParams(classDef.tparams);
+            printParams(classDef.vparams);
+            printOpt(TXT_COLON, classDef.tpe, false);
+            printTemplate(tree.symbol(), KW_EXTENDS, classDef.impl, true);
+        } else if (tree instanceof Tree.PackageDef) {
+            Tree.PackageDef packageDef = (Tree.PackageDef) tree;
             print(KW_PACKAGE);
             print(Text.Space);
-            print(packaged);
-            printTemplate(null, KW_WITH, impl, true);
-            break;
-
-        case ModuleDef(int mods, // :
-                       Name name,
-                       Tree tpe,
-                       Tree.Template impl):
-            printModifiers(mods);
+            print(packageDef.packaged);
+            printTemplate(null, KW_WITH, packageDef.impl, true);
+        } else if (tree instanceof Tree.ModuleDef) {
+            Tree.ModuleDef moduleDef = (Tree.ModuleDef) tree;
+            printModifiers(moduleDef.mods);
             print(KW_OBJECT);
             print(Text.Space);
-            printSymbolDefinition(tree.symbol(), name);
-            printOpt(TXT_COLON, tpe, false);
-            printTemplate(null, KW_EXTENDS, impl, true);
-            break;
-
-        case ValDef(int mods, Name name, Tree tpe, Tree rhs):
-            printModifiers(mods);
-            if ((mods & Modifiers.MUTABLE) != 0) print(KW_VAR);
+            printSymbolDefinition(tree.symbol(), moduleDef.name);
+            printOpt(TXT_COLON, moduleDef.tpe, false);
+            printTemplate(null, KW_EXTENDS, moduleDef.impl, true);
+        } else if (tree instanceof Tree.ValDef) {
+            Tree.ValDef valDef = (Tree.ValDef) tree;
+            printModifiers(valDef.mods);
+            if ((valDef.mods & Modifiers.MUTABLE) != 0) print(KW_VAR);
             else {
-                if ((mods & Modifiers.MODUL) != 0) print(TXT_OBJECT_COMMENT);
+                if ((valDef.mods & Modifiers.MODUL) != 0) print(TXT_OBJECT_COMMENT);
                 print(KW_VAL);
             }
             print(Text.Space);
-            printSymbolDefinition(tree.symbol(), name);
-            printOpt(TXT_COLON, tpe, false);
-            if ((mods & Modifiers.DEFERRED) == 0) {
+            printSymbolDefinition(tree.symbol(), valDef.name);
+            printOpt(TXT_COLON, valDef.tpe, false);
+            if ((valDef.mods & Modifiers.DEFERRED) == 0) {
                 print(Text.Space); print(TXT_EQUAL); print(Text.Space);
-                if (rhs == Tree.Empty) print("_");
-                else print(rhs);
+                if (valDef.rhs == Tree.Empty) print("_");
+                else print(valDef.rhs);
             }
-            break;
-
-        case PatDef(int mods, Tree pat, Tree rhs):
-            printModifiers(mods);
+        } else if (tree instanceof Tree.PatDef) {
+            Tree.PatDef patDef = (Tree.PatDef) tree;
+            printModifiers(patDef.mods);
             print(KW_VAL);
             print(Text.Space);
-            print(pat);
-            printOpt(TXT_EQUAL, rhs, true);
-            break;
-
-        case DefDef(int mods,
-		    Name name,
-		    Tree.AbsTypeDef[] tparams,
-		    Tree.ValDef[][] vparams,
-		    Tree tpe,
-		    Tree rhs):
-	    printModifiers(mods);
+            print(patDef.pat);
+            printOpt(TXT_EQUAL, patDef.rhs, true);
+        } else if (tree instanceof Tree.DefDef) {
+            Tree.DefDef defDef = (Tree.DefDef) tree;
+            printModifiers(defDef.mods);
             print(KW_DEF);
             print(Text.Space);
-            if (name.isTypeName()) print(KW_THIS);
-            else printSymbolDefinition(tree.symbol(), name);
-            printParams(tparams);
-            printParams(vparams);
-            printOpt(TXT_COLON, tpe, false);
-            printOpt(TXT_EQUAL, rhs, true);
-            break;
-
-            case AbsTypeDef(int mods,
-                            Name name,
-                            Tree rhs,
-                            Tree lobound):
-                printModifiers(mods);
+            if (defDef.name.isTypeName()) print(KW_THIS);
+            else printSymbolDefinition(tree.symbol(), defDef.name);
+            printParams(defDef.tparams);
+            printParams(defDef.vparams);
+            printOpt(TXT_COLON, defDef.tpe, false);
+            printOpt(TXT_EQUAL, defDef.rhs, true);
+        } else if (tree instanceof Tree.AbsTypeDef) {
+            Tree.AbsTypeDef absTypeDef = (Tree.AbsTypeDef) tree;
+            printModifiers(absTypeDef.mods);
             print(KW_TYPE);
             print(Text.Space);
-            printSymbolDefinition(tree.symbol(), name);
-            printBounds(lobound, rhs);
-            break;
-
-            case AliasTypeDef(int mods,
-                              Name name,
-                              Tree.AbsTypeDef[] tparams,
-                              Tree rhs):
-                printModifiers(mods);
+            printSymbolDefinition(tree.symbol(), absTypeDef.name);
+            printBounds(absTypeDef.lobound, absTypeDef.rhs);
+        } else if (tree instanceof Tree.AliasTypeDef) {
+            Tree.AliasTypeDef aliasTypeDef = (Tree.AliasTypeDef) tree;
+            printModifiers(aliasTypeDef.mods);
             print(KW_TYPE);
             print(Text.Space);
-            printSymbolDefinition(tree.symbol(), name);
-            printParams(tparams);
-            printOpt(TXT_EQUAL, rhs, true);
-            break;
-
-        case Import(Tree expr, Name[] selectors):
+            printSymbolDefinition(tree.symbol(), aliasTypeDef.name);
+            printParams(aliasTypeDef.tparams);
+            printOpt(TXT_EQUAL, aliasTypeDef.rhs, true);
+        } else if (tree instanceof Tree.Import) {
+            Tree.Import importTree = (Tree.Import) tree;
+            Name[] selectors = importTree.selectors;
             print(KW_IMPORT);
             print(Text.Space);
-            print(expr);
+            print(importTree.expr);
             print(TXT_DOT);
             print(TXT_LEFT_BRACE);
             for (int i = 0; i < selectors.length; i = i + 2) {
                 if (i > 0) print(TXT_COMMA_SP);
                 print(selectors[i].toString());
-                if (i + 1 < selectors.length && selectors[i] != selectors[i+1]) {
+                if (i + 1 < selectors.length && selectors[i] != selectors[i + 1]) {
                     print(TXT_RIGHT_ARROW);
-                    print(selectors[i+1].toString());
+                    print(selectors[i + 1].toString());
                 }
             }
             print(TXT_RIGHT_BRACE);
-            break;
-
-        case CaseDef(Tree pat, Tree guard, Tree body):
+        } else if (tree instanceof Tree.CaseDef) {
+            Tree.CaseDef caseDef = (Tree.CaseDef) tree;
             print(KW_CASE);
             print(Text.Space);
-            print(pat);
-            printOpt(KW_IF, guard, true);
+            print(caseDef.pat);
+            printOpt(KW_IF, caseDef.guard, true);
             print(Text.Space);
             print(TXT_RIGHT_ARROW);
             print(Text.Space);
-            print(body);
-            break;
-
-        case LabelDef(Name name, Tree.Ident[] params, Tree rhs):
-            printSymbolDefinition(tree.symbol(), name);
-            printArray(params, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_COMMA_SP);
-            print(rhs);
-            break;
-
-        case Block(Tree[] stats):
-            printArray(stats, TXT_BLOCK_BEGIN, TXT_BLOCK_END, TXT_BLOCK_SEP);
+            print(caseDef.body);
+        } else if (tree instanceof Tree.LabelDef) {
+            Tree.LabelDef labelDef = (Tree.LabelDef) tree;
+            printSymbolDefinition(tree.symbol(), labelDef.name);
+            printArray(labelDef.params, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_COMMA_SP);
+            print(labelDef.rhs);
+        } else if (tree instanceof Tree.Block) {
+            printArray(((Tree.Block) tree).stats, TXT_BLOCK_BEGIN, TXT_BLOCK_END, TXT_BLOCK_SEP);
             printType(tree);
-            break;
-
-        case Sequence(Tree[] trees): // sure ? was Tuple before...
-            printArray(trees, TXT_LEFT_BRACKET, TXT_RIGHT_BRACKET, TXT_COMMA_SP);
-            break;
-
-            /*
-              case Subsequence(Tree[] trees):
-              if( trees.length > 0 )
-              printArray(trees, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_COMMA_SP);
-              else
-              {
-              print( TXT_LEFT_PAREN );
-              print( TXT_COMMA );
-              print( TXT_RIGHT_PAREN );
-              }
-              break;
-            */
-        case Alternative(Tree[] trees):
-            printArray(trees, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_BAR_SP);
-            break;
-
-        case Bind(Name name, Tree t):
-            printSymbolDefinition(tree.symbol(), name);
+        } else if (tree instanceof Tree.Sequence) {
+            printArray(((Tree.Sequence) tree).trees, TXT_LEFT_BRACKET, TXT_RIGHT_BRACKET, TXT_COMMA_SP);
+        } else if (tree instanceof Tree.Alternative) {
+            printArray(((Tree.Alternative) tree).trees, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_BAR_SP);
+        } else if (tree instanceof Tree.Bind) {
+            Tree.Bind bind = (Tree.Bind) tree;
+            printSymbolDefinition(tree.symbol(), bind.name);
             print(Text.Space);
             print(TXT_AT);
             print(Text.Space);
             print(TXT_LEFT_PAREN);
-            print( t );
+            print(bind.rhs);
             print(TXT_RIGHT_PAREN);
             printType(tree);
-            break;
-
-        case Visitor(Tree.CaseDef[] cases):
-            printArray(cases, TXT_BLOCK_BEGIN, TXT_BLOCK_END, Text.Newline);
-            break;
-
-        case Function(Tree.ValDef[] vparams, Tree body):
+        } else if (tree instanceof Tree.Visitor) {
+            printArray(((Tree.Visitor) tree).cases, TXT_BLOCK_BEGIN, TXT_BLOCK_END, Text.Newline);
+        } else if (tree instanceof Tree.Function) {
+            Tree.Function function = (Tree.Function) tree;
             print(TXT_LEFT_PAREN);
-            printParams(vparams);
+            printParams(function.vparams);
             print(Text.Space);
             print(TXT_RIGHT_ARROW);
             print(Text.Space);
-            print(body);
+            print(function.body);
             print(TXT_RIGHT_PAREN);
-            break;
-
-        case Assign(Tree lhs, Tree rhs):
-            print(lhs);
+        } else if (tree instanceof Tree.Assign) {
+            Tree.Assign assign = (Tree.Assign) tree;
+            print(assign.lhs);
             print(Text.Space);
             print(TXT_EQUAL);
             print(Text.Space);
-            print(rhs);
-            break;
-
-        case If(Tree cond, Tree thenp, Tree elsep):
+            print(assign.rhs);
+        } else if (tree instanceof Tree.If) {
+            Tree.If ifTree = (Tree.If) tree;
             print(KW_IF);
             print(Text.Space);
             print(TXT_LEFT_PAREN);
-            print(cond);
+            print(ifTree.cond);
             print(TXT_RIGHT_PAREN);
             indent(); print(Text.Newline);
-            print(thenp);
+            print(ifTree.thenp);
             undent(); print(Text.Newline);
-            indent(); printOpt(TXT_ELSE_NL, elsep, false); undent();
+            indent(); printOpt(TXT_ELSE_NL, ifTree.elsep, false); undent();
             printType(tree);
-            break;
-
-        case Switch(Tree expr, int[] tags, Tree[] bodies, Tree defaultBody):
+        } else if (tree instanceof Tree.Switch) {
+            Tree.Switch switchTree = (Tree.Switch) tree;
             print("<switch>");
             print(Text.Space);
             print(TXT_LEFT_PAREN);
-            print(expr);
+            print(switchTree.test);
             print(TXT_RIGHT_PAREN);
             print(Text.Space);
             indent();
             print(TXT_BLOCK_BEGIN);
-            for (int i = 0; i < tags.length; i++) {
+            for (int i = 0; i < switchTree.tags.length; i++) {
                 print(KW_CASE);
                 print(Text.Space);
-                print("" + tags[i]);
+                print("" + switchTree.tags[i]);
                 print(Text.Space);
                 print(TXT_RIGHT_ARROW);
                 print(Text.Space);
-                print(bodies[i]);
+                print(switchTree.bodies[i]);
                 print(Text.Newline);
             }
             print("<default> => ");
-            print(defaultBody);
+            print(switchTree.otherwise);
             undent();
             print(TXT_BLOCK_END);
-            break;
-
-        case Return(Tree expr):
+        } else if (tree instanceof Tree.Return) {
             print(KW_RETURN);
             print(Text.Space);
-            print(expr);
-            break;
-
-        case New(Tree.Template templ):
-            printTemplate(null, KW_NEW, templ, false);
+            print(((Tree.Return) tree).expr);
+        } else if (tree instanceof Tree.New) {
+            printTemplate(null, KW_NEW, ((Tree.New) tree).templ, false);
             printType(tree);
-            break;
-
-        case Typed(Tree expr, Tree tpe):
+        } else if (tree instanceof Tree.Typed) {
+            Tree.Typed typed = (Tree.Typed) tree;
             print(TXT_LEFT_PAREN);
-            print(expr);
+            print(typed.expr);
             print(TXT_RIGHT_PAREN);
             print(Text.Space);
             print(TXT_COLON);
             print(Text.Space);
-            print(tpe);
+            print(typed.tpe);
             printType(tree);
-            break;
-
-        case TypeApply(Tree fun, Tree[] targs):
-            print(fun);
-            printArray(targs, TXT_LEFT_BRACKET, TXT_RIGHT_BRACKET, TXT_COMMA_SP);
+        } else if (tree instanceof Tree.TypeApply) {
+            Tree.TypeApply typeApply = (Tree.TypeApply) tree;
+            print(typeApply.fun);
+            printArray(typeApply.args, TXT_LEFT_BRACKET, TXT_RIGHT_BRACKET, TXT_COMMA_SP);
             printType(tree);
-            break;
-
-        case Apply(Tree fun, Tree[] vargs):
-            if (fun instanceof Tree.TypeTerm)
-                print(fun.type.resultType().symbol().fullName().toString());
+        } else if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply) tree;
+            if (apply.fun instanceof Tree.TypeTerm)
+                print(apply.fun.type.resultType().symbol().fullName().toString());
             else
-                print(fun);
-            printArray(vargs, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_COMMA_SP);
+                print(apply.fun);
+            printArray(apply.args, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_COMMA_SP);
             printType(tree);
-            break;
-
-        case Super(Name qualifier, Name mixin):
-            if (qualifier != TypeNames.EMPTY) {
-                printSymbolUse(tree.symbol(), qualifier);
+        } else if (tree instanceof Tree.Super) {
+            Tree.Super superTree = (Tree.Super) tree;
+            if (superTree.qualifier != TypeNames.EMPTY) {
+                printSymbolUse(tree.symbol(), superTree.qualifier);
                 print(TXT_DOT);
             }
             print(KW_SUPER);
-            if (mixin != TypeNames.EMPTY) {
+            if (superTree.mixin != TypeNames.EMPTY) {
                 print(TXT_LEFT_PAREN);
-                print(mixin.toString());
+                print(superTree.mixin.toString());
                 print(TXT_RIGHT_PAREN);
             }
             printType(tree);
-            break;
-
-        case This(Name name):
-            if (name != TypeNames.EMPTY) {
-                printSymbolUse(tree.symbol(), name);
+        } else if (tree instanceof Tree.This) {
+            Tree.This thisTree = (Tree.This) tree;
+            if (thisTree.qualifier != TypeNames.EMPTY) {
+                printSymbolUse(tree.symbol(), thisTree.qualifier);
                 print(TXT_DOT);
             }
             print(KW_THIS);
             printType(tree);
-            break;
-
-        case Select(Tree qualifier, Name name):
-            print(qualifier);
+        } else if (tree instanceof Tree.Select) {
+            Tree.Select select = (Tree.Select) tree;
+            print(select.qualifier);
             print(TXT_DOT);
-            printSymbolUse(tree.symbol(), name);
+            printSymbolUse(tree.symbol(), select.selector);
             printType(tree);
-            break;
-
-        case Ident(Name name):
-            printSymbolUse(tree.symbol(), name);
+        } else if (tree instanceof Tree.Ident) {
+            printSymbolUse(tree.symbol(), ((Tree.Ident) tree).name);
             printType(tree);
-            break;
-
-        case Literal(Object obj):
+        } else if (tree instanceof Tree.Literal) {
+            Object obj = ((Tree.Literal) tree).value;
             String str;
             if (obj instanceof String)
                 str = "\"" + obj + "\"";
@@ -568,53 +579,40 @@ public class TextTreePrinter implements TreePrinter {
                 str = String.valueOf(obj);
             print(Text.Literal(str));
             printType(tree);
-            break;
-
-        case TypeTerm():
+        } else if (tree instanceof Tree.TypeTerm) {
             print(tree.type.toString());
-            break;
-
-        case SingletonType(Tree ref):
-            print(ref);
+        } else if (tree instanceof Tree.SingletonType) {
+            print(((Tree.SingletonType) tree).ref);
             print(TXT_DOT); print(KW_TYPE);
-            break;
-
-        case SelectFromType(Tree qualifier, Name selector):
-            print(qualifier);
+        } else if (tree instanceof Tree.SelectFromType) {
+            Tree.SelectFromType selectFromType = (Tree.SelectFromType) tree;
+            print(selectFromType.qualifier);
             print(Text.Space); print(TXT_HASH); print(Text.Space);
-            printSymbolUse(tree.symbol(), selector);
-            break;
-
-        case FunType(Tree[] argtpes, Tree restpe):
-            printArray(argtpes, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_COMMA_SP);
+            printSymbolUse(tree.symbol(), selectFromType.selector);
+        } else if (tree instanceof Tree.FunType) {
+            Tree.FunType funType = (Tree.FunType) tree;
+            printArray(funType.argtpes, TXT_LEFT_PAREN, TXT_RIGHT_PAREN, TXT_COMMA_SP);
             print(TXT_RIGHT_ARROW);
-            print(restpe);
-            break;
-
-        case CompoundType(Tree[] baseTypes, Tree[] refinements):
-            printArray(baseTypes, Text.None, Text.None, TXT_WITH_SP);
-            printArray(refinements, TXT_BLOCK_BEGIN, TXT_BLOCK_END, Text.Newline);
-            break;
-
-        case AppliedType(Tree tpe, Tree[] args):
-            print(tpe);
+            print(funType.restpe);
+        } else if (tree instanceof Tree.CompoundType) {
+            Tree.CompoundType compoundType = (Tree.CompoundType) tree;
+            printArray(compoundType.parents, Text.None, Text.None, TXT_WITH_SP);
+            printArray(compoundType.refinements, TXT_BLOCK_BEGIN, TXT_BLOCK_END, Text.Newline);
+        } else if (tree instanceof Tree.AppliedType) {
+            Tree.AppliedType appliedType = (Tree.AppliedType) tree;
+            print(appliedType.tpe);
             indent();
             print(TXT_LEFT_BRACKET);
-            for (int i = 0; i < args.length; ++i) {
+            for (int i = 0; i < appliedType.args.length; ++i) {
                 if (i > 0) print(TXT_COMMA_SP);
-                print(args[i]);
+                print(appliedType.args[i]);
             }
             undent();
             print(TXT_RIGHT_BRACKET);
-            break;
-
-        case Template(Tree[] parents, Tree[] body):
+        } else if (tree instanceof Tree.Template) {
             Debug.abort("unexpected case: template");
-            break;
-
-        default:
+        } else {
             print(TXT_UNKNOWN);
-            break;
         }
         //print("{" + tree.type + "}");//DEBUG
         return this;
@@ -783,20 +781,17 @@ public class TextTreePrinter implements TreePrinter {
     }
 
     protected void printParam(Tree tree) {
-        switch (tree) {
-        case AbsTypeDef(int mods, Name name, Tree bound, Tree lobound):
-            printModifiers(mods);
-            printSymbolDefinition(tree.symbol(), name);
-            printBounds(lobound, bound);
-            break;
-
-        case ValDef(int mods, Name name, Tree tpe, Tree.Empty):
-            printModifiers(mods);
-            printSymbolDefinition(tree.symbol(), name);
-            printOpt(TXT_COLON, tpe, false);
-            break;
-
-        default:
+        if (tree instanceof Tree.AbsTypeDef) {
+            Tree.AbsTypeDef absTypeDef = (Tree.AbsTypeDef) tree;
+            printModifiers(absTypeDef.mods);
+            printSymbolDefinition(tree.symbol(), absTypeDef.name);
+            printBounds(absTypeDef.lobound, absTypeDef.rhs);
+        } else if (tree instanceof Tree.ValDef && ((Tree.ValDef) tree).rhs == Tree.Empty) {
+            Tree.ValDef valDef = (Tree.ValDef) tree;
+            printModifiers(valDef.mods);
+            printSymbolDefinition(tree.symbol(), valDef.name);
+            printOpt(TXT_COLON, valDef.tpe, false);
+        } else {
             Debug.abort("bad parameter: " + tree);
         }
     }

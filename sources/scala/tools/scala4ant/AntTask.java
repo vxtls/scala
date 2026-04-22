@@ -83,7 +83,8 @@ public class AntTask extends Javac {
     }
 
     protected String[] parseSuffixes() {
-        StringTokenizer st = new StringTokenizer(suffixes, " ,");
+        java.util.StringTokenizer st =
+            new java.util.StringTokenizer(suffixes, " ,");
         ArrayList al = new ArrayList();
         while (st.hasMoreTokens())
             al.add("." + st.nextToken());

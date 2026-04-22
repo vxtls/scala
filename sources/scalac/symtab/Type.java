@@ -20,30 +20,69 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     public static boolean explainSwitch = false;
     private static int indent = 0;
 
-    public case ErrorType;  // not used after analysis
-    public case AnyType;    // not used after analysis
-    public case NoType;
+    public static class ErrorType extends Type {
+        public ErrorType() {}
+    }  // not used after analysis
+    public static final ErrorType ErrorType = new ErrorType();
+
+    public static class AnyType extends Type {
+        public AnyType() {}
+    }    // not used after analysis
+    public static final AnyType AnyType = new AnyType();
+
+    public static class NoType extends Type {
+        public NoType() {}
+    }
+    public static final NoType NoType = new NoType();
 
     /** C.this.type
      */
-    public case ThisType(Symbol sym);
+    public static class ThisType extends Type {
+        public Symbol sym;
+
+        public ThisType(Symbol sym) {
+            this.sym = sym;
+        }
+    }
+
+    public static ThisType ThisType(Symbol sym) {
+        return new ThisType(sym);
+    }
 
     /** pre.sym.type
      *  sym represents a valueS
      */
-    public case SingleType(Type pre, Symbol sym) {
-        assert this instanceof ExtSingleType;
+    public static class SingleType extends Type {
+        public Type pre;
+        public Symbol sym;
+
+        public SingleType(Type pre, Symbol sym) {
+            this.pre = pre;
+            this.sym = sym;
+            assert this instanceof ExtSingleType;
+        }
     }
 
     /** Type for a numeric or string constant.
      */
-    public case ConstantType(Type base, Object value) {
-        if (base.symbol() == Global.instance.definitions.BYTE_CLASS)
-            assert value instanceof Byte;
-        if (base.symbol() == Global.instance.definitions.CHAR_CLASS)
-            assert value instanceof Character;
-        if (base.symbol() == Global.instance.definitions.SHORT_CLASS)
-            assert value instanceof Short;
+    public static class ConstantType extends Type {
+        public Type base;
+        public Object value;
+
+        public ConstantType(Type base, Object value) {
+            this.base = base;
+            this.value = value;
+            if (base.symbol() == Global.instance.definitions.BYTE_CLASS)
+                assert value instanceof Byte;
+            if (base.symbol() == Global.instance.definitions.CHAR_CLASS)
+                assert value instanceof Character;
+            if (base.symbol() == Global.instance.definitions.SHORT_CLASS)
+                assert value instanceof Short;
+        }
+    }
+
+    public static ConstantType ConstantType(Type base, Object value) {
+        return new ConstantType(base, value);
     }
 
     /** pre.sym[args]
@@ -62,22 +101,53 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *              new Type[]{})}).
      *
      */
-    public case TypeRef(Type pre, Symbol sym, Type[] args) {
-        assert pre.isLegalPrefix() || pre == ErrorType : pre + "#" + sym;
-        assert sym.kind == ERROR || sym.isType() : pre + " # " + sym;
+    public static class TypeRef extends Type {
+        public Type pre;
+        public Symbol sym;
+        public Type[] args;
+
+        public TypeRef(Type pre, Symbol sym, Type[] args) {
+            this.pre = pre;
+            this.sym = sym;
+            this.args = args;
+            assert pre.isLegalPrefix() || pre == ErrorType : pre + "#" + sym;
+            assert sym.kind == ERROR || sym.isType() : pre + " # " + sym;
+        }
+    }
+
+    public static TypeRef TypeRef(Type pre, Symbol sym, Type[] args) {
+        return new TypeRef(pre, sym, args);
     }
 
     /** parts_1 with ... with parts_n { members }
      */
-    public case CompoundType(Type[] parts, Scope members) {
-        assert this instanceof ExtCompoundType;
+    public static class CompoundType extends Type {
+        public Type[] parts;
+        public Scope members;
+
+        public CompoundType(Type[] parts, Scope members) {
+            this.parts = parts;
+            this.members = members;
+            assert this instanceof ExtCompoundType;
+        }
     }
 
     /** synthetic type of a method  def ...(vparams): result = ...
      */
-    public case MethodType(Symbol[] vparams, Type result) {
-        for (int i = 0; i < vparams.length; i++)
-            assert vparams[i].isParameter() && vparams[i].isTerm(): this;
+    public static class MethodType extends Type {
+        public Symbol[] vparams;
+        public Type result;
+
+        public MethodType(Symbol[] vparams, Type result) {
+            this.vparams = vparams;
+            this.result = result;
+            for (int i = 0; i < vparams.length; i++)
+                assert vparams[i].isParameter() && vparams[i].isTerm(): this;
+        }
+    }
+
+    public static MethodType MethodType(Symbol[] vparams, Type result) {
+        return new MethodType(vparams, result);
     }
 
     /** synthetic type of a method  def ...[tparams]result
@@ -90,9 +160,20 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *  For instance, given    def f = 1
      *  f has type   PolyType(new Symbol[]{}, <scala.Int>.type())
      */
-    public case PolyType(Symbol[] tparams, Type result) {
-        for (int i = 0; i < tparams.length; i++)
-            assert tparams[i].isParameter()&&tparams[i].isAbstractType(): this;
+    public static class PolyType extends Type {
+        public Symbol[] tparams;
+        public Type result;
+
+        public PolyType(Symbol[] tparams, Type result) {
+            this.tparams = tparams;
+            this.result = result;
+            for (int i = 0; i < tparams.length; i++)
+                assert tparams[i].isParameter()&&tparams[i].isAbstractType(): this;
+        }
+    }
+
+    public static PolyType PolyType(Symbol[] tparams, Type result) {
+        return new PolyType(tparams, result);
     }
 
     /** synthetic type of an overloaded value whose alternatives are
@@ -112,23 +193,70 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *                 PolyType(new Symbol[]{}, <String>),
      *
      */
-    public case OverloadedType(Symbol[] alts, Type[] alttypes);
+    public static class OverloadedType extends Type {
+        public Symbol[] alts;
+        public Type[] alttypes;
+
+        public OverloadedType(Symbol[] alts, Type[] alttypes) {
+            this.alts = alts;
+            this.alttypes = alttypes;
+        }
+    }
+
+    public static OverloadedType OverloadedType(Symbol[] alts, Type[] alttypes) {
+        return new OverloadedType(alts, alttypes);
+    }
 
     /** Hidden case to implement delayed evaluation of types.
      *  No need to pattern match on this type; it will never come up.
      */
-    public case LazyType();
+    public static class LazyType extends Type {
+        public LazyType() {}
+    }
 
     /** Hidden case to implement local type inference.
      *  Later phases do not need to match on this type.
      */
-    public case TypeVar(Type origin, Constraint constr);
+    public static class TypeVar extends Type {
+        public Type origin;
+        public Constraint constr;
+
+        public TypeVar(Type origin, Constraint constr) {
+            this.origin = origin;
+            this.constr = constr;
+        }
+    }
+
+    public static TypeVar TypeVar(Type origin, Constraint constr) {
+        return new TypeVar(origin, constr);
+    }
 
     /** Hidden cases to implement type erasure.
      *  Earlier phases do not need to match on these types.
      */
-    public case UnboxedType(int tag);
-    public case UnboxedArrayType(Type elemtp);
+    public static class UnboxedType extends Type {
+        public int tag;
+
+        public UnboxedType(int tag) {
+            this.tag = tag;
+        }
+    }
+
+    public static UnboxedType UnboxedType(int tag) {
+        return new UnboxedType(tag);
+    }
+
+    public static class UnboxedArrayType extends Type {
+        public Type elemtp;
+
+        public UnboxedArrayType(Type elemtp) {
+            this.elemtp = elemtp;
+        }
+    }
+
+    public static UnboxedArrayType UnboxedArrayType(Type elemtp) {
+        return new UnboxedArrayType(elemtp);
+    }
 
     /** Force evaluation of a lazy type. No cycle
      *  check is needed; since this is done in Symbol.
@@ -187,24 +315,23 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     }
 
     private Type singleTypeMethod0(Type pre, Symbol sym) {
-        switch (this) {
-        case PolyType(Symbol[] args, Type result):
-            return PolyType(args, result.singleTypeMethod0(pre, sym));
-        case MethodType(Symbol[] args, Type result):
-            return MethodType(args, result.singleTypeMethod0(pre, sym));
-        default:
-            return singleType(pre, sym);
+        if (this instanceof PolyType) {
+            PolyType polyType = (PolyType)this;
+            return PolyType(polyType.tparams, polyType.result.singleTypeMethod0(pre, sym));
+        } else if (this instanceof MethodType) {
+            MethodType methodType = (MethodType)this;
+            return MethodType(methodType.vparams, methodType.result.singleTypeMethod0(pre, sym));
         }
+        return singleType(pre, sym);
     }
 
     public static TypeRef appliedType(Type tycon, Type[] args) {
-        switch (tycon) {
-        case TypeRef(Type pre, Symbol sym, Type[] args1):
-            if (args == args1) return (TypeRef)tycon;
-            else return TypeRef(pre, sym, args);
-        default:
-            throw new ApplicationError();
+        if (tycon instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)tycon;
+            if (args == typeRef.args) return typeRef;
+            else return TypeRef(typeRef.pre, typeRef.sym, args);
         }
+        throw new ApplicationError();
     }
 
     public static CompoundType compoundType(Type[] parts, Scope members,
@@ -273,25 +400,23 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *  its symbol, otherwise Symbol.NONE.
      */
     public Symbol symbol() {
-        switch (this) {
-        case ErrorType:
+        if (this == ErrorType) {
             return Symbol.ERROR;
-        case ThisType(Symbol sym):
-            return sym;
-        case TypeRef(_, Symbol sym, _):
-            return sym;
-        case SingleType(_, Symbol sym):
-            return sym;
-        case ConstantType(Type base, _):
-            return base.symbol();
-        case TypeVar(Type origin, _):
-            return origin.symbol();
-        case CompoundType(_, _):
+        } else if (this instanceof ThisType) {
+            return ((ThisType)this).sym;
+        } else if (this instanceof TypeRef) {
+            return ((TypeRef)this).sym;
+        } else if (this instanceof SingleType) {
+            return ((SingleType)this).sym;
+        } else if (this instanceof ConstantType) {
+            return ((ConstantType)this).base.symbol();
+        } else if (this instanceof TypeVar) {
+            return ((TypeVar)this).origin.symbol();
+        } else if (this instanceof CompoundType) {
             // overridden in ExtCompoundType
             throw new ApplicationError();
-        default:
-            return Symbol.NONE;
         }
+        return Symbol.NONE;
     }
 
     public static Symbol[] symbol(Type[] tps) {
@@ -305,10 +430,10 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *  type parameters as arguments
      */
     public Type withDefaultArgs() {
-        switch (this) {
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            if (args.length == 0 && sym.typeParams().length != 0)
-                return TypeRef(pre, sym, Symbol.type(sym.typeParams()));
+        if (this instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)this;
+            if (typeRef.args.length == 0 && typeRef.sym.typeParams().length != 0)
+                return TypeRef(typeRef.pre, typeRef.sym, Symbol.type(typeRef.sym.typeParams()));
         }
         return this;
     }
@@ -317,41 +442,41 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      * symbol is a class.
      */
     public Type bound() {
-        switch (unalias()) {
-        case TypeRef(Type pre, Symbol sym, _):
-            if (sym.kind == TYPE) return pre.memberInfo(sym).bound();
-            assert sym.isClass() : Debug.show(sym) + " -- " + this;
+        Type tp = unalias();
+        if (tp instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)tp;
+            if (typeRef.sym.kind == TYPE) return typeRef.pre.memberInfo(typeRef.sym).bound();
+            assert typeRef.sym.isClass() : Debug.show(typeRef.sym) + " -- " + this;
             return this;
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        } else if (tp instanceof ThisType
+                   || tp instanceof SingleType
+                   || tp instanceof ConstantType) {
             return singleDeref().bound();
-        case TypeVar(Type origin, Constraint constr):
+        } else if (tp instanceof TypeVar) {
+            Constraint constr = ((TypeVar)tp).constr;
             if (constr.inst != NoType) return constr.inst.bound();
             else return this;
-        default:
-            throw Debug.abort("illegal case", this);
         }
+        throw Debug.abort("illegal case", this);
     }
 
     /** If this type is a thistype or singleton type, its type,
      *  otherwise the type itself.
      */
     public Type singleDeref() {
-        switch (this) {
-        case ThisType(Symbol sym):
-            return sym.typeOfThis();
-        case SingleType(Type pre, Symbol sym):
+        if (this instanceof ThisType) {
+            return ((ThisType)this).sym.typeOfThis();
+        } else if (this instanceof SingleType) {
             // overridden in ExtSingleType
             throw new ApplicationError();
-        case ConstantType(Type base, _):
-            return base;
-        case TypeVar(Type origin, Constraint constr):
+        } else if (this instanceof ConstantType) {
+            return ((ConstantType)this).base;
+        } else if (this instanceof TypeVar) {
+            Constraint constr = ((TypeVar)this).constr;
             if (constr.inst != NoType) return constr.inst.singleDeref();
             else return this;
-        default:
-            return this;
         }
+        return this;
     }
 
     /** If this type is a thistype or singleton type, its underlying object type,
@@ -359,14 +484,12 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      */
     public Type widen() {
         Type tp = singleDeref();
-        switch (tp) {
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        if (tp instanceof ThisType
+            || tp instanceof SingleType
+            || tp instanceof ConstantType) {
             return tp.widen();
-        default:
-            return tp;
         }
+        return tp;
     }
 
     private static Map widenMap = new Map() {
@@ -382,36 +505,34 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     /** The thistype or singleton type corresponding to values of this type.
       */
     public Type narrow() {
-        switch (unalias()) {
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            if (sym.kind == CLASS) return sym.thisType();
-            else return ThisType(sym);
-        case CompoundType(_, _):
+        Type tp = unalias();
+        if (tp instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)tp;
+            if (typeRef.sym.kind == CLASS) return typeRef.sym.thisType();
+            else return ThisType(typeRef.sym);
+        } else if (tp instanceof CompoundType) {
             return symbol().thisType();
-        default:
-            return this;
         }
+        return this;
     }
 
     /** If this type is a constant type, its underlying basetype;
      *  otherwise the type itself
      */
     public Type deconst() {
-        switch (this) {
-        case ConstantType(Type base, _):
-            return base;
-        default:
-            return this;
+        if (this instanceof ConstantType) {
+            return ((ConstantType)this).base;
         }
+        return this;
     }
 
     /** If this type is a parameterless method, its underlying resulttype;
      *  otherwise the type itself
      */
     public Type derefDef() {
-        switch (this) {
-        case PolyType(Symbol[] tparams, Type restp):
-            if (tparams.length == 0) return restp;
+        if (this instanceof PolyType) {
+            PolyType polyType = (PolyType)this;
+            if (polyType.tparams.length == 0) return polyType.result;
         }
         return this;
     }
@@ -419,11 +540,12 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     /** The lower approximation of this type (which must be a typeref)
      */
     public Type loBound() {
-        switch (unalias()) {
-        case TypeRef(Type pre, Symbol sym, Type[] args):
+        Type tp = unalias();
+        if (tp instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)tp;
             Type lb = Global.instance.definitions.ALL_TYPE();
-            if (sym.kind == TYPE) {
-                lb = pre.memberLoBound(sym);
+            if (typeRef.sym.kind == TYPE) {
+                lb = typeRef.pre.memberLoBound(typeRef.sym);
             }
             if (lb.symbol() == Global.instance.definitions.ALL_CLASS &&
                 this.symbol() != Global.instance.definitions.ALL_CLASS &&
@@ -431,58 +553,60 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
                 lb = Global.instance.definitions.ALLREF_TYPE();
             }
             return lb;
-        default:
-            throw new ApplicationError();
         }
+        throw new ApplicationError();
     }
 
     /** If this is a this-type, named-type, applied type or single-type, its prefix,
      *  otherwise NoType.
      */
     public Type prefix() {
-        switch (this) {
-        case ThisType(Symbol sym): return sym.owner().thisType();
-        case TypeRef(Type pre, _, _): return pre;
-        case SingleType(Type pre, _): return pre;
-        case TypeVar(Type origin, Constraint constr):
+        if (this instanceof ThisType) {
+            return ((ThisType)this).sym.owner().thisType();
+        } else if (this instanceof TypeRef) {
+            return ((TypeRef)this).pre;
+        } else if (this instanceof SingleType) {
+            return ((SingleType)this).pre;
+        } else if (this instanceof TypeVar) {
+            TypeVar typeVar = (TypeVar)this;
+            Constraint constr = typeVar.constr;
             if (constr.inst != NoType) return constr.inst.prefix();
             else return NoType;
-        default: return NoType;
         }
+        return NoType;
     }
 
    /** Get all type arguments of this type.
     */
     public Type[] typeArgs() {
-        switch (unalias()) {
-        case TypeRef(_, _, Type[] args):
-            return args;
-        default:
-            return Type.EMPTY_ARRAY;
+        Type tp = unalias();
+        if (tp instanceof TypeRef) {
+            return ((TypeRef)tp).args;
         }
+        return Type.EMPTY_ARRAY;
     }
 
     /** Get type of `this' symbol corresponding to this type, extend
      *  homomorphically to function types and poly types.
      */
     public Type instanceType() {
-        switch (unalias()) {
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            if (sym != sym.thisSym())
-                return sym.typeOfThis()
-                    .asSeenFrom(pre, sym.owner())
-                    .subst(sym.typeParams(), args);
-            break;
-        case MethodType(Symbol[] params, Type restp):
-            Type restp1 = restp.instanceType();
-            if (restp1 != restp)
-                return MethodType(params, restp1);
-            break;
-        case PolyType(Symbol[] tparams, Type restp):
-            Type restp1 = restp.instanceType();
-            if (restp1 != restp)
-                return PolyType(tparams, restp1);
-            break;
+        Type tp = unalias();
+        if (tp instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)tp;
+            if (typeRef.sym != typeRef.sym.thisSym())
+                return typeRef.sym.typeOfThis()
+                    .asSeenFrom(typeRef.pre, typeRef.sym.owner())
+                    .subst(typeRef.sym.typeParams(), typeRef.args);
+        } else if (tp instanceof MethodType) {
+            MethodType methodType = (MethodType)tp;
+            Type restp1 = methodType.result.instanceType();
+            if (restp1 != methodType.result)
+                return MethodType(methodType.vparams, restp1);
+        } else if (tp instanceof PolyType) {
+            PolyType polyType = (PolyType)tp;
+            Type restp1 = polyType.result.instanceType();
+            if (restp1 != polyType.result)
+                return PolyType(polyType.tparams, restp1);
         }
         return this;
     }
@@ -498,13 +622,13 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     private Type unalias(int n) {
         if (n == 100)
             throw new Type.Error("alias chain too long (recursive type alias?): " + this);
-        switch (this) {
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            if (sym.kind == ALIAS && sym.typeParams().length == args.length)
-                return sym.info().subst(sym.typeParams(), args)
-                    .asSeenFrom(pre, sym.owner()).unalias(n + 1);
-            break;
-        case TypeVar(Type origin, Constraint constr):
+        if (this instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)this;
+            if (typeRef.sym.kind == ALIAS && typeRef.sym.typeParams().length == typeRef.args.length)
+                return typeRef.sym.info().subst(typeRef.sym.typeParams(), typeRef.args)
+                    .asSeenFrom(typeRef.pre, typeRef.sym.owner()).unalias(n + 1);
+        } else if (this instanceof TypeVar) {
+            Constraint constr = ((TypeVar)this).constr;
             if (constr.inst != NoType) return constr.inst.unalias(n + 1);
             else return this;
         }
@@ -514,41 +638,40 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     /** The (prefix/argument-adapted) parents of this type.
      */
     public Type[] parents() {
-        switch (unalias()) {
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        Type tp = unalias();
+        if (tp instanceof ThisType
+            || tp instanceof SingleType
+            || tp instanceof ConstantType) {
             return singleDeref().parents();
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            if (sym.kind == CLASS) {
-                assert sym.typeParams().length == args.length : sym + " " + ArrayApply.toString(args) + " " + sym.primaryConstructor().info();//debug
-                return subst(asSeenFrom(sym.info().parents(), pre, sym.owner()),
-                             sym.typeParams(), args);
+        } else if (tp instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)tp;
+            if (typeRef.sym.kind == CLASS) {
+                assert typeRef.sym.typeParams().length == typeRef.args.length : typeRef.sym + " " + ArrayApply.toString(typeRef.args) + " " + typeRef.sym.primaryConstructor().info();//debug
+                return subst(asSeenFrom(typeRef.sym.info().parents(), typeRef.pre, typeRef.sym.owner()),
+                             typeRef.sym.typeParams(), typeRef.args);
             } else {
-                return new Type[]{sym.info().asSeenFrom(pre, sym.owner())};
+                return new Type[]{typeRef.sym.info().asSeenFrom(typeRef.pre, typeRef.sym.owner())};
             }
-        case CompoundType(Type[] parts, _):
-            return parts;
-        default:
-            return Type.EMPTY_ARRAY;
+        } else if (tp instanceof CompoundType) {
+            return ((CompoundType)tp).parts;
         }
+        return Type.EMPTY_ARRAY;
     }
 
     /** Get type parameters of method type (a PolyType or MethodType)
      * or EMPTY_ARRAY if method type is not polymorphic.
      */
     public Symbol[] typeParams() {
-        switch (this) {
-        case PolyType(Symbol[] tparams, _):
-            return tparams;
-        case MethodType(Symbol[] vparams, _):
+        if (this instanceof PolyType) {
+            return ((PolyType)this).tparams;
+        } else if (this instanceof MethodType) {
             return Symbol.EMPTY_ARRAY;
-        case TypeRef(_, Symbol sym, Type[] args):
-            if (args.length == 0) return sym.typeParams();
+        } else if (this instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)this;
+            if (typeRef.args.length == 0) return typeRef.sym.typeParams();
             else return Symbol.EMPTY_ARRAY;
-        default:
-            return Symbol.EMPTY_ARRAY;
         }
+        return Symbol.EMPTY_ARRAY;
     }
 
     /** Get value parameters of method type (a PolyType or MethodType)
@@ -558,15 +681,13 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         return valueParams(false);
     }
     private Symbol[] valueParams(boolean ok) {
-        switch (this) {
-        case PolyType(_, Type result):
-            return result.valueParams(true);
-        case MethodType(Symbol[] vparams, _):
-            return vparams;
-        default:
-            if (ok) return Symbol.EMPTY_ARRAY;
-            throw Debug.abort("illegal case", this);
+        if (this instanceof PolyType) {
+            return ((PolyType)this).result.valueParams(true);
+        } else if (this instanceof MethodType) {
+            return ((MethodType)this).vparams;
         }
+        if (ok) return Symbol.EMPTY_ARRAY;
+        throw Debug.abort("illegal case", this);
     }
 
     /** If this type is a (possibly polymorphic) method type, its result type
@@ -574,70 +695,62 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *  otherwise the type itself.
      */
     public Type resultType() {
-        switch (this) {
-        case PolyType(_, Type tpe):
-            return tpe.resultType();
-        case MethodType(_, Type tpe):
-            return tpe.resultType();
-        default:
-            return this;
+        if (this instanceof PolyType) {
+            return ((PolyType)this).result.resultType();
+        } else if (this instanceof MethodType) {
+            return ((MethodType)this).result.resultType();
         }
+        return this;
     }
 
     /** The number of value parameter sections of this type.
      */
     public int paramSectionCount() {
-        switch (this) {
-        case PolyType(_, Type restpe):
-            return restpe.paramSectionCount();
-        case MethodType(_, Type restpe):
-            return restpe.paramSectionCount() + 1;
-        default: return 0;
+        if (this instanceof PolyType) {
+            return ((PolyType)this).result.paramSectionCount();
+        } else if (this instanceof MethodType) {
+            return ((MethodType)this).result.paramSectionCount() + 1;
         }
+        return 0;
     }
 
     /** The first parameter section of this type.
      */
     public Symbol[] firstParams() {
-        switch (this) {
-        case PolyType(_, Type restpe):
-            return restpe.firstParams();
-        case MethodType(Symbol[] params, _):
-            return params;
-        default: return Symbol.EMPTY_ARRAY;
+        if (this instanceof PolyType) {
+            return ((PolyType)this).result.firstParams();
+        } else if (this instanceof MethodType) {
+            return ((MethodType)this).vparams;
         }
+        return Symbol.EMPTY_ARRAY;
     }
 
     /** If this type is overloaded, its alternative types,
      *  otherwise an array consisting of this type itself.
      */
     public Type[] alternativeTypes() {
-        switch (this) {
-        case OverloadedType(_, Type[] alttypes):
-            return alttypes;
-        default:
-            return new Type[]{this};
+        if (this instanceof OverloadedType) {
+            return ((OverloadedType)this).alttypes;
         }
+        return new Type[]{this};
     }
 
     /** If this type is overloaded, its alternative symbols,
      *  otherwise an empty array.
      */
     public Symbol[] alternativeSymbols() {
-        switch (this) {
-        case OverloadedType(Symbol[] alts, _):
-            return alts;
-        default:
-            return Symbol.EMPTY_ARRAY;
+        if (this instanceof OverloadedType) {
+            return ((OverloadedType)this).alts;
         }
+        return Symbol.EMPTY_ARRAY;
     }
 
     /** If type is a this type of a module class, transform to singletype of
      *  module.
      */
     public Type expandModuleThis() {
-        switch (this) {
-        case ThisType(Symbol sym):
+        if (this instanceof ThisType) {
+            Symbol sym = ((ThisType)this).sym;
             if ((sym.flags & MODUL) != 0 && sym.module() != Symbol.NONE) {
                 return singleType(
                     sym.owner().thisType().expandModuleThis(), sym.module());
@@ -649,52 +762,40 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     /** Numeric values
      */
     public int intValue() {
-        switch (this) {
-        case ConstantType(_, Object value):
-            return toNumber(value).intValue();
-        default:
-            throw new ApplicationError();
+        if (this instanceof ConstantType) {
+            return toNumber(((ConstantType)this).value).intValue();
         }
+        throw new ApplicationError();
     }
     public long longValue() {
-        switch (this) {
-        case ConstantType(_, Object value):
-            return toNumber(value).longValue();
-        default:
-            throw new ApplicationError();
+        if (this instanceof ConstantType) {
+            return toNumber(((ConstantType)this).value).longValue();
         }
+        throw new ApplicationError();
     }
     public float floatValue() {
-        switch (this) {
-        case ConstantType(_, Object value):
-            return toNumber(value).floatValue();
-        default:
-            throw new ApplicationError();
+        if (this instanceof ConstantType) {
+            return toNumber(((ConstantType)this).value).floatValue();
         }
+        throw new ApplicationError();
     }
     public double doubleValue() {
-        switch (this) {
-        case ConstantType(_, Object value):
-            return toNumber(value).doubleValue();
-        default:
-            throw new ApplicationError();
+        if (this instanceof ConstantType) {
+            return toNumber(((ConstantType)this).value).doubleValue();
         }
+        throw new ApplicationError();
     }
     public boolean booleanValue() {
-        switch (this) {
-        case ConstantType(_, Object value):
-            return ((Boolean)value).booleanValue();
-        default:
-            throw new ApplicationError();
+        if (this instanceof ConstantType) {
+            return ((Boolean)((ConstantType)this).value).booleanValue();
         }
+        throw new ApplicationError();
     }
     public String stringValue() {
-        switch (this) {
-        case ConstantType(_, Object value):
-            return value.toString();
-        default:
-            throw new ApplicationError();
+        if (this instanceof ConstantType) {
+            return ((ConstantType)this).value.toString();
         }
+        throw new ApplicationError();
     }
     private static Number toNumber(Object value) {
         return (value instanceof Character)
@@ -707,50 +808,48 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     /** Is this type a this type or singleton type?
      */
     public boolean isStable() {
-        switch (unalias()) {
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        Type tp = unalias();
+        if (tp instanceof ThisType
+            || tp instanceof SingleType
+            || tp instanceof ConstantType) {
             return true;
-        case TypeRef(_, Symbol sym, _):
+        } else if (tp instanceof TypeRef) {
+            Symbol sym = ((TypeRef)tp).sym;
             if (sym.isParameter() && sym.isSynthetic() && sym.hasStableFlag()) return true;
             return false;
-        default:
-            return false;
         }
+        return false;
     }
 
     /** Is this type a legal prefix?
      */
     public boolean isLegalPrefix() {
-        switch (unalias()) {
-        case ThisType(_):
-        case SingleType(_, _):
+        Type tp = unalias();
+        if (tp instanceof ThisType || tp instanceof SingleType) {
             return true;
-        case TypeRef(_, Symbol sym, _):
+        } else if (tp instanceof TypeRef) {
+            Symbol sym = ((TypeRef)tp).sym;
             if (sym.isParameter() && sym.isSynthetic()) return true;
             return sym.kind == CLASS &&
                 ((sym.flags & JAVA) != 0 ||
                  (sym.flags & (TRAIT | ABSTRACT)) == 0);
-        default:
-            return false;
         }
+        return false;
     }
 
     /** Is this type a reference to an object type?
      *  todo: replace by this.isSubType(global.definitions.ANY_TYPE())?
      */
     public boolean isObjectType() {
-        switch (unalias()) {
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
-        case CompoundType(_, _):
-        case TypeRef(_, _, _):
+        Type tp = unalias();
+        if (tp instanceof ThisType
+            || tp instanceof SingleType
+            || tp instanceof ConstantType
+            || tp instanceof CompoundType
+            || tp instanceof TypeRef) {
             return true;
-        default:
-            return false;
         }
+        return false;
     }
 
     /** Is this type of the form scala.FunctionN[T_1, ..., T_n, +T] or
@@ -758,16 +857,17 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *  java.lang.Object with scala.FunctionN[T_1, ..., T_n, +T]?
      */
     public boolean isFunctionType() {
-        switch (this) {
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            return sym.fullName().startsWith(Names.scala_Function) &&
-                args.length > 0;
-        case CompoundType(Type[] parents, Scope members):
-            return members.isEmpty() &&
-                parents.length == 2 &&
-                (parents[0].symbol().fullName() == Names.java_lang_Object ||
-		 parents[0].symbol().fullName() == Names.scala_AnyRef) &&
-                parents[1].isFunctionType();
+        if (this instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)this;
+            return typeRef.sym.fullName().startsWith(Names.scala_Function) &&
+                typeRef.args.length > 0;
+        } else if (this instanceof CompoundType) {
+            CompoundType compoundType = (CompoundType)this;
+            return compoundType.members.isEmpty() &&
+                compoundType.parts.length == 2 &&
+                (compoundType.parts[0].symbol().fullName() == Names.java_lang_Object ||
+			 compoundType.parts[0].symbol().fullName() == Names.scala_AnyRef) &&
+                compoundType.parts[1].isFunctionType();
         }
         return false;
     }
@@ -781,10 +881,7 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     /** Is this a parameterized or polymorphic method type?
      */
     public boolean isParameterized() {
-        switch (this) {
-        case MethodType(_, _): return true;
-        default: return isPolymorphic();
-        }
+        return this instanceof MethodType || isPolymorphic();
     }
 
 // Members and Lookup -------------------------------------------------------
@@ -793,57 +890,55 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *  Symbols in this scope are not prefix-adapted!
      */
     public Scope members() {
-        switch (this) {
-        case ErrorType:
+        if (this == ErrorType) {
             return new Scope();
-        case TypeRef(_, Symbol sym, _):
-            return sym.info().members();
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        } else if (this instanceof TypeRef) {
+            return ((TypeRef)this).sym.info().members();
+        } else if (this instanceof SingleType || this instanceof ConstantType) {
             return singleDeref().members();
-        case CompoundType(Type[] basetypes, Scope members):
-            return members;
-        default:
-            return Scope.EMPTY;
+        } else if (this instanceof CompoundType) {
+            return ((CompoundType)this).members;
         }
+        return Scope.EMPTY;
     }
 
     /** Lookup symbol with given name among all local and inherited members
      *  of this type; return Symbol.NONE if not found.
      */
     public Symbol lookup(Name name) {
-        switch (this) {
-        case ErrorType:
+        if (this == ErrorType) {
             return Symbol.ERROR;
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        } else if (this instanceof ThisType
+                   || this instanceof SingleType
+                   || this instanceof ConstantType) {
             return singleDeref().lookup(name);
-        case TypeRef(_, Symbol sym, _):
-            return sym.info().lookup(name);
-        case CompoundType(Type[] parts, Scope members):
+        } else if (this instanceof TypeRef) {
+            return ((TypeRef)this).sym.info().lookup(name);
+        } else if (this instanceof CompoundType) {
+            Scope members = ((CompoundType)this).members;
             Symbol sym = members.lookup(name);
             if (sym.kind != NONE) return sym;
             else return lookupNonPrivate(name);
-        default:
-            return Symbol.NONE;
         }
+        return Symbol.NONE;
     }
 
     /** Lookup non-private symbol with given name among all local and
      *  inherited members of this type; return Symbol.NONE if not found.
      */
     public Symbol lookupNonPrivate(Name name) {
-        switch (this) {
-        case ErrorType:
+        if (this == ErrorType) {
             return Symbol.ERROR;
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        } else if (this instanceof ThisType
+                   || this instanceof SingleType
+                   || this instanceof ConstantType) {
             return singleDeref().lookupNonPrivate(name);
-        case TypeRef(_, Symbol sym, _):
-            return sym.info().lookupNonPrivate(name);
-        case CompoundType(Type[] parts, Scope members):
+        } else if (this instanceof TypeRef) {
+            return ((TypeRef)this).sym.info().lookupNonPrivate(name);
+        } else if (this instanceof CompoundType) {
+            CompoundType compoundType = (CompoundType)this;
+            Type[] parts = compoundType.parts;
+            Scope members = compoundType.members;
             Symbol sym = members.lookup(name);
             if (sym.kind != NONE && (sym.flags & PRIVATE) == 0)
                 return sym;
@@ -867,9 +962,8 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
                     sym = sym1;
             }
             return sym;
-        default:
-            return Symbol.NONE;
         }
+        return Symbol.NONE;
     }
 
     /**
@@ -891,24 +985,24 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         for (int i = 0; i < classes.length; i++) {
             if (deferred != null && deferred.isSubClass(classes[i])) continue;
             Symbol sym1 = classes[i].members().lookup(sym.name);
-            switch (sym1.type()) {
-            case NoType:
-            case ErrorType:
+            Type sym1Type = sym1.type();
+            if (sym1Type == NoType || sym1Type == ErrorType) {
                 continue;
-            case OverloadedType(Symbol[] alts, _):
+            } else if (sym1Type instanceof OverloadedType) {
+                Symbol[] alts = ((OverloadedType)sym1Type).alts;
                 for (int j = 0; j < alts.length; j++)
                     if (areRelated(sym, symtype, relation, pre,alts[j],false)){
                         if (!alts[j].isDeferred()) return alts[j];
                         if (deferred == null) deferred = alts[j];
                     }
                 continue;
-            default:
+            } else {
                 if (areRelated(sym, symtype, relation, pre, sym1, true)) {
                     if (!sym1.isDeferred()) return sym1;
                     if (deferred == null) deferred = sym1;
                 }
                 continue;
-            }
+            } 
         }
         return deferred == null ? Symbol.NONE : deferred;
     }
@@ -928,20 +1022,18 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         return false;
     }
     private Symbol[] classes() {
-        switch (this) {
-        case ErrorType:
+        if (this == ErrorType) {
             return new Symbol[] {Symbol.ERROR};
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        } else if (this instanceof ThisType
+                   || this instanceof SingleType
+                   || this instanceof ConstantType) {
             return singleDeref().classes();
-        case TypeRef(_, Symbol sym, _):
-            return sym.info().classes();
-        case CompoundType(Type[] parts, Scope members):
+        } else if (this instanceof TypeRef) {
+            return ((TypeRef)this).sym.info().classes();
+        } else if (this instanceof CompoundType) {
             return symbol(symbol().closure());
-        default:
-            return Symbol.EMPTY_ARRAY;
         }
+        return Symbol.EMPTY_ARRAY;
     }
     static private Map objToAnyMap = new Map() {
 	public Type apply(Type t) {
@@ -952,25 +1044,26 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     };
 
     private Type objParamToAny() {
-	switch (this) {
-	case MethodType(Symbol[] params, Type restp):
-	    Symbol[] params1 = objToAnyMap.map(params);
-	    if (params1 == params) return this;
-	    else return MethodType(params1, restp);
-	default:
-	    return this;
+	if (this instanceof MethodType) {
+            MethodType methodType = (MethodType)this;
+	    Symbol[] params1 = objToAnyMap.map(methodType.vparams);
+	    if (params1 == methodType.vparams) return this;
+	    else return MethodType(params1, methodType.result);
 	}
+	return this;
     }
 
 // Set Owner ------------------------------------------------------------------
 
     public Type setOwner(Symbol owner) {
-        switch (this) {
-        case PolyType(Symbol[] tparams, Type restpe):
-            Type restpe1 = restpe.setOwner(owner);
-            if (restpe1 == restpe) return this;
-            else return Type.PolyType(tparams, restpe1);
-        case MethodType(Symbol[] params, Type restpe):
+        if (this instanceof PolyType) {
+            PolyType polyType = (PolyType)this;
+            Type restpe1 = polyType.result.setOwner(owner);
+            if (restpe1 == polyType.result) return this;
+            else return Type.PolyType(polyType.tparams, restpe1);
+        } else if (this instanceof MethodType) {
+            MethodType methodType = (MethodType)this;
+            Symbol[] params = methodType.vparams;
             Symbol[] params1 = params;
             if (params.length > 0 &&
                 params[0].owner() != owner && params[0].owner() != Symbol.NONE) {
@@ -980,12 +1073,11 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             }
             for (int i = 0; i < params.length; i++)
                 params1[i].setOwner(owner);
-            Type restpe1 = restpe.setOwner(owner);
-            if (params1 == params && restpe1 == restpe) return this;
+            Type restpe1 = methodType.result.setOwner(owner);
+            if (params1 == params && restpe1 == methodType.result) return this;
             else return Type.MethodType(params1, restpe1);
-        default:
-            return this;
         }
+        return this;
     }
 
 // Maps --------------------------------------------------------------------------
@@ -1001,54 +1093,54 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
          * PolyTypes have already been cloned.
          */
         public Type applyParams(Type type) {
-            switch (type) {
-
-            case MethodType(Symbol[] vparams, Type result):
-                map(vparams, true);
-                Type result1 = applyParams(result);
-                return result == result1 ? type : MethodType(vparams, result1);
-
-            case PolyType(Symbol[] tparams, Type result):
-                map(tparams, true);
-                Type result1 = applyParams(result);
-                return result == result1 ? type : PolyType(tparams, result1);
-
-            default:
-                return apply(type);
+            if (type instanceof MethodType) {
+                MethodType methodType = (MethodType)type;
+                map(methodType.vparams, true);
+                Type result1 = applyParams(methodType.result);
+                return methodType.result == result1 ? type : MethodType(methodType.vparams, result1);
+            } else if (type instanceof PolyType) {
+                PolyType polyType = (PolyType)type;
+                map(polyType.tparams, true);
+                Type result1 = applyParams(polyType.result);
+                return polyType.result == result1 ? type : PolyType(polyType.tparams, result1);
             }
+            return apply(type);
         }
 
         /** Apply map to all top-level components of this type.
          */
         public Type map(Type tp) {
-            switch (tp) {
-            case ErrorType:
-            case AnyType:
-            case NoType:
-            case UnboxedType(_):
-            case TypeVar(_, _):
-            case ThisType(_):
+            if (tp == ErrorType
+                || tp == AnyType
+                || tp == NoType
+                || tp instanceof UnboxedType
+                || tp instanceof TypeVar
+                || tp instanceof ThisType) {
                 return tp;
-            case TypeRef(Type pre, Symbol sym, Type[] args):
-                Type pre1 = apply(pre);
-                Type[] args1 = map(args);
-                if (pre1 == pre && args1 == args) return tp;
-                else return typeRef(pre1, sym, args1);
-            case SingleType(Type pre, Symbol sym):
-                Type pre1 = apply(pre);
-                if (pre1 == pre) return tp;
-                else return singleType(pre1, sym);
-            case ConstantType(Type base, Object value):
-                Type base1 = apply(base);
-                if (base1 == base) return tp;
-                else return new ConstantType(base1, value);
-            case CompoundType(Type[] parts, Scope members):
-                Type[] parts1 = map(parts);
-                Scope members1 = map(members);
-                if (parts1 == parts && members1 == members) {
+            } else if (tp instanceof TypeRef) {
+                TypeRef typeRef0 = (TypeRef)tp;
+                Type pre1 = apply(typeRef0.pre);
+                Type[] args1 = map(typeRef0.args);
+                if (pre1 == typeRef0.pre && args1 == typeRef0.args) return tp;
+                else return typeRef(pre1, typeRef0.sym, args1);
+            } else if (tp instanceof SingleType) {
+                SingleType singleType0 = (SingleType)tp;
+                Type pre1 = apply(singleType0.pre);
+                if (pre1 == singleType0.pre) return tp;
+                else return singleType(pre1, singleType0.sym);
+            } else if (tp instanceof ConstantType) {
+                ConstantType constantType = (ConstantType)tp;
+                Type base1 = apply(constantType.base);
+                if (base1 == constantType.base) return tp;
+                else return new ConstantType(base1, constantType.value);
+            } else if (tp instanceof CompoundType) {
+                CompoundType compoundType = (CompoundType)tp;
+                Type[] parts1 = map(compoundType.parts);
+                Scope members1 = map(compoundType.members);
+                if (parts1 == compoundType.parts && members1 == compoundType.members) {
                     return tp;
-                } else if (members1 == members && !tp.symbol().isCompoundSym()) {
-                    return compoundType(parts1, members, tp.symbol());
+                } else if (members1 == compoundType.members && !tp.symbol().isCompoundSym()) {
+                    return compoundType(parts1, compoundType.members, tp.symbol());
                 } else {
                     Scope members2 = new Scope();
                     //Type tp1 = compoundType(parts1, members2);
@@ -1069,29 +1161,31 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
                     }
                     return tp1;
                 }
-
-            case MethodType(Symbol[] vparams, Type result):
-                Symbol[] vparams1 = map(vparams);
-                Type result1 = apply(result);
-                if (vparams1 == vparams && result1 == result) return tp;
+            } else if (tp instanceof MethodType) {
+                MethodType methodType = (MethodType)tp;
+                Symbol[] vparams1 = map(methodType.vparams);
+                Type result1 = apply(methodType.result);
+                if (vparams1 == methodType.vparams && result1 == methodType.result) return tp;
                 else return MethodType(vparams1, result1);
-            case PolyType(Symbol[] tparams, Type result):
-                Symbol[] tparams1 = map(tparams);
-                Type result1 = apply(result);
-                if (tparams1 != tparams) result1 = result1.subst(tparams, tparams1);
-                if (tparams1 == tparams && result1 == result) return tp;
+            } else if (tp instanceof PolyType) {
+                PolyType polyType = (PolyType)tp;
+                Symbol[] tparams1 = map(polyType.tparams);
+                Type result1 = apply(polyType.result);
+                if (tparams1 != polyType.tparams) result1 = result1.subst(polyType.tparams, tparams1);
+                if (tparams1 == polyType.tparams && result1 == polyType.result) return tp;
                 else return PolyType(tparams1, result1);
-            case OverloadedType(Symbol[] alts, Type[] alttypes):
-                Type[] alttypes1 = map(alttypes);
-                if (alttypes1 == alttypes) return tp;
-                else return OverloadedType(alts, alttypes1);
-            case UnboxedArrayType(Type elemtp):
-                Type elemtp1 = apply(elemtp);
-                if (elemtp1 == elemtp) return tp;
+            } else if (tp instanceof OverloadedType) {
+                OverloadedType overloadedType = (OverloadedType)tp;
+                Type[] alttypes1 = map(overloadedType.alttypes);
+                if (alttypes1 == overloadedType.alttypes) return tp;
+                else return OverloadedType(overloadedType.alts, alttypes1);
+            } else if (tp instanceof UnboxedArrayType) {
+                UnboxedArrayType unboxedArrayType = (UnboxedArrayType)tp;
+                Type elemtp1 = apply(unboxedArrayType.elemtp);
+                if (elemtp1 == unboxedArrayType.elemtp) return tp;
                 else return UnboxedArrayType(elemtp1);
-            default:
-                throw new ApplicationError(tp + " " + tp.symbol());
             }
+            throw new ApplicationError(tp + " " + tp.symbol());
         }
 
         public final Symbol map(Symbol sym) {
@@ -1190,42 +1284,38 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      */
     public Type baseType(Symbol clazz) {
         //System.out.println(this + ".baseType(" + clazz + ")");//DEBUG
-        switch (this) {
-        case ErrorType:
+        if (this == ErrorType) {
             return ErrorType;
-
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        } else if (this instanceof ThisType
+                   || this instanceof SingleType
+                   || this instanceof ConstantType) {
             return singleDeref().baseType(clazz);
-
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            if (sym == clazz)
+        } else if (this instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)this;
+            if (typeRef.sym == clazz)
                 return this;
-            else if (sym.kind == TYPE)
-                return sym.info()
-                    .asSeenFrom(pre, sym.owner()).baseType(clazz);
-            else if (sym.kind == ALIAS)
-                if (sym.typeParams().length == args.length)
-                    return sym.info().subst(sym.typeParams(), args)
-                        .asSeenFrom(pre, sym.owner()).baseType(clazz);
+            else if (typeRef.sym.kind == TYPE)
+                return typeRef.sym.info()
+                    .asSeenFrom(typeRef.pre, typeRef.sym.owner()).baseType(clazz);
+            else if (typeRef.sym.kind == ALIAS)
+                if (typeRef.sym.typeParams().length == typeRef.args.length)
+                    return typeRef.sym.info().subst(typeRef.sym.typeParams(), typeRef.args)
+                        .asSeenFrom(typeRef.pre, typeRef.sym.owner()).baseType(clazz);
                 else return Type.NoType;
             else if (clazz.isCompoundSym())
                 return NoType;
             else {
-                return sym.baseType(clazz)
-                    .asSeenFrom(pre, sym.owner())
-                    .subst(sym.typeParams(), args);
+                return typeRef.sym.baseType(clazz)
+                    .asSeenFrom(typeRef.pre, typeRef.sym.owner())
+                    .subst(typeRef.sym.typeParams(), typeRef.args);
             }
-
-        case CompoundType(Type[] parts, _):
+        } else if (this instanceof CompoundType) {
+            Type[] parts = ((CompoundType)this).parts;
             for (int i = parts.length - 1; i >= 0; i--) {
                 Type result = parts[i].baseType(clazz);
                 if (result != NoType) return result;
             }
-            break;
-
-        case UnboxedArrayType(_):
+        } else if (this instanceof UnboxedArrayType) {
             if (clazz == Global.instance.definitions.ANY_CLASS ||
                 clazz == Global.instance.definitions.ANYREF_CLASS)
                 return clazz.type();
@@ -1267,11 +1357,13 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             //System.out.println(t + " as seen from " + pre + "," + clazz);//DEBUG
             if (pre == NoType || clazz.kind != CLASS)
                 return t;
-            switch (t) {
-            case ThisType(Symbol sym):
-                return t.toPrefix(sym, pre, clazz);
-
-            case TypeRef(Type prefix, Symbol sym, Type[] args):
+            if (t instanceof ThisType) {
+                return t.toPrefix(((ThisType)t).sym, pre, clazz);
+            } else if (t instanceof TypeRef) {
+                TypeRef typeRef0 = (TypeRef)t;
+                Type prefix = typeRef0.pre;
+                Symbol sym = typeRef0.sym;
+                Type[] args = typeRef0.args;
                 if (sym.kind == ALIAS && sym.typeParams().length == args.length) {
                     return apply(
                         sym.info().subst(sym.typeParams(), args)
@@ -1318,18 +1410,18 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
                     if (sym1 != sym) t1 = apply(t1.unalias());
                     return t1;
                 }
-
-            case SingleType(Type prefix, Symbol sym):
+            } else if (t instanceof SingleType) {
+                SingleType singleType0 = (SingleType)t;
+                Type prefix = singleType0.pre;
+                Symbol sym = singleType0.sym;
                 try {
                     Type prefix1 = apply(prefix);
                     if (prefix1 == prefix) return t;
                     else return singleType(prefix1, prefix1.rebind(sym));
                 } catch (Type.Malformed ex) {}
                 return apply(t.singleDeref());
-
-            default:
-                return map(t);
             }
+            return map(t);
         }
     }
     //where
@@ -1339,15 +1431,16 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             Symbol ownclass = sym.owner().constructorClass();
             if (ownclass == clazz &&
                 pre.widen().symbol().isSubClass(ownclass)) {
-                switch (pre.baseType(ownclass)) {
-                case TypeRef(_, Symbol basesym, Type[] baseargs):
+                Type baseType = pre.baseType(ownclass);
+                if (baseType instanceof TypeRef) {
+                    Symbol basesym = ((TypeRef)baseType).sym;
+                    Type[] baseargs = ((TypeRef)baseType).args;
                     Symbol[] baseparams = basesym.typeParams();
                     for (int i = 0; i < baseparams.length; i++) {
                         if (sym == baseparams[i]) return baseargs[i];
                     }
                     //System.out.println(sym + " " + basesym + " " + ArrayApply.toString(baseparams));//DEBUG
-                    break;
-                case ErrorType:
+                } else if (baseType == ErrorType) {
                     return ErrorType;
                 }
                 throw new ApplicationError(
@@ -1416,7 +1509,7 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     /** A common map superclass for symbol/symbol and type/symbol substitutions.
      */
     public static abstract class SubstMap extends Map {
-        private Symbol[] from;
+        protected Symbol[] from;
 
         SubstMap(Symbol[] from) {
             this.from = from;
@@ -1439,26 +1532,30 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         protected abstract SubstMap exclude(Symbol[] newfrom, Symbol[] excluded);
 
         public Type apply(Type t) {
-            switch (t) {
-            case TypeRef(ThisType(_), Symbol sym, Type[] args):
-                for (int i = 0; i < from.length; i++) {
-                    if (matches(sym, from[i])) return replacement(i, t);
+            if (t instanceof TypeRef) {
+                TypeRef typeRef = (TypeRef)t;
+                if (typeRef.pre instanceof ThisType) {
+                    for (int i = 0; i < from.length; i++) {
+                        if (matches(typeRef.sym, from[i])) return replacement(i, t);
+                    }
                 }
-                break;
-            case SingleType(ThisType(_), Symbol sym):
-                for (int i = 0; i < from.length; i++) {
-                    if (matches(sym, from[i])) return replacement(i, t);
+            } else if (t instanceof SingleType) {
+                SingleType singleType = (SingleType)t;
+                if (singleType.pre instanceof ThisType) {
+                    for (int i = 0; i < from.length; i++) {
+                        if (matches(singleType.sym, from[i])) return replacement(i, t);
+                    }
                 }
-                break;
-            case PolyType(Symbol[] tparams, Type result):
-                Symbol[] from1 = excludeSyms(from, tparams, from);
+            } else if (t instanceof PolyType) {
+                PolyType polyType = (PolyType)t;
+                Symbol[] from1 = excludeSyms(from, polyType.tparams, from);
                 if (from1 != from) {
-                    SubstMap f = exclude(from1, tparams);
-                    Symbol[] tparams1 = f.map(tparams);
-                    Type result1 = f.apply(result);
-                    if (tparams1 != tparams)
-                        result1 = result1.subst(tparams, tparams1);
-                    if (tparams1 == tparams && result1 == result) return t;
+                    SubstMap f = exclude(from1, polyType.tparams);
+                    Symbol[] tparams1 = f.map(polyType.tparams);
+                    Type result1 = f.apply(polyType.result);
+                    if (tparams1 != polyType.tparams)
+                        result1 = result1.subst(polyType.tparams, tparams1);
+                    if (tparams1 == polyType.tparams && result1 == polyType.result) return t;
                     else return PolyType(tparams1, result1);
                 }
             }
@@ -1479,7 +1576,7 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             return cnt;
         }
 
-        private Symbol[] excludeSyms(Symbol[] from, Symbol[] tparams, Symbol[] syms) {
+        protected final Symbol[] excludeSyms(Symbol[] from, Symbol[] tparams, Symbol[] syms) {
             int n = nCommon(from, tparams);
             if (n == 0) {
                 return syms;
@@ -1493,7 +1590,7 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             }
         }
 
-        private Type[] excludeTypes(Symbol[] from, Symbol[] tparams, Type[] types) {
+        protected final Type[] excludeTypes(Symbol[] from, Symbol[] tparams, Type[] types) {
             int n = nCommon(from, tparams);
             if (n == 0) {
                 return types;
@@ -1517,14 +1614,14 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             this.to = to;
         }
         protected Type replacement(int i, Type fromtp) {
-            switch (fromtp) {
-            case TypeRef(Type pre, Symbol sym, Type[] args):
-                return typeRef(pre, to[i], args);
-            case SingleType(Type pre, Symbol sym):
-                return singleType(pre, to[i]);
-            default:
-                throw new ApplicationError();
+            if (fromtp instanceof TypeRef) {
+                TypeRef typeRef = (TypeRef)fromtp;
+                return typeRef(typeRef.pre, to[i], typeRef.args);
+            } else if (fromtp instanceof SingleType) {
+                SingleType singleType = (SingleType)fromtp;
+                return singleType(singleType.pre, to[i]);
             }
+            throw new ApplicationError();
         }
         protected SubstMap exclude(Symbol[] newfrom, Symbol[] excluded) {
             return new SubstSymMap(newfrom, excludeSyms(from, excluded, to));
@@ -1556,29 +1653,29 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             super(from, to);
         }
         public Type apply(Type t) {
-            switch (t) {
-            case PolyType(Symbol[] params, Type result):
+            if (t instanceof PolyType) {
+                PolyType polyType = (PolyType)t;
                 // !!! Also update loBounds? How? loBound can only be set!
-                for (int i = 0; i < params.length; i++) {
-                    Type tp = params[i].nextType();
+                for (int i = 0; i < polyType.tparams.length; i++) {
+                    Type tp = polyType.tparams[i].nextType();
                     Type tp1 = apply(tp);
-                    if (tp != tp1) params[i].updateInfo(tp1);
+                    if (tp != tp1) polyType.tparams[i].updateInfo(tp1);
                 }
-                Type result1 = apply(result);
-                if (result1 == result) return t;
-                else return Type.PolyType(params, result1);
-            case MethodType(Symbol[] params, Type result):
-                for (int i = 0; i < params.length; i++) {
-                    Type tp = params[i].nextType();
+                Type result1 = apply(polyType.result);
+                if (result1 == polyType.result) return t;
+                else return Type.PolyType(polyType.tparams, result1);
+            } else if (t instanceof MethodType) {
+                MethodType methodType = (MethodType)t;
+                for (int i = 0; i < methodType.vparams.length; i++) {
+                    Type tp = methodType.vparams[i].nextType();
                     Type tp1 = apply(tp);
-                    if (tp != tp1) params[i].updateInfo(tp1);
+                    if (tp != tp1) methodType.vparams[i].updateInfo(tp1);
                 }
-                Type result1 = apply(result);
-                if (result1 == result) return t;
-                else return Type.MethodType(params, result1);
-            default:
-                return super.apply(t);
+                Type result1 = apply(methodType.result);
+                if (result1 == methodType.result) return t;
+                else return Type.MethodType(methodType.vparams, result1);
             }
+            return super.apply(t);
         }
         public Symbol map(Symbol sym, boolean dontClone) { return sym; }
         public Symbol[] map(Symbol[] syms, boolean dontClone) { return syms; }
@@ -1654,18 +1751,16 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             this(oldSym, newSym.thisType());
         }
         public Type apply(Type t) {
-            switch (t) {
-            case ThisType(Symbol sym):
-                if (sym == from) return to;
-                else return t;
-	    case TypeRef(Type pre, Symbol sym, Type[] args):
-                Type pre1 = apply(pre);
-                Type[] args1 = map(args);
-                if (pre1 == pre && args1 == args) return t;
-                else return typeRef(pre1, pre1.rebind(sym), args1);
-            default:
-                return map(t);
+            if (t instanceof ThisType) {
+                return ((ThisType)t).sym == from ? to : t;
+            } else if (t instanceof TypeRef) {
+                TypeRef typeRef = (TypeRef)t;
+                Type pre1 = apply(typeRef.pre);
+                Type[] args1 = map(typeRef.args);
+                if (pre1 == typeRef.pre && args1 == typeRef.args) return t;
+                else return typeRef(pre1, pre1.rebind(typeRef.sym), args1);
             }
+            return map(t);
         }
     }
 
@@ -1685,16 +1780,18 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         }
         public Type apply(Type t) {
             if (!result) {
-                switch (t) {
-                case TypeRef(Type pre, Symbol sym1, Type[] args):
-                    if (sym == sym1) result = true;
-                    else { map(pre); map(args); }
-                    break;
-                case SingleType(Type pre, Symbol sym1):
-                    map(pre);
-                    if (sym == sym1) result = true;
-                    break;
-                default:
+                if (t instanceof TypeRef) {
+                    TypeRef typeRef = (TypeRef)t;
+                    if (sym == typeRef.sym) result = true;
+                    else {
+                        map(typeRef.pre);
+                        map(typeRef.args);
+                    }
+                } else if (t instanceof SingleType) {
+                    SingleType singleType = (SingleType)t;
+                    map(singleType.pre);
+                    if (sym == singleType.sym) result = true;
+                } else {
                     map(t);
                 }
             }
@@ -1768,35 +1865,32 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      * MethodTypes and PolyTypes have been cloned.
      */
     public Type cloneType(Symbol oldOwner, Symbol newOwner) {
-        switch (this) {
-
-        case MethodType(Symbol[] vparams, Type result):
-            Symbol[] clones = new Symbol[vparams.length];
+        if (this instanceof MethodType) {
+            MethodType methodType = (MethodType)this;
+            Symbol[] clones = new Symbol[methodType.vparams.length];
             for (int i = 0; i < clones.length; i++) {
-                assert vparams[i].owner() == oldOwner : Debug.show(vparams[i]);
-                clones[i] = vparams[i].cloneSymbol(newOwner);
+                assert methodType.vparams[i].owner() == oldOwner : Debug.show(methodType.vparams[i]);
+                clones[i] = methodType.vparams[i].cloneSymbol(newOwner);
             }
-            result = result.cloneType(oldOwner, newOwner);
+            Type result = methodType.result.cloneType(oldOwner, newOwner);
             Type clone = Type.MethodType(clones, result);
-            if (vparams.length != 0)
-                clone = new SubstSymMap(vparams, clones).applyParams(clone);
+            if (methodType.vparams.length != 0)
+                clone = new SubstSymMap(methodType.vparams, clones).applyParams(clone);
             return clone;
-
-        case PolyType(Symbol[] tparams, Type result):
-            Symbol[] clones = new Symbol[tparams.length];
+        } else if (this instanceof PolyType) {
+            PolyType polyType = (PolyType)this;
+            Symbol[] clones = new Symbol[polyType.tparams.length];
             for (int i = 0; i < clones.length; i++) {
-                assert tparams[i].owner() == oldOwner : Debug.show(tparams[i]);
-                clones[i] = tparams[i].cloneSymbol(newOwner);
+                assert polyType.tparams[i].owner() == oldOwner : Debug.show(polyType.tparams[i]);
+                clones[i] = polyType.tparams[i].cloneSymbol(newOwner);
             }
-            result = result.cloneType(oldOwner, newOwner);
+            Type result = polyType.result.cloneType(oldOwner, newOwner);
             Type clone = Type.PolyType(clones, result);
-            if (tparams.length != 0)
-                clone = new SubstSymMap(tparams, clones).applyParams(clone);
+            if (polyType.tparams.length != 0)
+                clone = new SubstSymMap(polyType.tparams, clones).applyParams(clone);
             return clone;
-
-        default:
-            return this;
         }
+        return this;
     }
 
     /**
@@ -1807,29 +1901,26 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      * applying some Map.applyParams method to the returned type.
      */
     public Type cloneTypeNoSubst(SymbolCloner cloner) {
-        switch (this) {
-
-        case MethodType(Symbol[] vparams, Type result):
-            Symbol[] clones = cloner.cloneSymbols(vparams);
-            return Type.MethodType(clones, result.cloneTypeNoSubst(cloner));
-
-        case PolyType(Symbol[] tparams, Type result):
-            Symbol[] clones = cloner.cloneSymbols(tparams);
-            return Type.PolyType(clones, result.cloneTypeNoSubst(cloner));
-
-        default:
-            return this;
+        if (this instanceof MethodType) {
+            MethodType methodType = (MethodType)this;
+            Symbol[] clones = cloner.cloneSymbols(methodType.vparams);
+            return Type.MethodType(clones, methodType.result.cloneTypeNoSubst(cloner));
+        } else if (this instanceof PolyType) {
+            PolyType polyType = (PolyType)this;
+            Symbol[] clones = cloner.cloneSymbols(polyType.tparams);
+            return Type.PolyType(clones, polyType.result.cloneTypeNoSubst(cloner));
         }
+        return this;
     }
 
 
 // Comparisons ------------------------------------------------------------------
 
     /** Type relations */
-    public static class Relation {
-        public case SubType;   // this SubType   that <=> this.isSubType(that)
-        public case SameType;  // this SameType  that <=> this.isSameAs(that)
-        public case SuperType; // this SuperType that <=> that.isSubType(this)
+    public enum Relation {
+        SubType,   // this SubType   that <=> this.isSubType(that)
+        SameType,  // this SameType  that <=> this.isSameAs(that)
+        SuperType; // this SuperType that <=> that.isSubType(this)
 
         public String toString() {
             return toString(false);
@@ -1875,177 +1966,149 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     public boolean isSubType0(Type that) {
         if (this == that) return true;
 
-        switch (this) {
-        case ErrorType:
-        case AnyType:
+        if (this == ErrorType || this == AnyType) {
             return true;
         }
 
-        switch (that) {
-        case ErrorType:
-        case AnyType:
+        if (that == ErrorType || that == AnyType) {
             return true;
-
-        case NoType:
+        } else if (that == NoType) {
             return false;
-
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
-            switch (this) {
-            case ThisType(_):
-            case SingleType(_, _):
-            case ConstantType(_, _):
+        } else if (that instanceof ThisType
+                   || that instanceof SingleType
+                   || that instanceof ConstantType) {
+            if (this instanceof ThisType
+                || this instanceof SingleType
+                || this instanceof ConstantType) {
                 return this.isSameAs(that);
             }
-            break;
-
-        case TypeRef(Type pre1, Symbol sym1, Type[] args1):
-            switch (this) {
-            case TypeRef(Type pre, Symbol sym, Type[] args):
-                if (pre.isSubType(pre1) &&
-                     (sym == sym1 || sym == pre.rebind(sym1)) &&
-                    isSubArgs(args, args1, sym.typeParams())
+        } else if (that instanceof TypeRef) {
+            TypeRef thatTypeRef = (TypeRef)that;
+            if (this instanceof TypeRef) {
+                TypeRef thisTypeRef = (TypeRef)this;
+                if ((thisTypeRef.pre.isSubType(thatTypeRef.pre) &&
+                     (thisTypeRef.sym == thatTypeRef.sym || thisTypeRef.sym == thisTypeRef.pre.rebind(thatTypeRef.sym)) &&
+                     isSubArgs(thisTypeRef.args, thatTypeRef.args, thisTypeRef.sym.typeParams()))
                     ||
-                    sym.kind == TYPE && pre.memberInfo(sym).isSubType(that))
+                    (thisTypeRef.sym.kind == TYPE && thisTypeRef.pre.memberInfo(thisTypeRef.sym).isSubType(that)))
                     return true;
-                break;
             }
-            if (sym1.kind == CLASS) {
-                Type base = this.baseType(sym1);
+            if (thatTypeRef.sym.kind == CLASS) {
+                Type base = this.baseType(thatTypeRef.sym);
                 if (this != base && base.isSubType(that))
                     return true;
             }
-            break;
-
-        case CompoundType(Type[] parts1, Scope members1):
+        } else if (that instanceof CompoundType) {
+            CompoundType compoundType = (CompoundType)that;
             int i = 0;
-            while (i < parts1.length && isSubType(parts1[i])) i++;
-            if (i == parts1.length && specializes(members1))
+            while (i < compoundType.parts.length && isSubType(compoundType.parts[i])) i++;
+            if (i == compoundType.parts.length && specializes(compoundType.members))
                 return true;
-            break;
-
-        case MethodType(Symbol[] ps1, Type res1):
-            switch (this) {
-            case MethodType(Symbol[] ps, Type res):
-                if (ps.length != ps1.length) return false;
-                for (int i = 0; i < ps.length; i++) {
-                    Symbol p1 = ps1[i];
-                    Symbol p = ps[i];
+        } else if (that instanceof MethodType) {
+            if (this instanceof MethodType) {
+                MethodType thisMethodType = (MethodType)this;
+                MethodType thatMethodType = (MethodType)that;
+                if (thisMethodType.vparams.length != thatMethodType.vparams.length) return false;
+                for (int i = 0; i < thisMethodType.vparams.length; i++) {
+                    Symbol p1 = thatMethodType.vparams[i];
+                    Symbol p = thisMethodType.vparams[i];
                     if (!p1.type().isSameAs(p.type()) ||
                         (p1.flags & (DEF | REPEATED)) != (p.flags & (DEF | REPEATED)))
                         return false;
                 }
-                return res.isSubType(res1);
+                return thisMethodType.result.isSubType(thatMethodType.result);
             }
-            break;
-
-        case PolyType(Symbol[] ps1, Type res1):
-            switch (this) {
-            case PolyType(Symbol[] ps, Type res):
-                if (ps.length != ps1.length) return false;
-                for (int i = 0; i < ps.length; i++)
-                    if (!ps1[i].info().subst(ps1, ps).isSameAs(ps[i].info()) ||
-                        !ps[i].loBound().isSameAs(ps1[i].loBound().subst(ps1, ps)))
+        } else if (that instanceof PolyType) {
+            if (this instanceof PolyType) {
+                PolyType thisPolyType = (PolyType)this;
+                PolyType thatPolyType = (PolyType)that;
+                if (thisPolyType.tparams.length != thatPolyType.tparams.length) return false;
+                for (int i = 0; i < thisPolyType.tparams.length; i++)
+                    if (!thatPolyType.tparams[i].info().subst(thatPolyType.tparams, thisPolyType.tparams).isSameAs(thisPolyType.tparams[i].info()) ||
+                        !thisPolyType.tparams[i].loBound().isSameAs(thatPolyType.tparams[i].loBound().subst(thatPolyType.tparams, thisPolyType.tparams)))
                         return false;
-                return res.isSubType(res1.subst(ps1, ps));
+                return thisPolyType.result.isSubType(thatPolyType.result.subst(thatPolyType.tparams, thisPolyType.tparams));
             }
-            break;
-
-        case OverloadedType(Symbol[] alts1, Type[] alttypes1):
-            for (int i = 0; i < alttypes1.length; i++) {
-                if (!isSubType(alttypes1[i]))
+        } else if (that instanceof OverloadedType) {
+            OverloadedType overloadedType = (OverloadedType)that;
+            for (int i = 0; i < overloadedType.alttypes.length; i++) {
+                if (!isSubType(overloadedType.alttypes[i]))
                     return false;
             }
             return true;
-
-        case UnboxedType(int tag1):
-            switch (this) {
-            case UnboxedType(int tag):
-                return tag == tag1;
+        } else if (that instanceof UnboxedType) {
+            if (this instanceof UnboxedType) {
+                return ((UnboxedType)this).tag == ((UnboxedType)that).tag;
             }
-            break;
-
-        case UnboxedArrayType(Type elemtp1):
-            switch (this) {
-            case UnboxedArrayType(Type elemtp):
-                return elemtp.isSubType(elemtp1);
+        } else if (that instanceof UnboxedArrayType) {
+            if (this instanceof UnboxedArrayType) {
+                return ((UnboxedArrayType)this).elemtp.isSubType(((UnboxedArrayType)that).elemtp);
             }
-            break;
-
-        case TypeVar(Type origin, Constraint constr):
+        } else if (that instanceof TypeVar) {
+            TypeVar typeVar = (TypeVar)that;
             //todo: should we test for equality with origin?
-            if (constr.inst != NoType) {
-                return this.isSubType(constr.inst);
+            if (typeVar.constr.inst != NoType) {
+                return this.isSubType(typeVar.constr.inst);
             } else {
-                constr.lobounds = new List(this, constr.lobounds);
+                typeVar.constr.lobounds = new List(this, typeVar.constr.lobounds);
                 return true;
             }
-
-        default:
+        } else {
             throw new ApplicationError(this + " <: " + that);
         }
 
-        switch (this) {
-        case NoType:
+        if (this == NoType) {
             return false;
-        case ThisType(_):
-        case SingleType(_, _):
+        } else if (this instanceof ThisType || this instanceof SingleType) {
             if (this.singleDeref().isSubType(that)) return true;
-            break;
-        case ConstantType(_, Object value):
+        } else if (this instanceof ConstantType) {
             if (this.singleDeref().isSubType(that)) return true;
-            break;
-        case TypeVar(Type origin, Constraint constr):
-            if (constr.inst != NoType) {
-                return constr.inst.isSubType(that);
+        } else if (this instanceof TypeVar) {
+            TypeVar typeVar = (TypeVar)this;
+            if (typeVar.constr.inst != NoType) {
+                return typeVar.constr.inst.isSubType(that);
             } else {
-                constr.hibounds = new List(that, constr.hibounds);
+                typeVar.constr.hibounds = new List(that, typeVar.constr.hibounds);
                 return true;
             }
-
-        case TypeRef(_, Symbol sym, Type[] args):
-            switch (that) {
-            case TypeRef(Type pre1, Symbol sym1, _):
-                if (sym1.kind == TYPE && this.isSubType(that.loBound()))
+        } else if (this instanceof TypeRef) {
+            TypeRef thisTypeRef = (TypeRef)this;
+            if (that instanceof TypeRef) {
+                TypeRef thatTypeRef = (TypeRef)that;
+                if (thatTypeRef.sym.kind == TYPE && this.isSubType(that.loBound()))
                     return true;
             }
-            if (sym.kind == ALIAS && sym.typeParams().length == args.length)
+            if (thisTypeRef.sym.kind == ALIAS && thisTypeRef.sym.typeParams().length == thisTypeRef.args.length)
                 return this.unalias().isSubType(that);
-            else if (sym == Global.instance.definitions.ALL_CLASS)
+            else if (thisTypeRef.sym == Global.instance.definitions.ALL_CLASS)
                 return that.isSubType(Global.instance.definitions.ANY_TYPE());
-            else if (sym == Global.instance.definitions.ALLREF_CLASS)
+            else if (thisTypeRef.sym == Global.instance.definitions.ALLREF_CLASS)
                 return
                     that.symbol() == Global.instance.definitions.ANY_CLASS ||
                     (that.symbol() != Global.instance.definitions.ALL_CLASS &&
                      that.isSubType(Global.instance.definitions.ANYREF_TYPE()));
-            break;
-
-        case OverloadedType(Symbol[] alts, Type[] alttypes):
-            for (int i = 0; i < alttypes.length; i++) {
-                if (alttypes[i].isSubType(that)) return true;
+        } else if (this instanceof OverloadedType) {
+            OverloadedType overloadedType = (OverloadedType)this;
+            for (int i = 0; i < overloadedType.alttypes.length; i++) {
+                if (overloadedType.alttypes[i].isSubType(that)) return true;
             }
-            break;
-
-        case CompoundType(Type[] parts, Scope members):
+        } else if (this instanceof CompoundType) {
+            CompoundType compoundType = (CompoundType)this;
             int i = 0;
-            while (i < parts.length) {
-                if (parts[i].isSubType(that)) return true;
+            while (i < compoundType.parts.length) {
+                if (compoundType.parts[i].isSubType(that)) return true;
                 i++;
             }
-            break;
-
-        case UnboxedArrayType(_):
+        } else if (this instanceof UnboxedArrayType) {
             if (Global.instance.definitions.JAVA_OBJECT_TYPE().isSubType(that))
                 return true;
             // !!! we should probably also test for Clonable, Serializable, ...
         }
 
-        switch (that) {
-        case TypeRef(_, Symbol sym1, Type[] args):
-            if (sym1.kind == ALIAS && sym1.typeParams().length == args.length)
+        if (that instanceof TypeRef) {
+            TypeRef thatTypeRef = (TypeRef)that;
+            if (thatTypeRef.sym.kind == ALIAS && thatTypeRef.sym.typeParams().length == thatTypeRef.args.length)
                 return this.isSubType(that.unalias());
-            break;
         }
 
         return false;
@@ -2152,146 +2215,133 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     public boolean isSameAs0(Type that) {
         if (this == that) return true;
 
-        switch (this) {
-        case ErrorType:
-        case AnyType:
+        if (this == ErrorType || this == AnyType) {
             return true;
-
-        case ThisType(Symbol sym):
-            switch (that) {
-            case ThisType(Symbol sym1):
-                return sym == sym1;
-            case SingleType(Type pre1, Symbol sym1):
-                return sym1.isModule()
-                    && sym == sym1.moduleClass()
-                    && sym.owner().thisType().isSameAs(pre1)
+        } else if (this instanceof ThisType) {
+            Symbol sym = ((ThisType)this).sym;
+            if (that instanceof ThisType) {
+                return sym == ((ThisType)that).sym;
+            } else if (that instanceof SingleType) {
+                SingleType thatSingleType = (SingleType)that;
+                return (thatSingleType.sym.isModule()
+                    && sym == thatSingleType.sym.moduleClass()
+                    && sym.owner().thisType().isSameAs(thatSingleType.pre))
                     ||
                     deAlias(that) != that &&
                     this.isSameAs(deAlias(that));
             }
-            break;
-
-        case SingleType(Type pre, Symbol sym):
-            switch (that) {
-            case SingleType(Type pre1, Symbol sym1):
-                return sym == sym1 && pre.isSameAs(pre1)
+        } else if (this instanceof SingleType) {
+            SingleType thisSingleType = (SingleType)this;
+            if (that instanceof SingleType) {
+                SingleType thatSingleType = (SingleType)that;
+                return (thisSingleType.sym == thatSingleType.sym && thisSingleType.pre.isSameAs(thatSingleType.pre))
                     ||
                     (deAlias(this) != this || deAlias(that) != that) &&
                     deAlias(this).isSameAs(deAlias(that));
-            case ThisType(Symbol sym1):
-                return sym.isModule()
-                    && sym.moduleClass() == sym1
-                    && pre.isSameAs(sym1.owner().thisType())
+            } else if (that instanceof ThisType) {
+                Symbol sym1 = ((ThisType)that).sym;
+                return (thisSingleType.sym.isModule()
+                    && thisSingleType.sym.moduleClass() == sym1
+                    && thisSingleType.pre.isSameAs(sym1.owner().thisType()))
                     ||
                     deAlias(this) != this &&
                     deAlias(this).isSameAs(that);
-            default:
+            } else {
                 if (deAlias(this) != this)
                     return deAlias(this).isSameAs(that);
             }
-            break;
-
-        case ConstantType(Type base, Object value):
-            switch (that) {
-            case ConstantType(Type base1, Object value1):
-                return base.isSameAs(base1) && value.equals(value1);
+        } else if (this instanceof ConstantType) {
+            ConstantType thisConstantType = (ConstantType)this;
+            if (that instanceof ConstantType) {
+                ConstantType thatConstantType = (ConstantType)that;
+                return thisConstantType.base.isSameAs(thatConstantType.base)
+                    && thisConstantType.value.equals(thatConstantType.value);
             }
-            break;
-
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            switch (that) {
-            case TypeRef(Type pre1, Symbol sym1, Type[] args1):
-                if (sym == sym1 && pre.isSameAs(pre1) && isSameAs(args, args1))
+        } else if (this instanceof TypeRef) {
+            TypeRef thisTypeRef = (TypeRef)this;
+            if (that instanceof TypeRef) {
+                TypeRef thatTypeRef = (TypeRef)that;
+                if (thisTypeRef.sym == thatTypeRef.sym
+                    && thisTypeRef.pre.isSameAs(thatTypeRef.pre)
+                    && isSameAs(thisTypeRef.args, thatTypeRef.args))
                     return true;
             }
-            break;
-
-        case CompoundType(Type[] parts, Scope members):
-            switch (that) {
-            case CompoundType(Type[] parts1, Scope members1):
-                if (parts.length != parts1.length) return false;
-                for (int i = 0; i < parts.length; i++)
-                    if (!parts[i].isSameAs(parts1[i])) return false;
-                return isSameAs(members, members1);
+        } else if (this instanceof CompoundType) {
+            CompoundType thisCompoundType = (CompoundType)this;
+            if (that instanceof CompoundType) {
+                CompoundType thatCompoundType = (CompoundType)that;
+                if (thisCompoundType.parts.length != thatCompoundType.parts.length) return false;
+                for (int i = 0; i < thisCompoundType.parts.length; i++)
+                    if (!thisCompoundType.parts[i].isSameAs(thatCompoundType.parts[i])) return false;
+                return isSameAs(thisCompoundType.members, thatCompoundType.members);
             }
-            break;
-
-        case MethodType(Symbol[] ps, Type res):
-            switch (that) {
-            case MethodType(Symbol[] ps1, Type res1):
-                if (ps.length != ps1.length) return false;
-                for (int i = 0; i < ps.length; i++) {
-                    Symbol p1 = ps1[i];
-                    Symbol p = ps[i];
+        } else if (this instanceof MethodType) {
+            MethodType thisMethodType = (MethodType)this;
+            if (that instanceof MethodType) {
+                MethodType thatMethodType = (MethodType)that;
+                if (thisMethodType.vparams.length != thatMethodType.vparams.length) return false;
+                for (int i = 0; i < thisMethodType.vparams.length; i++) {
+                    Symbol p1 = thatMethodType.vparams[i];
+                    Symbol p = thisMethodType.vparams[i];
                     if (!p1.type().isSameAs(p.type()) ||
                         (p1.flags & (DEF | REPEATED)) != (p.flags & (DEF | REPEATED)))
                         return false;
                 }
-                return res.isSameAs(res1);
+                return thisMethodType.result.isSameAs(thatMethodType.result);
             }
-            break;
-
-        case PolyType(Symbol[] ps, Type res):
-            switch (that) {
-            case PolyType(Symbol[] ps1, Type res1):
-                if (ps.length != ps1.length) return false;
-                for (int i = 0; i < ps.length; i++)
-                    if (!ps1[i].info().subst(ps1, ps).isSameAs(ps[i].info()) ||
-                        !ps1[i].loBound().subst(ps1, ps).isSameAs(ps[i].loBound()))
+        } else if (this instanceof PolyType) {
+            PolyType thisPolyType = (PolyType)this;
+            if (that instanceof PolyType) {
+                PolyType thatPolyType = (PolyType)that;
+                if (thisPolyType.tparams.length != thatPolyType.tparams.length) return false;
+                for (int i = 0; i < thisPolyType.tparams.length; i++)
+                    if (!thatPolyType.tparams[i].info().subst(thatPolyType.tparams, thisPolyType.tparams).isSameAs(thisPolyType.tparams[i].info()) ||
+                        !thatPolyType.tparams[i].loBound().subst(thatPolyType.tparams, thisPolyType.tparams).isSameAs(thisPolyType.tparams[i].loBound()))
                         return false;
-                return res.isSameAs(res1.subst(ps1, ps));
+                return thisPolyType.result.isSameAs(thatPolyType.result.subst(thatPolyType.tparams, thisPolyType.tparams));
             }
-            break;
-
-        case OverloadedType(Symbol[] alts, Type[] alttypes):
-            switch (that) {
-            case OverloadedType(Symbol[] alts1, Type[] alttypes1):
-                return isSubSet(alttypes1, alttypes)
-                    && isSubSet(alttypes, alttypes1);
+        } else if (this instanceof OverloadedType) {
+            if (that instanceof OverloadedType) {
+                OverloadedType thisOverloadedType = (OverloadedType)this;
+                OverloadedType thatOverloadedType = (OverloadedType)that;
+                return isSubSet(thatOverloadedType.alttypes, thisOverloadedType.alttypes)
+                    && isSubSet(thisOverloadedType.alttypes, thatOverloadedType.alttypes);
             }
-            break;
-
-        case UnboxedType(int kind):
-            switch (that) {
-            case UnboxedType(int kind1):
-                return kind == kind1;
+        } else if (this instanceof UnboxedType) {
+            if (that instanceof UnboxedType) {
+                return ((UnboxedType)this).tag == ((UnboxedType)that).tag;
             }
-            break;
-
-        case UnboxedArrayType(Type elemtp):
-            switch (that) {
-            case UnboxedArrayType(Type elemtp1):
-                return elemtp.isSameAs(elemtp1);
+        } else if (this instanceof UnboxedArrayType) {
+            if (that instanceof UnboxedArrayType) {
+                return ((UnboxedArrayType)this).elemtp.isSameAs(((UnboxedArrayType)that).elemtp);
             }
-            break;
         }
 
-        switch (that) {
-        case ErrorType:
-        case AnyType:
+        if (that == ErrorType || that == AnyType) {
             return true;
-        case NoType:
+        } else if (that == NoType) {
             return false;
-        case TypeVar(Type origin, Constraint constr):
+        } else if (that instanceof TypeVar) {
+            Constraint constr = ((TypeVar)that).constr;
             if (constr.inst != NoType) return constr.inst.isSameAs(this);
             else return constr.instantiate(this.any2typevar());
         }
 
-        switch (this) {
-        case NoType:
+        if (this == NoType) {
             return false;
-        case TypeRef(_, Symbol sym, Type[] args):
-            if (sym.kind == ALIAS && sym.typeParams().length == args.length)
+        } else if (this instanceof TypeRef) {
+            TypeRef thisTypeRef = (TypeRef)this;
+            if (thisTypeRef.sym.kind == ALIAS && thisTypeRef.sym.typeParams().length == thisTypeRef.args.length)
                 return this.unalias().isSameAs(that);
-            break;
-        case TypeVar(Type origin, Constraint constr):
+        } else if (this instanceof TypeVar) {
+            Constraint constr = ((TypeVar)this).constr;
             if (constr.inst != NoType) return constr.inst.isSameAs(that);
             else return constr.instantiate(that.any2typevar());
         }
 
-        switch (that) {
-        case TypeRef(_, Symbol sym, Type[] args):
-            if (sym.kind == ALIAS && sym.typeParams().length == args.length)
+        if (that instanceof TypeRef) {
+            TypeRef thatTypeRef = (TypeRef)that;
+            if (thatTypeRef.sym.kind == ALIAS && thatTypeRef.sym.typeParams().length == thatTypeRef.args.length)
                 return this.isSameAs(that.unalias());
         }
 
@@ -2299,8 +2349,7 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     }
     //where
         Type deAlias(Type tp) {
-            switch (tp) {
-            case SingleType(_, _):
+            if (tp instanceof SingleType) {
                 Type tp1 = tp.singleDeref();
                 if (tp1.isStable()) return deAlias(tp1);
             }
@@ -2354,12 +2403,10 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     };
 
     public Type any2typevar() {
-        switch (this) {
-        case AnyType:
+        if (this == AnyType) {
             return TypeVar(this, new Constraint());
-        default:
-            return any2typevarMap.map(this);
         }
+        return any2typevarMap.map(this);
     }
 
 // Closures and Least Upper Bounds ---------------------------------------------------
@@ -2368,13 +2415,13 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *  its direct and indirect (pre-) base types, sorted by Symbol.isLess().
      */
     public Type[] closure() {
-        switch (this.widen().unalias()) {
-        case TypeRef(Type pre, Symbol sym, Type[] args):
+        Type widened = this.widen().unalias();
+        if (widened instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)widened;
             return subst(
-                asSeenFrom(sym.closure(), pre, sym.owner()),
-                sym.typeParams(), args);
-
-        case CompoundType(Type[] parts, Scope members):
+                asSeenFrom(typeRef.sym.closure(), typeRef.pre, typeRef.sym.owner()),
+                typeRef.sym.typeParams(), typeRef.args);
+        } else if (widened instanceof CompoundType) {
 /*
 	    if (symbol().isCompoundSym()) {
 		Type[][] closures = new Type[parts.length][];
@@ -2384,10 +2431,8 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
 	    } else {
 */
 	    return symbol().closure();
-
-        default:
-            return new Type[]{this};
         }
+        return new Type[]{this};
     }
 
     /** return union of array of closures. It is assumed that
@@ -2497,17 +2542,19 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         Type[] args = new Type[tparams.length];
         Type[][] argss = new Type[args.length][tps.length];
         for (int i = 0; i < tps.length; i++) {
-            switch (tps[i]) {
-            case TypeRef(Type pre1, Symbol sym1, Type[] args1):
+            if (tps[i] instanceof TypeRef) {
+                TypeRef typeRef = (TypeRef)tps[i];
+                Type pre1 = typeRef.pre;
+                Symbol sym1 = typeRef.sym;
+                Type[] args1 = typeRef.args;
                 assert sym == sym1;
                 assert args1.length == args.length;
                 if (!pre.isSameAs(pre1)) return NoType;
                 for (int j = 0; j < args1.length; j++)
                     argss[j][i] = args1[j];
-                break;
-            case ErrorType:
+            } else if (tps[i] == ErrorType) {
                 return ErrorType;
-            default:
+            } else {
                 assert false : tps[i];
             }
         }
@@ -2549,14 +2596,13 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         int nredundant = 0;
         boolean[] redundant = new boolean[tps.length];
         for (int i = 0; i < tps.length; i++) {
-            switch (tps[i]) {
-            case ErrorType:
+            if (tps[i] == ErrorType) {
                 return new Type[]{ErrorType};
-            case MethodType(_, _):
-            case PolyType(_, _):
-            case OverloadedType(_, _):
+            } else if (tps[i] instanceof MethodType
+                       || tps[i] instanceof PolyType
+                       || tps[i] instanceof OverloadedType) {
                 return new Type[]{NoType};
-            default:
+            } else {
                 assert tps[i].isObjectType(): tps[i];
                 for (int j = 0; j < i && !redundant[i]; j++) {
                     if (!redundant[j]) {
@@ -2620,11 +2666,10 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
 
         //If all types are method types with same parameters,
         //compute lub of their result types.
-        switch (tps[0]) {
-        case PolyType(Symbol[] tparams, _):
-            return polyLub(tps, tparams);
-        case MethodType(Symbol[] vparams, _):
-            return methodLub(tps, vparams);
+        if (tps[0] instanceof PolyType) {
+            return polyLub(tps, ((PolyType)tps[0]).tparams);
+        } else if (tps[0] instanceof MethodType) {
+            return methodLub(tps, ((MethodType)tps[0]).vparams);
         }
 
         // remove types that are subtypes of some other type.
@@ -2700,8 +2745,10 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         Type[][] loboundss = new Type[tparams0.length][tps.length];
         Type[] restps   = new Type[tps.length];
         for (int i = 0; i < tps.length; i++) {
-            switch (tps[i]) {
-            case PolyType(Symbol[] tparams, Type restp):
+            if (tps[i] instanceof PolyType) {
+                PolyType polyType = (PolyType)tps[i];
+                Symbol[] tparams = polyType.tparams;
+                Type restp = polyType.result;
                 if (tparams.length == tparams0.length) {
                     for (int j = 0; j < tparams0.length; j++) {
                         hiboundss[j][i] = tparams[j].info()
@@ -2713,8 +2760,7 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
                 } else {
                     return Type.NoType;
                 }
-                break;
-            default:
+            } else {
                 return Type.NoType;
             }
         }
@@ -2736,8 +2782,10 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     private static Type methodLub(Type[] tps, Symbol[] vparams0) {
         Type[] restps = new Type[tps.length];
         for (int i = 0; i < tps.length; i++) {
-            switch (tps[i]) {
-            case MethodType(Symbol[] vparams, Type restp):
+            if (tps[i] instanceof MethodType) {
+                MethodType methodType = (MethodType)tps[i];
+                Symbol[] vparams = methodType.vparams;
+                Type restp = methodType.result;
                 if (vparams.length != vparams0.length)
                     return Type.NoType;
                 for (int j = 0; j < vparams.length; j++)
@@ -2746,6 +2794,8 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
                         (vparams0[j].flags & (DEF | REPEATED)))
                         return Type.NoType;
                 restps[i] = restp;
+            } else {
+                return Type.NoType;
             }
         }
         Symbol[] vparams = new Symbol[vparams0.length];
@@ -2819,19 +2869,17 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         Type.List treftl = Type.List.EMPTY;
         Type.List comptl = Type.List.EMPTY;
         for (int i = 0; i < tps.length; i++) {
-            switch (tps[i]) {
-            case TypeRef(_, _, _):
+            if (tps[i] instanceof TypeRef) {
                 treftl = new Type.List(tps[i], treftl);
-                break;
-            case CompoundType(Type[] parents, Scope members):
-                if (!members.isEmpty())
+            } else if (tps[i] instanceof CompoundType) {
+                CompoundType compoundType = (CompoundType)tps[i];
+                if (!compoundType.members.isEmpty())
                     comptl = new Type.List(tps[i], comptl);
-                for (int j = 0; j < parents.length; j++)
-                    treftl = new Type.List(parents[j], treftl);
-                break;
-            case ThisType(_):
-            case SingleType(_, _):
-            case ConstantType(_, _):
+                for (int j = 0; j < compoundType.parts.length; j++)
+                    treftl = new Type.List(compoundType.parts[j], treftl);
+            } else if (tps[i] instanceof ThisType
+                       || tps[i] instanceof SingleType
+                       || tps[i] instanceof ConstantType) {
                 return Global.instance.definitions.ALL_TYPE();
             }
         }
@@ -2901,26 +2949,24 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     }
 
     private static Type argGlb(Type tp1, Type tp2) {
-        switch (tp1) {
-        case TypeRef(Type pre1, Symbol sym1, Type[] args1):
-            switch (tp2) {
-            case TypeRef(Type pre2, Symbol sym2, Type[] args2):
-                assert sym1 == sym2;
-                if (pre1.isSameAs(pre2)) {
-                    Symbol[] tparams = sym1.typeParams();
-                    Type[] args = new Type[tparams.length];
-                    for (int i = 0; i < tparams.length; i++) {
-                        if (args1[i].isSameAs(args2[i]))
-                            args[i] = args1[i];
-                        else if ((tparams[i].flags & COVARIANT) != 0)
-                            args[i]= lub(new Type[]{args1[i], args2[i]});
-                        else if ((tparams[i].flags & CONTRAVARIANT) != 0)
-                            args[i]= glb(new Type[]{args1[i], args2[i]});
-                        else
-                            return glb(new Type[]{tp1.loBound(), tp2.loBound()});
-                    }
-                    return typeRef(pre1, sym1, args);
+        if (tp1 instanceof TypeRef && tp2 instanceof TypeRef) {
+            TypeRef typeRef1 = (TypeRef)tp1;
+            TypeRef typeRef2 = (TypeRef)tp2;
+            assert typeRef1.sym == typeRef2.sym;
+            if (typeRef1.pre.isSameAs(typeRef2.pre)) {
+                Symbol[] tparams = typeRef1.sym.typeParams();
+                Type[] args = new Type[tparams.length];
+                for (int i = 0; i < tparams.length; i++) {
+                    if (typeRef1.args[i].isSameAs(typeRef2.args[i]))
+                        args[i] = typeRef1.args[i];
+                    else if ((tparams[i].flags & COVARIANT) != 0)
+                        args[i] = lub(new Type[]{typeRef1.args[i], typeRef2.args[i]});
+                    else if ((tparams[i].flags & CONTRAVARIANT) != 0)
+                        args[i] = glb(new Type[]{typeRef1.args[i], typeRef2.args[i]});
+                    else
+                        return glb(new Type[]{tp1.loBound(), tp2.loBound()});
                 }
+                return typeRef(typeRef1.pre, typeRef1.sym, args);
             }
         }
         return glb(new Type[]{tp1.loBound(), tp2.loBound()});
@@ -2978,8 +3024,10 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
         Type[][] loboundss = new Type[tparams0.length][tps.length];
         Type[] restps   = new Type[tps.length];
         for (int i = 0; i < tps.length; i++) {
-            switch (tps[i]) {
-            case PolyType(Symbol[] tparams, Type restp):
+            if (tps[i] instanceof PolyType) {
+                PolyType polyType = (PolyType)tps[i];
+                Symbol[] tparams = polyType.tparams;
+                Type restp = polyType.result;
                 if (tparams.length == tparams0.length) {
                     for (int j = 0; j < tparams0.length; j++) {
                         hiboundss[j][i] = tparams[j].info()
@@ -2991,8 +3039,7 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
                 } else {
                     return Type.NoType;
                 }
-                break;
-            default:
+            } else {
                 return Type.NoType;
             }
         }
@@ -3014,8 +3061,10 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     private static Type methodGlb(Type[] tps, Symbol[] vparams0) {
         Type[] restps = new Type[tps.length];
         for (int i = 0; i < tps.length; i++) {
-            switch (tps[i]) {
-            case MethodType(Symbol[] vparams, Type restp):
+            if (tps[i] instanceof MethodType) {
+                MethodType methodType = (MethodType)tps[i];
+                Symbol[] vparams = methodType.vparams;
+                Type restp = methodType.result;
                 if (vparams.length != vparams0.length)
                     return Type.NoType;
                 for (int j = 0; j < vparams.length; j++)
@@ -3024,6 +3073,8 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
                         (vparams0[i].flags & (DEF | REPEATED)))
                         return Type.NoType;
                 restps[i] = restp;
+            } else {
+                return Type.NoType;
             }
         }
         Symbol[] vparams = new Symbol[vparams0.length];
@@ -3104,8 +3155,10 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
      *  itself.
      */
     public Type unbox() {
-        switch (this) {
-        case TypeRef(Type pre, Symbol sym, Type[] args):
+        if (this instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)this;
+            Symbol sym = typeRef.sym;
+            Type[] args = typeRef.args;
             if ((sym.flags & MODUL) == 0) {
                 Name fullname = sym.fullName();
                 if (fullname == Names.scala_Array && args.length == 1) {
@@ -3128,8 +3181,11 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     }
     //where
         private Type upperBound() {
-            switch (this) {
-            case TypeRef(Type pre, Symbol sym, Type[] args):
+            if (this instanceof TypeRef) {
+                TypeRef typeRef = (TypeRef)this;
+                Type pre = typeRef.pre;
+                Symbol sym = typeRef.sym;
+                Type[] args = typeRef.args;
                 if (sym.kind == ALIAS && sym.typeParams().length == args.length
                     || sym.kind == TYPE)
                     return pre.memberInfo(sym).upperBound();
@@ -3140,12 +3196,14 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     /** Return the erasure of this type.
      */
     public Type erasure() {
-        switch (this) {
-        case ThisType(_):
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        if (this instanceof ThisType
+            || this instanceof SingleType
+            || this instanceof ConstantType) {
             return singleDeref().erasure();
-        case TypeRef(Type pre, Symbol sym, Type[] args):
+        } else if (this instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)this;
+            Type pre = typeRef.pre;
+            Symbol sym = typeRef.sym;
             switch (sym.kind) {
             case ALIAS: case TYPE:
                 return sym.info().asSeenFrom(pre, sym.owner()).erasure();
@@ -3165,27 +3223,28 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
 
             default: throw new ApplicationError(sym + " has wrong kind: " + sym.kind);
             }
-        case CompoundType(Type[] parents, _):
+        } else if (this instanceof CompoundType) {
+            Type[] parents = ((CompoundType)this).parts;
             if (parents.length > 0) return parents[0].erasure();
             else return this;
-        case MethodType(Symbol[] params, Type tp):
-            Symbol[] params1 = erasureMap.map(params);
-            Type tp1 = tp.fullErasure();
-            switch (tp1) {
-            case MethodType(Symbol[] params2, Type tp2):
-                Symbol[] newparams = new Symbol[params1.length + params2.length];
+        } else if (this instanceof MethodType) {
+            MethodType methodType = (MethodType)this;
+            Symbol[] params1 = erasureMap.map(methodType.vparams);
+            Type tp1 = methodType.result.fullErasure();
+            if (tp1 instanceof MethodType) {
+                MethodType nestedMethodType = (MethodType)tp1;
+                Symbol[] newparams = new Symbol[params1.length + nestedMethodType.vparams.length];
                 System.arraycopy(params1, 0, newparams, 0, params1.length);
-                System.arraycopy(params2, 0, newparams, params1.length, params2.length);
-                return MethodType(newparams, tp2);
-            default:
-                if (params1 == params && tp1 == tp) return this;
+                System.arraycopy(nestedMethodType.vparams, 0, newparams, params1.length, nestedMethodType.vparams.length);
+                return MethodType(newparams, nestedMethodType.result);
+            } else {
+                if (params1 == methodType.vparams && tp1 == methodType.result) return this;
                 else return MethodType(params1, tp1);
             }
-        case PolyType(_, Type result):
-            return result.erasure();
-        default:
-            return erasureMap.map(this);
+        } else if (this instanceof PolyType) {
+            return ((PolyType)this).result.erasure();
         }
+        return erasureMap.map(this);
     }
 
     /** Return the full erasure of the type. Full erasure is the same
@@ -3212,56 +3271,61 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     }
 
     public int hashCode() {
-        switch (this) {
-        case ErrorType:
+        if (this == ErrorType) {
             return ERROR;
-        case NoType:
+        } else if (this == NoType) {
             return NOtpe;
-        case ThisType(Symbol sym):
+        } else if (this instanceof ThisType) {
+            Symbol sym = ((ThisType)this).sym;
             return THIStpe
                 ^ (sym.hashCode() * 41);
-        case TypeRef(Type pre, Symbol sym, Type[] args):
+        } else if (this instanceof TypeRef) {
+            TypeRef typeRef = (TypeRef)this;
             return TYPEREFtpe
-                ^ (pre.hashCode() * 41)
-                ^ (sym.hashCode() * (41*41))
-                ^ (hashCode(args) * (41*41*41));
-        case SingleType(Type pre, Symbol sym):
+                ^ (typeRef.pre.hashCode() * 41)
+                ^ (typeRef.sym.hashCode() * (41*41))
+                ^ (hashCode(typeRef.args) * (41*41*41));
+        } else if (this instanceof SingleType) {
+            SingleType singleType = (SingleType)this;
             return SINGLEtpe
-                ^ (pre.hashCode() * 41)
-                ^ (sym.hashCode() * (41*41));
-        case ConstantType(Type base, Object value):
+                ^ (singleType.pre.hashCode() * 41)
+                ^ (singleType.sym.hashCode() * (41*41));
+        } else if (this instanceof ConstantType) {
+            ConstantType constantType = (ConstantType)this;
             return CONSTANTtpe
-                ^ (base.hashCode() * 41)
-                ^ (value.hashCode() * (41*41));
-        case CompoundType(Type[] parts, Scope members):
+                ^ (constantType.base.hashCode() * 41)
+                ^ (constantType.value.hashCode() * (41*41));
+        } else if (this instanceof CompoundType) {
             return symbol().hashCode();
             //return COMPOUNDtpe
             //  ^ (hashCode(parts) * 41)
             //  ^ (members.hashCode() * (41 * 41));
-        case MethodType(Symbol[] vparams, Type result):
+        } else if (this instanceof MethodType) {
+            MethodType methodType = (MethodType)this;
             int h = METHODtpe;
-            for (int i = 0; i < vparams.length; i++)
-                h = (h << 4) ^ (vparams[i].flags & SOURCEFLAGS);
+            for (int i = 0; i < methodType.vparams.length; i++)
+                h = (h << 4) ^ (methodType.vparams[i].flags & SOURCEFLAGS);
             return h
-                ^ (hashCode(Symbol.type(vparams)) * 41)
-                ^ (result.hashCode() * (41 * 41));
-        case PolyType(Symbol[] tparams, Type result):
+                ^ (hashCode(Symbol.type(methodType.vparams)) * 41)
+                ^ (methodType.result.hashCode() * (41 * 41));
+        } else if (this instanceof PolyType) {
+            PolyType polyType = (PolyType)this;
             return POLYtpe
-                ^ (hashCode(tparams) * 41)
-                ^ (result.hashCode() * (41 * 41));
-        case OverloadedType(Symbol[] alts, Type[] alttypes):
+                ^ (hashCode(polyType.tparams) * 41)
+                ^ (polyType.result.hashCode() * (41 * 41));
+        } else if (this instanceof OverloadedType) {
+            OverloadedType overloadedType = (OverloadedType)this;
             return OVERLOADEDtpe
-                ^ (hashCode(alts) * 41)
-                ^ (hashCode(alttypes) * (41 * 41));
-        case UnboxedType(int kind):
+                ^ (hashCode(overloadedType.alts) * 41)
+                ^ (hashCode(overloadedType.alttypes) * (41 * 41));
+        } else if (this instanceof UnboxedType) {
             return UNBOXEDtpe
-                ^ (kind * 41);
-        case UnboxedArrayType(Type elemtp):
+                ^ (((UnboxedType)this).tag * 41);
+        } else if (this instanceof UnboxedArrayType) {
             return UNBOXEDARRAYtpe
-                ^ (elemtp.hashCode() * 41);
-        default:
-            throw new ApplicationError();
+                ^ (((UnboxedArrayType)this).elemtp.hashCode() * 41);
         }
+        throw new ApplicationError();
     }
 
     public static int hashCode(Object[] elems) {
@@ -3278,81 +3342,87 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
             return true;
         } else if (other instanceof Type) {
             Type that = (Type) other;
-            switch (this) {
-            case ErrorType:
+            if (this == ErrorType) {
                 return that == ErrorType;
-            case NoType:
+            } else if (this == NoType) {
                 return that == NoType;
-            case ThisType(Symbol sym):
-                switch (that) {
-                case ThisType(Symbol sym1):
-                    return sym == sym1;
-                default: return false;
+            } else if (this instanceof ThisType) {
+                if (that instanceof ThisType) {
+                    return ((ThisType)this).sym == ((ThisType)that).sym;
                 }
-            case TypeRef(Type pre, Symbol sym, Type[] args):
-                switch (that) {
-                case TypeRef(Type pre1, Symbol sym1, Type[] args1):
-                    return pre.equals(pre1) && sym == sym1 && equals(args, args1);
-                default: return false;
+                return false;
+            } else if (this instanceof TypeRef) {
+                if (that instanceof TypeRef) {
+                    TypeRef thisTypeRef = (TypeRef)this;
+                    TypeRef thatTypeRef = (TypeRef)that;
+                    return thisTypeRef.pre.equals(thatTypeRef.pre)
+                        && thisTypeRef.sym == thatTypeRef.sym
+                        && equals(thisTypeRef.args, thatTypeRef.args);
                 }
-            case SingleType(Type pre, Symbol sym):
-                switch (that) {
-                case SingleType(Type pre1, Symbol sym1):
-                    return pre.equals(pre1) && sym == sym1;
-                default: return false;
+                return false;
+            } else if (this instanceof SingleType) {
+                if (that instanceof SingleType) {
+                    SingleType thisSingleType = (SingleType)this;
+                    SingleType thatSingleType = (SingleType)that;
+                    return thisSingleType.pre.equals(thatSingleType.pre)
+                        && thisSingleType.sym == thatSingleType.sym;
                 }
-            case ConstantType(Type base, Object value):
-                switch (that) {
-                case ConstantType(Type base1, Object value1):
-                    return base.equals(base1) && value.equals(value1);
-                default: return false;
+                return false;
+            } else if (this instanceof ConstantType) {
+                if (that instanceof ConstantType) {
+                    ConstantType thisConstantType = (ConstantType)this;
+                    ConstantType thatConstantType = (ConstantType)that;
+                    return thisConstantType.base.equals(thatConstantType.base)
+                        && thisConstantType.value.equals(thatConstantType.value);
                 }
-            case CompoundType(Type[] parts, Scope members):
-                switch (that) {
-                case CompoundType(Type[] parts1, Scope members1):
+                return false;
+            } else if (this instanceof CompoundType) {
+                if (that instanceof CompoundType) {
                     return this.symbol() == that.symbol();
                     //return parts.equals(parts1) && members.equals(members1);
-                default: return false;
                 }
-            case MethodType(Symbol[] vparams, Type result):
-                switch (that) {
-                case MethodType(Symbol[] vparams1, Type result1):
-                    if (vparams.length != vparams1.length)
+                return false;
+            } else if (this instanceof MethodType) {
+                if (that instanceof MethodType) {
+                    MethodType thisMethodType = (MethodType)this;
+                    MethodType thatMethodType = (MethodType)that;
+                    if (thisMethodType.vparams.length != thatMethodType.vparams.length)
                         return false;
-                    for (int i = 0; i < vparams.length; i++)
-                        if ((vparams[i].flags & SOURCEFLAGS) !=
-                            (vparams1[i].flags & SOURCEFLAGS))
+                    for (int i = 0; i < thisMethodType.vparams.length; i++)
+                        if ((thisMethodType.vparams[i].flags & SOURCEFLAGS) !=
+                            (thatMethodType.vparams[i].flags & SOURCEFLAGS))
                             return false;
                     return
-                        equals(Symbol.type(vparams), Symbol.type(vparams1)) &&
-                        result.equals(result1);
-                default: return false;
+                        equals(Symbol.type(thisMethodType.vparams), Symbol.type(thatMethodType.vparams)) &&
+                        thisMethodType.result.equals(thatMethodType.result);
                 }
-            case PolyType(Symbol[] tparams, Type result):
-                switch (that) {
-                case PolyType(Symbol[] tparams1, Type result1):
-                    return equals(tparams, tparams1) && result.equals(result1);
-                default: return false;
+                return false;
+            } else if (this instanceof PolyType) {
+                if (that instanceof PolyType) {
+                    PolyType thisPolyType = (PolyType)this;
+                    PolyType thatPolyType = (PolyType)that;
+                    return equals(thisPolyType.tparams, thatPolyType.tparams)
+                        && thisPolyType.result.equals(thatPolyType.result);
                 }
-            case OverloadedType(Symbol[] alts, Type[] alttypes):
-                switch (that) {
-                case OverloadedType(Symbol[] alts1, Type[] alttypes1):
-                    return equals(alts, alts1) && equals(alttypes, alttypes1);
-                default: return false;
+                return false;
+            } else if (this instanceof OverloadedType) {
+                if (that instanceof OverloadedType) {
+                    OverloadedType thisOverloadedType = (OverloadedType)this;
+                    OverloadedType thatOverloadedType = (OverloadedType)that;
+                    return equals(thisOverloadedType.alts, thatOverloadedType.alts)
+                        && equals(thisOverloadedType.alttypes, thatOverloadedType.alttypes);
                 }
-            case UnboxedType(int kind):
-                switch (that) {
-                case UnboxedType(int kind1):
-                    return kind == kind1;
-                default: return false;
+                return false;
+            } else if (this instanceof UnboxedType) {
+                if (that instanceof UnboxedType) {
+                    return ((UnboxedType)this).tag == ((UnboxedType)that).tag;
                 }
-            case UnboxedArrayType(Type elemtp):
-                switch (that) {
-                case UnboxedArrayType(Type elemtp1):
-                    return elemtp.equals(elemtp1);
-                default: return false;
+                return false;
+            } else if (this instanceof UnboxedArrayType) {
+                if (that instanceof UnboxedArrayType) {
+                    return ((UnboxedArrayType)this).elemtp.equals(((UnboxedArrayType)that).elemtp);
                 }
-            default:
+                return false;
             }
         }
         return false;
@@ -3481,4 +3551,3 @@ public class Type implements Modifiers, Kinds, TypeTags, EntryTags {
     case PolyType(Symbol[] tparams, Type result):
     case OverloadedType(Symbol[] alts, Type[] alttypes):
 */
-

@@ -11,11 +11,11 @@
 
 package scala;
 
-/** @meta class [?T] extends scala.Function1[scala.Int, ?T];
- */
-public abstract class Array
+public abstract class Array<T>
     extends java.lang.Object
-    implements Function1, Cloneable, java.io.Serializable {
+    implements Function1<scala.Int, T>, Cloneable, java.io.Serializable {
+
+    public int length;
 
     /** @meta constr (scala.Int);
      */
@@ -66,19 +66,13 @@ public abstract class Array
         throw new ClassCastException();
     }
 
-    public java.lang.Object apply(java.lang.Object i) {
-	return apply(((Number) i).intValue());
+    public T apply(scala.Int i) {
+	return apply(i.value);
     }
 
-    /** @meta method (scala.Int) ?T;
-     */
-    public abstract java.lang.Object apply(int i);
+    public abstract T apply(int i);
 
-    /** @meta method (scala.Int, ?T) scala.Unit;
-     */
-    public abstract void update(int i, java.lang.Object x);
+    public abstract void update(int i, T x);
 
-    /** @meta method []scala.Int;
-     */
     public abstract int length();
 }

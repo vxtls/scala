@@ -22,16 +22,12 @@ public class PackageParser extends MetadataParser {
     public ClassParser classCompletion;
     public SymblParser symblCompletion; // provisional
 
-    protected final CLRPackageParser importer;
-
     public PackageParser(Global global) {
         super(global);
         this.classCompletion = new ClassParser(global);
 	this.symblCompletion = new SymblParser(global); // provisional
 	if (global.reporter.verbose)
 	    System.out.println("classpath = " + global.classPath);//debug
-	importer = (global.target == global.TARGET_MSIL)
-	    ? CLRPackageParser.create(global) : null;
     }
 
     /** complete package type symbol p by loading all package members
@@ -52,8 +48,6 @@ public class PackageParser extends MetadataParser {
 		AbstractFile.open(base[i], dirname),
 		p, members, symFile);
 	}
- 	if (global.target == global.TARGET_MSIL)
- 	    importer.importCLRTypes(p, members, this);
         p.setInfo(Type.compoundType(Type.EMPTY_ARRAY, members, p));
         if (dirname == null)
             dirname = "anonymous package";
@@ -81,9 +75,9 @@ public class PackageParser extends MetadataParser {
      */
     protected void includeMembers(AbstractFile dir, Symbol p, Scope locals,
 				  HashMap symFile) {
-        if (dir == null)
+	if (dir == null)
             return;
-	boolean inclClasses = p != global.definitions.ROOT_CLASS;
+	boolean inclClasses = true;
         String[] filenames = null;
         try {
             if ((filenames = dir.list()) == null)

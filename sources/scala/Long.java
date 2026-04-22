@@ -13,9 +13,19 @@ package scala;
 public abstract class Long    extends AnyVal {
 
     public final long    value;
+    public final long    $plus;
+    public final long    $minus;
+    public final double  coerceToDouble;
+    public final float   coerceToFloat;
+    public final long    $tilde;
 
     public Long   (long    value) {
         this.value = value;
+        this.$plus = +value;
+        this.$minus = -value;
+        this.coerceToDouble = value;
+        this.coerceToFloat = value;
+        this.$tilde = ~value;
     }
 
     public boolean equals(java.lang.Object other) {
@@ -54,7 +64,7 @@ public abstract class Long    extends AnyVal {
     public double  $percent   (double  that) { return  value %  that; }
 
     /** @meta method []scala.Double ; */
-    public double  coerce     (            ) { return  value        ; }
+    public double  coerceToDouble(         ) { return  value        ; }
 
     public boolean $eq$eq     (float   that) { return  value == that; }
     public boolean $bang$eq   (float   that) { return  value != that; }
@@ -69,7 +79,7 @@ public abstract class Long    extends AnyVal {
     public float   $percent   (float   that) { return  value %  that; }
 
     /** @meta method []scala.Float  ; */
-    public float   coerce     (            ) { return  value        ; }
+    public float   coerceToFloat(          ) { return  value        ; }
     /** @meta method []scala.Long   ; */
     public long    $tilde     (            ) { return ~value        ; }
 

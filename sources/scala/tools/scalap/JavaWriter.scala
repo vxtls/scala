@@ -83,7 +83,7 @@ class JavaWriter(classfile: Classfile, writer: Writer) extends CodeWriter(writer
 		case cf.UTF8(str) => str;
 		case cf.StringConst(m) => getName(m);
 		case cf.ClassRef(m) => getName(m);
-		case x => Console.println("* " + x); "<error>"
+		case x => scala.Console.println("* " + x); "<error>"
 	}
 
 	def getClassName(n: Int): String = nameToClass(getName(n));

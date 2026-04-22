@@ -180,7 +180,7 @@ public class Comment extends DefaultHandler {
 	Pattern p = Pattern.compile("\\.(\\s)");
 	Matcher m = p.matcher(text);
 	if (m.find()) {
-	    return text.substring(0, m.start(1));;
+	    return text.substring(0, m.start(1));
 	} else
 	    return text;
     }

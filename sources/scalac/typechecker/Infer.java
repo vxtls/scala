@@ -13,6 +13,7 @@ import scalac.ApplicationError;
 import scalac.*;
 import scalac.util.*;
 import scalac.ast.*;
+import scalac.ast.Tree.*;
 import scalac.symtab.*;
 
 public class Infer implements Modifiers, Kinds {
@@ -93,8 +94,9 @@ public class Infer implements Modifiers, Kinds {
 
 	Type.Map elimInferredPolyMap = new Type.Map() {
     	    public Type apply(Type t) {
-		switch (t) {
-		case PolyType(Symbol[] tparams1, Type restp):
+		if (t instanceof Type.PolyType) {
+		    Symbol[] tparams1 = ((Type.PolyType)t).tparams;
+		    Type restp = ((Type.PolyType)t).result;
 		    if (tparams1.length == tparams.length &&
 			tparams1[0] == tparams[0]) {
 			for (int i = 1; i < tparams.length; i++)
@@ -112,8 +114,8 @@ public class Infer implements Modifiers, Kinds {
 		tree.type = typeSubstituter.apply(
 		    elimInferredPolyMap.apply(tree.type));
 	    }
-	    switch (tree) {
-	    case Ident(Name name):
+	    if (tree instanceof Ident) {
+		Name name = ((Ident)tree).name;
 		if (name.isTypeName()) {
 		    Symbol sym = tree.symbol();
 		    for (int i = 0; i < tparams.length; i++) {
@@ -123,11 +125,13 @@ public class Infer implements Modifiers, Kinds {
 		    }
 		}
 		return tree;
-
-	    case TypeApply(Tree fun, Tree[] targs):
+	    }
+	    if (tree instanceof TypeApply) {
+		Tree fun = ((TypeApply)tree).fun;
+		Tree[] targs = ((TypeApply)tree).args;
 		boolean proceed = true;
-		switch (fun.type) {
-		case PolyType(Symbol[] tparams1, _):
+		if (fun.type instanceof Type.PolyType) {
+		    Symbol[] tparams1 = ((Type.PolyType)fun.type).tparams;
 		    if (tparams1.length == tparams.length &&
 			tparams1[0] == tparams[0] &&
 			targs.length == tparams.length) {
@@ -140,21 +144,8 @@ public class Infer implements Modifiers, Kinds {
 		Tree fun1 = proceed ? transform(fun) : fun;
 		Tree[] targs1 = transform(targs);
 		return copy.TypeApply(tree, fun1, targs1);
-
-/*
-	    case TypeTerm():
-		Symbol sym = tree.type.symbol();
-		for (int i = 0; i < tparams.length; i++) {
-		    if (tparams[i].name == sym.name &&
-			tparams[i].owner() == sym.owner()) {
-			return gen.mkType(tree.pos, targs[i]);
-		    }
-		}
-		return tree;
-*/
-	    default:
-		return super.transform(tree);
 	    }
+	    return super.transform(tree);
 	}
     }
 
@@ -166,7 +157,7 @@ public class Infer implements Modifiers, Kinds {
 	else return v;
     }
 
-    private static static int cut(int v) {
+    private static int cut(int v) {
 	if (v == VARIANCES) return v;
 	else return 0;
     }
@@ -203,19 +194,20 @@ public class Infer implements Modifiers, Kinds {
     /** Compute variance of type parameter `tparam' in type of symbol `sym'.
      */
     private static int variance(Symbol tparam, Symbol sym) {
-	switch (sym.kind) {
-	case ERROR:
+	if (sym.kind == ERROR) {
 	    return VARIANCES;
-	case VAL:
+	}
+	if (sym.kind == VAL) {
 	    return variance(tparam, sym.info());
-	case TYPE:
+	}
+	if (sym.kind == TYPE) {
 	    return variance(tparam, sym.info()) &
 		flip(variance(tparam, sym.loBound()));
-	case ALIAS:
-	    return cut(variance(tparam, sym.info()));
-	default:
-	    return 0;
 	}
+	if (sym.kind == ALIAS) {
+	    return cut(variance(tparam, sym.info()));
+	}
+	return 0;
     }
 
     /** Compute variance of type parameter `tparam' in all types `tps'.
@@ -248,28 +240,42 @@ public class Infer implements Modifiers, Kinds {
     /** Does given `tparam' occur with variance `v' in type?
      */
     private static int variance(Symbol tparam, Type tp) {
-	switch (tp) {
-	case ErrorType:
-	case AnyType:
-	case NoType:
-	case ThisType(_):
-	case ConstantType(_, _):
+	if (tp == Type.ErrorType ||
+	    tp == Type.AnyType ||
+	    tp == Type.NoType ||
+	    tp instanceof Type.ThisType ||
+	    tp instanceof Type.ConstantType) {
 	    return VARIANCES;
-	case TypeRef(Type pre, Symbol sym, Type[] args):
+	}
+	if (tp instanceof Type.TypeRef) {
+	    Type.TypeRef typeRef = (Type.TypeRef)tp;
+	    Type pre = typeRef.pre;
+	    Symbol sym = typeRef.sym;
+	    Type[] args = typeRef.args;
 	    if (sym == tparam) return COVARIANT;
 	    else return variance(tparam, pre) &
 		     varianceInArgs(tparam, args, sym.typeParams());
-	case SingleType(Type pre, Symbol sym):
-	    return cut(variance(tparam, pre));
-	case CompoundType(Type[] parts, Scope members):
-	    return variance(tparam, parts) & variance(tparam, members.elements());
-	case MethodType(Symbol[] params, Type restype):
-	    return flip(variance(tparam, params)) & variance(tparam, restype);
-	case PolyType(Symbol[] tparams, Type restype):
-	    return flip(variance(tparam, tparams)) & variance(tparam, restype);
-	default:
-	    throw new ApplicationError(tp.toString());
 	}
+	if (tp instanceof Type.SingleType) {
+	    Type pre = ((Type.SingleType)tp).pre;
+	    return cut(variance(tparam, pre));
+	}
+	if (tp instanceof Type.CompoundType) {
+	    Type[] parts = ((Type.CompoundType)tp).parts;
+	    Scope members = ((Type.CompoundType)tp).members;
+	    return variance(tparam, parts) & variance(tparam, members.elements());
+	}
+	if (tp instanceof Type.MethodType) {
+	    Symbol[] params = ((Type.MethodType)tp).vparams;
+	    Type restype = ((Type.MethodType)tp).result;
+	    return flip(variance(tparam, params)) & variance(tparam, restype);
+	}
+	if (tp instanceof Type.PolyType) {
+	    Symbol[] tparams = ((Type.PolyType)tp).tparams;
+	    Type restype = ((Type.PolyType)tp).result;
+	    return flip(variance(tparam, tparams)) & variance(tparam, restype);
+	}
+	throw new ApplicationError(tp.toString());
     }
 
 // Type parameter inference -----------------------------------------------------
@@ -290,25 +296,25 @@ public class Infer implements Modifiers, Kinds {
     };
 
     private static Type instantiate(Type tp) throws NoInstance {
-	switch (tp) {
-	case AnyType:
-	case NoType:
+	if (tp == Type.AnyType || tp == Type.NoType) {
 	    throw new NoInstance("undetermined type");
-	case TypeVar(Type origin, Type.Constraint constr):
+	}
+	if (tp instanceof Type.TypeVar) {
+	    Type origin = ((Type.TypeVar)tp).origin;
+	    Type.Constraint constr = ((Type.TypeVar)tp).constr;
 	    if (constr.inst != Type.NoType) return instantiate(constr.inst);
 	    else throw new NoInstance("no unique instantiation of type variable " +
 				      origin + " could be found");
-	default:
-	    return instantiateMap.map(tp);
 	}
+	return instantiateMap.map(tp);
     }
 
     /** Map type variable to its instance, or, if `covariant' is true,
      *  to its upper bound;
      */
     private Type instantiateToBound(Type tp, int variance) {
-	switch (tp) {
-	case TypeVar(Type origin, Type.Constraint constr):
+	if (tp instanceof Type.TypeVar) {
+	    Type.Constraint constr = ((Type.TypeVar)tp).constr;
 	    try {
 		if (constr.inst != Type.NoType) {
 		    return instantiate(constr.inst);
@@ -320,13 +326,12 @@ public class Infer implements Modifiers, Kinds {
 			   constr.lobounds != Type.List.EMPTY) {
 		    minimizeVar(tp);
 		    return instantiate(constr.inst);
-		}
+		    }
 	    } catch (NoInstance ex) {
 	    }
 	    return Type.AnyType;
-	default:
-	    throw new ApplicationError();
 	}
+	throw new ApplicationError();
     }
 
     /** The formal parameter types corresponding to `params'.
@@ -417,27 +422,25 @@ public class Infer implements Modifiers, Kinds {
     /** Instantiate variable to glb of its high bounds.
      */
     private void maximizeVar(Type tp) {
-	switch (tp) {
-	case TypeVar(Type origin, Type.Constraint constr):
+	if (tp instanceof Type.TypeVar) {
+	    Type.Constraint constr = ((Type.TypeVar)tp).constr;
 	    if (constr.inst == Type.NoType)
 		constr.inst = Type.glb(constr.hibounds.toArray());
-	    break;
-	default:
-	    throw new ApplicationError();
+	    return;
 	}
+	throw new ApplicationError();
     }
 
     /** Instantiate variable to lub of its low bounds.
      */
     private void minimizeVar(Type tp) {
-	switch (tp) {
-	case TypeVar(Type origin, Type.Constraint constr):
+	if (tp instanceof Type.TypeVar) {
+	    Type.Constraint constr = ((Type.TypeVar)tp).constr;
 	    if (constr.inst == Type.NoType)
 		constr.inst = Type.lub(constr.lobounds.toArray());
-	    break;
-	default:
-	    throw new ApplicationError();
+	    return;
 	}
+	throw new ApplicationError();
     }
 
     /** Solve constraint collected in types `tvars', instantiating `tvars[i]'
@@ -452,8 +455,8 @@ public class Infer implements Modifiers, Kinds {
     private void solve(Symbol[] tparams, boolean upper, int[] variances, Type[] tvars, int i)
         throws NoInstance {
 	if (tvars[i] != Type.NoType) {
-	    switch (tvars[i]) {
-	    case TypeVar(Type origin, Type.Constraint constr):
+	    if (tvars[i] instanceof Type.TypeVar) {
+		Type.Constraint constr = ((Type.TypeVar)tvars[i]).constr;
 		if (constr.inst != Type.NoType) {
 		    constr.inst = tvars[i] = instantiate(constr.inst);
 		} else {
@@ -519,13 +522,13 @@ public class Infer implements Modifiers, Kinds {
 
     private Type.Map freshInstanceMap = new Type.Map() {
         public Type apply(Type t) {
-	    switch (t) {
-	    case PolyType(Symbol[] tparams, Type restp):
+	    if (t instanceof Type.PolyType) {
+		Symbol[] tparams = ((Type.PolyType)t).tparams;
+		Type restp = ((Type.PolyType)t).result;
 		Type restp1 = apply(restp);
 		Symbol[] tparams1 = Symbol.EMPTY_ARRAY;
 		Symbol[] newparams1 = Symbol.EMPTY_ARRAY;
-		switch (restp1) {
-		case PolyType(_, _):
+		if (restp1 instanceof Type.PolyType) {
 		    // If there is a nested polytype, we need to
 		    // substitute also its new type parameters for its old ones
 		    // here. Reason: The outer polytype may refer to type
@@ -548,12 +551,11 @@ public class Infer implements Modifiers, Kinds {
 		}
 		return Type.PolyType(
 		    newparams, restp1.subst(tparams, newparams));
-
-	    case OverloadedType(_, _):
-		return map(t);
-	    default:
-		return t;
 	    }
+	    if (t instanceof Type.OverloadedType) {
+		return map(t);
+	    }
+	    return t;
 	}
     };
 
@@ -566,11 +568,15 @@ public class Infer implements Modifiers, Kinds {
      *  A nullary method type becomes its result type.
      */
     private Type normalize(Type tp) {
-	switch (tp) {
-	case MethodType(Symbol[] params, Type restype):
+	if (tp instanceof Type.MethodType) {
+	    Symbol[] params = ((Type.MethodType)tp).vparams;
+	    Type restype = ((Type.MethodType)tp).result;
 	    return global.definitions.FUNCTION_TYPE(
 		Symbol.type(params), normalize(restype));
-	case PolyType(Symbol[] tparams, Type restype):
+	}
+	if (tp instanceof Type.PolyType) {
+	    Symbol[] tparams = ((Type.PolyType)tp).tparams;
+	    Type restype = ((Type.PolyType)tp).result;
 	    if (tparams.length == 0) return normalize(restype);
 	}
 	return tp;
@@ -581,23 +587,42 @@ public class Infer implements Modifiers, Kinds {
     public boolean isCompatible(Type tp, Type pt) {
 	Type tp1 = normalize(tp);
 	if (tp1.isSubType(pt)) return true;
-	Symbol coerceMeth = tp1.lookup(Names.coerce);
+	Symbol coerceMeth = coerceMethod(tp1, pt);
 	if (coerceMeth.kind == NONE) return false;
         return canCoerce(tp1.memberType(coerceMeth), pt);
     }
         // where
         private boolean canCoerce(Type tp, Type pt) {
-            switch (tp) {
-            case OverloadedType(_, Type[] alttypes):
+            if (tp instanceof Type.OverloadedType) {
+                Type[] alttypes = ((Type.OverloadedType)tp).alttypes;
                 for (int i = 0; i < alttypes.length; i++)
                     if (canCoerce(alttypes[i], pt)) return true;
                 return false;
-            case PolyType(Symbol[] tparams, Type restype):
-                return tparams.length == 0 && restype.isSubType(pt);
-            default:
-                return false;
             }
+            if (tp instanceof Type.PolyType) {
+                Symbol[] tparams = ((Type.PolyType)tp).tparams;
+                Type restype = ((Type.PolyType)tp).result;
+                return tparams.length == 0 && restype.isSubType(pt);
+            }
+            return tp.isSubType(pt);
         }
+
+    public Symbol coerceMethod(Type from, Type to) {
+	Symbol coerceMeth = from.lookup(coerceName(to));
+	if (coerceMeth == Symbol.NONE && coerceName(to) != Names.coerce)
+	    coerceMeth = from.lookup(Names.coerce);
+	return coerceMeth;
+    }
+
+    private Name coerceName(Type to) {
+	Symbol toSym = to.deconst().symbol();
+	if (toSym == definitions.DOUBLE_CLASS) return Names.coerceToDouble;
+	if (toSym == definitions.FLOAT_CLASS) return Names.coerceToFloat;
+	if (toSym == definitions.LONG_CLASS) return Names.coerceToLong;
+	if (toSym == definitions.INT_CLASS) return Names.coerceToInt;
+	if (toSym == definitions.SHORT_CLASS) return Names.coerceToShort;
+	return Names.coerce;
+    }
 
     public boolean isCompatible(Type[] tps, Type[] pts) {
 	for (int i = 0; i < tps.length; i++)
@@ -770,27 +795,28 @@ public class Infer implements Modifiers, Kinds {
      */
     public Type argumentTypeInstance(Symbol[] tparams, Type restype, Type pt1, Type pt2)
 	                      throws Type.Error {
-	switch (restype) {
-	case PolyType(Symbol[] tparams1, Type restype1):
+	if (restype instanceof Type.PolyType) {
+	    Type.PolyType poly = (Type.PolyType) restype;
+	    Symbol[] tparams1 = poly.tparams;
+	    Type restype1 = poly.result;
 	    Symbol[] tparams2 = new Symbol[tparams.length + tparams1.length];
 	    System.arraycopy(tparams, 0, tparams2, 0, tparams.length);
 	    System.arraycopy(tparams1, 0, tparams2, tparams.length, tparams1.length);
 	    return argumentTypeInstance(tparams2, restype1, pt1, pt2);
-	default:
-	    if (tparams.length != 0) {
-		Type[] targs = exprTypeArgs(tparams, restype, pt1);
-		if (targs == null)
-		    targs = exprTypeArgs(tparams, restype, pt2);
-		if (targs == null)
-		    throw new Type.Error(
-			typeErrorMsg(
-			    "polymorphic argument cannot be instantiated to formal parameter type",
-			    Type.PolyType(tparams, restype), pt2));
-		checkBounds(tparams, targs, "inferred ");
-		return restype.subst(tparams, targs);
-	    } else {
-		return normalize(restype);
-	    }
+	}
+	if (tparams.length != 0) {
+	    Type[] targs = exprTypeArgs(tparams, restype, pt1);
+	    if (targs == null)
+		targs = exprTypeArgs(tparams, restype, pt2);
+	    if (targs == null)
+		throw new Type.Error(
+		    typeErrorMsg(
+			"polymorphic argument cannot be instantiated to formal parameter type",
+			Type.PolyType(tparams, restype), pt2));
+	    checkBounds(tparams, targs, "inferred ");
+	    return restype.subst(tparams, targs);
+	} else {
+	    return normalize(restype);
 	}
     }
 
@@ -799,8 +825,10 @@ public class Infer implements Modifiers, Kinds {
      */
     public Tree exprInstance(Tree tree, Symbol[] tparams, Type restype, Type pt)
                             throws Type.Error {
-	switch (restype) {
-	case PolyType(Symbol[] tparams1, Type restype1):
+	if (restype instanceof Type.PolyType) {
+	    Type.PolyType poly = (Type.PolyType) restype;
+	    Symbol[] tparams1 = poly.tparams;
+	    Type restype1 = poly.result;
 	    Symbol[] tparams2 = new Symbol[tparams.length + tparams1.length];
 	    System.arraycopy(tparams, 0, tparams2, 0, tparams.length);
 	    System.arraycopy(tparams1, 0, tparams2, tparams.length, tparams1.length);
@@ -823,13 +851,18 @@ public class Infer implements Modifiers, Kinds {
 			       Symbol[] tparams, Type restype,
 			       Type[] argtypes, Type pt)
 	                       throws Type.Error {
-	switch (restype) {
-	case PolyType(Symbol[] tparams1, Type restype1):
+	if (restype instanceof Type.PolyType) {
+	    Type.PolyType poly = (Type.PolyType) restype;
+	    Symbol[] tparams1 = poly.tparams;
+	    Type restype1 = poly.result;
 	    Symbol[] tparams2 = new Symbol[tparams.length + tparams1.length];
 	    System.arraycopy(tparams, 0, tparams2, 0, tparams.length);
 	    System.arraycopy(tparams1, 0, tparams2, tparams.length, tparams1.length);
 	    return methodInstance(tree, tparams2, restype1, argtypes, pt);
-	case MethodType(Symbol[] params, Type restpe):
+	} else if (restype instanceof Type.MethodType) {
+	    Type.MethodType methodType = (Type.MethodType) restype;
+	    Symbol[] params = methodType.vparams;
+	    Type restpe = methodType.result;
 	    Type[] targs;
 	    try {
 		targs = methTypeArgs(tparams, params, argtypes, restpe, pt, true);
@@ -848,7 +881,7 @@ public class Infer implements Modifiers, Kinds {
 		: Type.MethodType(
 		    params, Type.PolyType(uninstantiated, restpe));
 	    return mkTypeApply(tree, tparams, restype1, targs);
-	default:
+	} else {
 	    return tree;
 	}
     }
@@ -861,8 +894,10 @@ public class Infer implements Modifiers, Kinds {
     public void constructorInstance(Tree tree,
 				    Symbol[] tparams, Type restype, Type pt)
 	                            throws Type.Error {
-	switch (restype) {
-	case PolyType(Symbol[] tparams1, Type restype1):
+	if (restype instanceof Type.PolyType) {
+	    Type.PolyType poly = (Type.PolyType) restype;
+	    Symbol[] tparams1 = poly.tparams;
+	    Type restype1 = poly.result;
 	    Symbol[] tparams2 = new Symbol[tparams.length + tparams1.length];
 	    System.arraycopy(tparams, 0, tparams2, 0, tparams.length);
 	    System.arraycopy(tparams1, 0, tparams2, tparams.length, tparams1.length);
@@ -902,26 +937,35 @@ public class Infer implements Modifiers, Kinds {
      *  does its result conform to `pt'?
      */
     public boolean isApplicable(Type ftpe, Type[] argtypes, Type pt) {
-	switch (ftpe) {
-	case MethodType(Symbol[] params, Type restpe):
+	if (ftpe instanceof Type.MethodType) {
+	    Type.MethodType methodType = (Type.MethodType) ftpe;
+	    Symbol[] params = methodType.vparams;
+	    Type restpe = methodType.result;
 	    // sequences ? List( a* )
 	    Type[] formals = formalTypes(params, argtypes.length);
 	    return
 		isCompatible(restpe, pt) &&
 		formals.length == argtypes.length &&
 		isCompatible(argtypes, formals);
-	case PolyType(Symbol[] tparams, MethodType(Symbol[] params, Type restpe)):
-	    try {
-		Type[] targs = methTypeArgs(
-		    tparams, params, argtypes, restpe, pt, false);
-		if (targs != null) {
-		    Symbol[] uninstantiated = normalizeArgs(targs, tparams);
-		    return
-			isWithinBounds(tparams, targs) &&
-			exprTypeArgs(uninstantiated, restpe.subst(tparams, targs), pt)
-			    != null;
+	} else if (ftpe instanceof Type.PolyType) {
+	    Type.PolyType poly = (Type.PolyType) ftpe;
+	    Symbol[] tparams = poly.tparams;
+	    if (poly.result instanceof Type.MethodType) {
+		Type.MethodType methodType = (Type.MethodType) poly.result;
+		Symbol[] params = methodType.vparams;
+		Type restpe = methodType.result;
+		try {
+		    Type[] targs = methTypeArgs(
+			tparams, params, argtypes, restpe, pt, false);
+		    if (targs != null) {
+			Symbol[] uninstantiated = normalizeArgs(targs, tparams);
+			return
+			    isWithinBounds(tparams, targs) &&
+			    exprTypeArgs(uninstantiated, restpe.subst(tparams, targs), pt)
+				!= null;
+		    }
+		} catch (NoInstance ex) {
 		}
-	    } catch (NoInstance ex) {
 	    }
 	}
 	return false;
@@ -931,14 +975,17 @@ public class Infer implements Modifiers, Kinds {
      *  when both are alternatives in an overloaded function?
      */
     boolean specializes(Type ftpe1, Type ftpe2) {
-	switch (ftpe1) {
-	case MethodType(Symbol[] params, _):
-	    return isApplicable(ftpe2, Symbol.type(params), Type.AnyType);
-	case PolyType(_, MethodType(Symbol[] params, _)):
-	    return isApplicable(ftpe2, Symbol.type(params), Type.AnyType);
-	default:
-	    return false;
+	if (ftpe1 instanceof Type.MethodType) {
+	    Type.MethodType methodType = (Type.MethodType) ftpe1;
+	    return isApplicable(ftpe2, Symbol.type(methodType.vparams), Type.AnyType);
+	} else if (ftpe1 instanceof Type.PolyType) {
+	    Type.PolyType poly = (Type.PolyType) ftpe1;
+	    if (poly.result instanceof Type.MethodType) {
+		Type.MethodType methodType = (Type.MethodType) poly.result;
+		return isApplicable(ftpe2, Symbol.type(methodType.vparams), Type.AnyType);
+	    }
 	}
+	return false;
     }
 
     /** Assign `tree' the type of the alternative which matches
@@ -1068,4 +1115,3 @@ public class Infer implements Modifiers, Kinds {
 	}
     }
 }
-

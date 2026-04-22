@@ -131,8 +131,8 @@ public class Interpreter {
     private Symbol getModule(Symbol owner, Name name) {
         Symbol symbol = owner.lookup(name);
         if (symbol == Symbol.NONE || symbol.isModule()) return symbol;
-        switch (symbol.type()) {
-        case OverloadedType(Symbol[] alts, _):
+        if (symbol.type() instanceof Type.OverloadedType) {
+            Symbol[] alts = ((Type.OverloadedType)symbol.type()).alts;
             for (int k = 0; k < alts.length; k++)
                 if (alts[k].isModule()) return alts[k];
         }
@@ -171,8 +171,8 @@ public class Interpreter {
     private Symbol getMethod(Symbol module, Name name, Type type) {
         Symbol symbol = module.moduleClass().lookup(name);
         if (symbol == Symbol.NONE || isMethod(symbol, type)) return symbol;
-        switch (symbol.type()) {
-        case OverloadedType(Symbol[] alts, _):
+        if (symbol.type() instanceof Type.OverloadedType) {
+            Symbol[] alts = ((Type.OverloadedType)symbol.type()).alts;
             for (int k = 0; k < alts.length; k++)
                 if (isMethod(alts[k], type)) return alts[k];
         }
@@ -180,7 +180,19 @@ public class Interpreter {
     }
 
     private boolean isMethod(Symbol symbol, Type type) {
-        return symbol.isMethod() && symbol.type().equals(type);
+        return symbol.isMethod() && isSameMethodType(symbol.type(), type);
+    }
+
+    private boolean isSameMethodType(Type actual, Type expected) {
+        return unwrapParameterlessType(actual).isSameAs(unwrapParameterlessType(expected));
+    }
+
+    private Type unwrapParameterlessType(Type type) {
+        while (type instanceof Type.PolyType
+            && ((Type.PolyType)type).tparams.length == 0) {
+            type = ((Type.PolyType)type).result;
+        }
+        return type;
     }
 
     //########################################################################

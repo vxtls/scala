@@ -95,9 +95,10 @@ public class ClassParser extends MetadataParser {
                 if (global.debug) e.printStackTrace();
                 global.error("i/o error while loading " + c);
                 c.setInfo(Type.ErrorType);
+                c.primaryConstructor().setInfo(Type.ErrorType);
+                c.module().setInfo(Type.ErrorType);
             }
             global.currentPhase = phase;
         }
     }
 }
-

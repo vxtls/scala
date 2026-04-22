@@ -13,45 +13,112 @@ import java.lang.reflect.Field;
 
 import scalac.util.Debug;
 
-public class Variable {
+public abstract class Variable {
 
     //########################################################################
     // Public Cases
 
-    public case Global(Object value);
-    public case Module(CodePromise body, Object value);
-    public case Member(int index);
-    public case Argument(int index);
-    public case Local(int index);
-    public case JavaField(Field field);
+    public static final class Global extends Variable {
+        public Object value;
+
+        private Global(Object value) {
+            this.value = value;
+        }
+    }
+
+    public static final class Module extends Variable {
+        public CodePromise body;
+        public Object value;
+
+        private Module(CodePromise body, Object value) {
+            this.body = body;
+            this.value = value;
+        }
+    }
+
+    public static final class Member extends Variable {
+        public final int index;
+
+        private Member(int index) {
+            this.index = index;
+        }
+    }
+
+    public static final class Argument extends Variable {
+        public final int index;
+
+        private Argument(int index) {
+            this.index = index;
+        }
+    }
+
+    public static final class Local extends Variable {
+        public final int index;
+
+        private Local(int index) {
+            this.index = index;
+        }
+    }
+
+    public static final class JavaField extends Variable {
+        public final Field field;
+
+        private JavaField(Field field) {
+            this.field = field;
+        }
+    }
+
+    //########################################################################
+    // Public Factory Methods
+
+    public static Global Global(Object value) {
+        return new Global(value);
+    }
+
+    public static Module Module(CodePromise body, Object value) {
+        return new Module(body, value);
+    }
+
+    public static Member Member(int index) {
+        return new Member(index);
+    }
+
+    public static Argument Argument(int index) {
+        return new Argument(index);
+    }
+
+    public static Local Local(int index) {
+        return new Local(index);
+    }
+
+    public static JavaField JavaField(Field field) {
+        return new JavaField(field);
+    }
 
     //########################################################################
     // Public Methods
 
     public String toString() {
-        switch (this) {
-
-        case Global(Object value):
-            return "Global(" + Debug.show(value) + ")";
-
-        case Module(CodePromise body, Object value):
-            return "Module(" + body + "," + Debug.show(value) + ")";
-
-        case Member(int index):
-            return "Member(" + index + ")";
-
-        case Argument(int index):
-            return "Context(" + index + ")";
-
-        case Local(int index):
-            return "Variable(" + index + ")";
-
-        case JavaField(Field field):
-            return "Java(" + field + ")";
-
-        default:
-            throw Debug.abort("illegal variable", this);
+        if (this instanceof Global) {
+            return "Global(" + Debug.show(((Global)this).value) + ")";
         }
+        if (this instanceof Module) {
+            Module module = (Module)this;
+            return "Module(" + module.body + "," + Debug.show(module.value) + ")";
+        }
+        if (this instanceof Member) {
+            return "Member(" + ((Member)this).index + ")";
+        }
+        if (this instanceof Argument) {
+            return "Context(" + ((Argument)this).index + ")";
+        }
+        if (this instanceof Local) {
+            return "Variable(" + ((Local)this).index + ")";
+        }
+        if (this instanceof JavaField) {
+            return "Java(" + ((JavaField)this).field + ")";
+        }
+        throw Debug.abort("illegal variable", this);
     }
 
     //########################################################################

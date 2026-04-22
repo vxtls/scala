@@ -135,12 +135,10 @@ public class Global {
      */
     public static final String TARGET_INT;
     public static final String TARGET_JVM;
-    public static final String TARGET_MSIL;
 
     public static final String[] TARGETS = new String[] {
         TARGET_INT      = "int",
         TARGET_JVM      = "jvm",
-        TARGET_MSIL     = "msil",
     };
 
     /** tree printers
@@ -224,7 +222,6 @@ public class Global {
         // if (!optimize) PHASE.remove(args.phases.OPTIMIZE);
         // TODO: Enable TailCall for other backends when they handle LabelDefs
         if (target != TARGET_JVM) args.phases.TAILCALL.addSkipFlag();
-        if (target != TARGET_MSIL) args.phases.GENMSIL.addSkipFlag();
         if (target != TARGET_JVM) args.phases.GENJVM.addSkipFlag();
         PHASE.freeze();
         PhaseDescriptor[] descriptors = PHASE.phases();
@@ -405,7 +402,12 @@ public class Global {
                     make.Apply(Position.FIRSTPOS,
                         make.Select(Position.FIRSTPOS,
                             make.Ident(Position.FIRSTPOS, Names.scala),
-                            Names.Object.toTypeName()),
+                            Names.AnyRef.toTypeName()),
+                        new Tree[0]),
+                    make.Apply(Position.FIRSTPOS,
+                        make.Select(Position.FIRSTPOS,
+                            make.Ident(Position.FIRSTPOS, Names.scala),
+                            Names.ScalaObject.toTypeName()),
                         new Tree[0])},
                     unit.body))};
         module++;
@@ -420,13 +422,15 @@ public class Global {
     private void fix2(Unit unit) {
         imports.clear();
         for (int i = 0; i < unit.body.length; i++) {
-            switch (unit.body[i]) {
-            case ModuleDef(_, _, _, Tree.Template impl):
-                Symbol symbol = unit.body[i].symbol();
-                if (!symbol.name.startsWith(CONSOLE_N)) break;
+            Tree tree = unit.body[i];
+            if (tree instanceof Tree.ModuleDef) {
+                Tree.ModuleDef moduleDef = (Tree.ModuleDef)tree;
+                Tree.Template impl = moduleDef.impl;
+                Symbol symbol = tree.symbol();
+                if (!symbol.name.startsWith(CONSOLE_N)) continue;
                 console = symbol;
-                if (impl.body.length <= 0) break;
-                imports.add(unit.body[i].symbol());
+                if (impl.body.length <= 0) continue;
+                imports.add(tree.symbol());
                 Tree last = impl.body[impl.body.length - 1];
                 if (last.isTerm()) {
                     impl.body[impl.body.length - 1] =
@@ -444,23 +448,21 @@ public class Global {
                 for (int j = 0; j < impl.body.length; j++)
                     fix2(body, impl.body[j]);
                 impl.body = body.toArray();
-                break;
             }
         }
     }
 
     private void fix2(TreeList body, Tree tree) {
         body.append(tree);
-        switch (tree) {
-        case PatDef(_, _, _): // !!! impossible (removed by analyzer)
+        if (tree instanceof Tree.PatDef) { // !!! impossible (removed by analyzer)
             assert false : Debug.show(tree);
             return;
-        case ClassDef(_, _, _, _, _, _):
-        case PackageDef(_, _):
-        case ModuleDef(_, _, _, _):
-        case DefDef(_, _, _, _, _, _):
-        case AbsTypeDef(_, _, _, _):
-        case AliasTypeDef(_, _, _, _):
+        } else if (tree instanceof Tree.ClassDef ||
+                   tree instanceof Tree.PackageDef ||
+                   tree instanceof Tree.ModuleDef ||
+                   tree instanceof Tree.DefDef ||
+                   tree instanceof Tree.AbsTypeDef ||
+                   tree instanceof Tree.AliasTypeDef) {
             if (!mustShow(tree.symbol())) return;
             body.append(
                 treeGen.Apply(tree.pos,
@@ -471,7 +473,7 @@ public class Global {
                         make.Literal(tree.pos, show(tree.symbol())).setType(
                             definitions.JAVA_STRING_TYPE())}));
             return;
-        case ValDef(_, _, _, _):
+        } else if (tree instanceof Tree.ValDef) {
             if (!mustShow(tree.symbol())) return;
             body.append(
                 treeGen.Apply(tree.pos,
@@ -483,7 +485,7 @@ public class Global {
                             definitions.JAVA_STRING_TYPE()),
                         treeGen.Ident(tree.pos, tree.symbol())}));
             return;
-        default:
+        } else {
             return;
         }
     }

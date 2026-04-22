@@ -11,7 +11,7 @@ package scalac.ast.parser;
 import scalac.Unit;
 import scalac.ast.*;
 import scalac.util.Name;
-import Tree.*;
+import scalac.ast.Tree.*;
 import java.util.HashMap;
 
 import scalac.util.Names;
@@ -52,27 +52,27 @@ public class PatternNormalizer {
      *  t: the tree to be checked
      */
     protected boolean check1( Tree t, boolean inAlt ) {
-	switch( t ) {
-
-	case Literal( _ ):
+	if (t instanceof Literal) {
 	    return true;
-
-	case Apply( _, Tree[] args ):
-              seqDepth++;
-              boolean res = check1( args, inAlt );
-              seqDepth--;
-              return res;
-
-	case Sequence( Tree[] trees ): // this is a hack to disallow deep binding
-              seqDepth++;
-              boolean res = check1( trees, inAlt );
-              seqDepth--;
-              return res;
-
-	case Alternative( Tree[] trees ):
+	} else if (t instanceof Apply) {
+	    Tree[] args = ((Apply)t).args;
+            seqDepth++;
+            boolean res = check1( args, inAlt );
+            seqDepth--;
+            return res;
+	} else if (t instanceof Sequence) { // this is a hack to disallow deep binding
+	    Tree[] trees = ((Sequence)t).trees;
+            seqDepth++;
+            boolean res = check1( trees, inAlt );
+            seqDepth--;
+            return res;
+	} else if (t instanceof Alternative) {
+	    Tree[] trees = ((Alternative)t).trees;
 	    return check1( trees, true );
-
-	case Bind( Name var, Tree tree ):
+	} else if (t instanceof Bind) {
+	    Bind bind = (Bind)t;
+	    Name var = bind.name;
+	    Tree tree = bind.rhs;
 	    if(( inAlt )
 	       &&( var.toString().lastIndexOf("$") == -1)) {
 
@@ -95,11 +95,10 @@ public class PatternNormalizer {
               }
 	    */
 	    return check1( tree, inAlt );
-
-	case Typed( _, _):
+	} else if (t instanceof Typed) {
 	    return true;
-
-	case Ident( Name var ):
+	} else if (t instanceof Ident) {
+	    Name var = ((Ident)t).name;
 	    if (inAlt && var.isVariable() && var != Names.PATTERN_WILDCARD &&
 		var.lastPos((byte)'$') == -1) {
 		unit.error( t.pos,
@@ -119,14 +118,12 @@ public class PatternNormalizer {
               }
 
 	    return true;
-
-	case Select( _, _ ):
+	} else if (t instanceof Select) {
 	    return true;
-
-	default:
+	} else {
 	    unit.error( t.pos, "whut'z dis ?"+t.toString()); // never happens
+	    return false;
 	}
-	return false;
 
     }
 
@@ -160,20 +157,19 @@ public class PatternNormalizer {
     //
 
     boolean isEmptySequence( Tree tree ) {
-	switch( tree ) {
-	case Sequence( Tree[] trees ):
+	if (tree instanceof Sequence) {
+	    Tree[] trees = ((Sequence)tree).trees;
 	    //return ((trees.length == 1)&&( trees[ 0 ] == Tree.Empty ));
 	    return trees.length == 0;
-	default:
+	} else {
 	    return false;
 	}
     }
 
     boolean isSequence( Tree tree ) {
-	switch( tree ) {
-	case Sequence( _ ):
+	if (tree instanceof Sequence) {
 	    return true;
-	default:
+	} else {
 	    return false;
 	}
     }
@@ -219,17 +215,15 @@ public class PatternNormalizer {
 
     // main algo for (1)
     public Tree flattenAlternative( Tree tree ) {
-	switch( tree ) {
-	case Alternative( Tree[] choices ):
+	if (tree instanceof Alternative) {
+	    Tree[] choices = ((Alternative)tree).trees;
 	    TreeList cs = new TreeList();
 	    for( int i = 0; i < choices.length; i++ ) {
 		Tree child = choices[ i ];
-		switch( child ) {
-
-		case Alternative( Tree[] child_choices ): // grab its flattened children
+		if (child instanceof Alternative) {
+		    Tree[] child_choices = ((Alternative)child).trees;
 		    cs.append( flattenAlternativeChildren( child_choices ) );
-		    break;
-		default:
+		} else {
 		    cs.append( child );
 		}
 	    }
@@ -239,16 +233,20 @@ public class PatternNormalizer {
 		return newtrees[ 0 ];
 	    case 0:
 		return make.Sequence( tree.pos, Tree.EMPTY_ARRAY );
-	    default:
-		return make.Alternative( tree.pos, cs.toArray() );
-	    }
+		    default:
+			return make.Alternative( tree.pos, cs.toArray() );
+		    }
 
-	    // recursive call
-	case Sequence( Tree[] trees):
+		    // recursive call
+	} else if (tree instanceof Sequence) {
+	    Tree[] trees = ((Sequence)tree).trees;
 	    return make.Sequence( tree.pos, flattenAlternatives( trees ));
-	case Bind( Name var, Tree body ):
+	} else if (tree instanceof Bind) {
+	    Bind bind = (Bind)tree;
+	    Name var = bind.name;
+	    Tree body = bind.rhs;
 	    return make.Bind( tree.pos, var, flattenAlternative( body ));
-	default:
+	} else {
 	    return tree; // no alternatives can occur
 	}
     }
@@ -259,14 +257,13 @@ public class PatternNormalizer {
 	TreeList cs = new TreeList();
 	for( int j = 0; j < choices.length; j++ ) {
 	    Tree tree = flattenAlternative( choices[ j ] ); // flatten child
-	    switch( tree ) {
-	    case Alternative( Tree[] child_choices ):
+	    if (tree instanceof Alternative) {
+		Tree[] child_choices = ((Alternative)tree).trees;
 		int tmp = cs.length();
 		appendNonEmpty( cs, child_choices );
 		if( cs.length() != tmp )
 		    allEmpty = false;
-		break;
-	    default:
+	    } else {
 		cs.append( tree );
 		allEmpty = allEmpty && TreeInfo.isEmptySequence( tree );
 	    }
@@ -294,23 +291,22 @@ public class PatternNormalizer {
     // main algo for (2)
     public Tree flattenSequence( Tree tree ) {
 	//System.out.println("flattenSequence of "+tree);
-	switch( tree ) {
+	if (tree instanceof Sequence) {
+	    Tree[] trees = ((Sequence)tree).trees;
 	    /*
-	case Sequence( Tree[] trees ):
-	    trees = flattenSequences( trees );
+		case Sequence( Tree[] trees ):
+		    trees = flattenSequences( trees );
 	    if(( trees.length == 1 )&&( isEmptySequence( trees[ 0 ] )))
 		trees = Tree.EMPTY_ARRAY;
-	    return make.Sequence( tree.pos, trees );
-	    */
-	case Sequence( Tree[] trees ):
+		    return make.Sequence( tree.pos, trees );
+		    */
 	    TreeList ts = new TreeList();
 	    for( int i = 0; i < trees.length; i++ ) {
 		Tree child = trees[ i ];
-		switch( child ) {
-		case Sequence( Tree[] child_trees ): // grab its flattened children
+		if (child instanceof Sequence) {
+		    Tree[] child_trees = ((Sequence)child).trees;
 		    ts.append( flattenSequenceChildren( child_trees ) );
-		    break;
-		default:
+		} else {
 		    ts.append( child );
 		}
 	    }
@@ -320,15 +316,19 @@ public class PatternNormalizer {
 		System.out.print(ts.get( jj ).toString()+" ");
 	    }
 	    System.out.println();
-	    */
+		    */
 	    return treeListToSequence( tree.pos, ts ) ;
 
-	    // recursive call
-	case Alternative( Tree[] choices ):
+		    // recursive call
+	} else if (tree instanceof Alternative) {
+	    Tree[] choices = ((Alternative)tree).trees;
 	    return make.Alternative( tree.pos, flattenSequences( choices ));
-	case Bind( Name var, Tree body ):
+	} else if (tree instanceof Bind) {
+	    Bind bind = (Bind)tree;
+	    Name var = bind.name;
+	    Tree body = bind.rhs;
 	    return make.Bind( tree.pos, var, flattenSequence( body ));
-	default:
+	} else {
 	    return tree;
 	}
     }
@@ -338,11 +338,10 @@ public class PatternNormalizer {
 	TreeList ts = new TreeList();
 	for( int j = 0; j < trees.length; j++ ) {
 	    Tree tree = flattenSequence( trees[ j ] );
-	    switch( tree ) {
-	    case Sequence( Tree[] child_trees ):
+	    if (tree instanceof Sequence) {
+		Tree[] child_trees = ((Sequence)tree).trees;
 		appendNonEmpty( ts, child_trees );
-		break;
-	    default:
+	    } else {
 		appendNonEmpty( ts, tree );
 	    }
 	}
@@ -365,8 +364,8 @@ public class PatternNormalizer {
     }
 
     public Tree elimSequence( Tree tree ) {
-	switch( tree ) {
-	case Sequence( Tree[] trees ):
+	if (tree instanceof Sequence) {
+	    Tree[] trees = ((Sequence)tree).trees;
 	    // might be empty ...
 	    Tree[] newtrees = mergeHedge( trees ).toArray();
 	    if(( newtrees.length == 1 )&&( isEmptySequence( newtrees[ 0 ] )))
@@ -383,14 +382,18 @@ public class PatternNormalizer {
 		    ts.append( elimSequence( t )); // recurse
 	    }
 	    return treeListToSequence( tree.pos, ts );
-	    */
+		    */
 	    //return make.Sequence( tree.pos, elimSequences( trees ));
-	case Alternative( Tree[] choices ):
+	} else if (tree instanceof Alternative) {
+	    Tree[] choices = ((Alternative)tree).trees;
 	    Tree result = make.Alternative( tree.pos, elimSequences( choices ) );
 	    return flattenAlternative( result ); // apply
-	case Bind( Name var, Tree body ):
+	} else if (tree instanceof Bind) {
+	    Bind bind = (Bind)tree;
+	    Name var = bind.name;
+	    Tree body = bind.rhs;
 	    return make.Bind( tree.pos, var, elimSequence( body ));
-	default:
+	} else {
 	    return tree; // nothing to do
 	}
     }
@@ -433,22 +436,20 @@ public class PatternNormalizer {
      *  otherwise, returns null. "move concatenation to the top"
      */
     Tree mergeThem( Tree left, Tree right ) {
-	switch( left ) {
-	case Sequence( Tree[] treesLeft ):             // left tree is subsequence
+	if (left instanceof Sequence) {             // left tree is subsequence
+	    Tree[] treesLeft = ((Sequence)left).trees;
 	    TreeList ts = new TreeList();
 	    appendNonEmpty( ts, treesLeft );
-	    switch( right ) {
-	    case Sequence( Tree[] treesRight ):
+	    if (right instanceof Sequence) {
+		Tree[] treesRight = ((Sequence)right).trees;
 		appendNonEmpty( ts, treesRight ); // ...and right tree is subsequence
-		break;
-	    default:
+	    } else {
 		ts.append( right );                       // ...and right tree is atom
 	    }
 	    return treeListToSequence( left.pos, ts );
-
-	default:                                          // left tree is atom
-	    switch( right ) {
-	    case Sequence( Tree[] treesRight ):
+	} else {                                          // left tree is atom
+	    if (right instanceof Sequence) {
+		Tree[] treesRight = ((Sequence)right).trees;
 		TreeList ts = new TreeList();
 		ts.append( left );
 		appendNonEmpty( ts, treesRight ); // ...and right tree is subsequence
@@ -477,19 +478,24 @@ public class PatternNormalizer {
     /** main algo for (4)
      */
      public Tree wrapAlternative( Tree tree ) {
-            switch( tree ) {
-            case Alternative( Tree[] choices ):
-                  return make.Alternative( tree.pos, wrapAlternativeChildren( choices ));
-                  // recursive
-            case Sequence( Tree[] trees ):
-                  return make.Sequence( tree.pos, wrapAlternatives( trees ));
-            case Bind(Name var, Tree body ):
-                  return make.Bind( tree.pos, var, wrapAlternative( body ));
+            if (tree instanceof Alternative) {
+                  Tree[] choices = ((Alternative)tree).trees;
+	                  return make.Alternative( tree.pos, wrapAlternativeChildren( choices ));
+	                  // recursive
+            } else if (tree instanceof Sequence) {
+                  Tree[] trees = ((Sequence)tree).trees;
+	                  return make.Sequence( tree.pos, wrapAlternatives( trees ));
+            } else if (tree instanceof Bind) {
+                  Bind bind = (Bind)tree;
+                  Name var = bind.name;
+                  Tree body = bind.rhs;
+	                  return make.Bind( tree.pos, var, wrapAlternative( body ));
 
-            case Ident( Name name ):
-                  /*
-                  System.out.println( "in case Ident, name" +name);
-                  if ( name != Name.fromString("_")
+            } else if (tree instanceof Ident) {
+                  Name name = ((Ident)tree).name;
+	                  /*
+	                  System.out.println( "in case Ident, name" +name);
+	                  if ( name != Name.fromString("_")
                        && ( boundVars.get( tree.symbol() ) == null )) {
 
                         System.out.println("TRANSF, name:"+name);
@@ -499,15 +505,14 @@ public class PatternNormalizer {
                                           make.Ident( tree.pos,
                                                       Name.fromString("_") ))
                               .symbol( tree.symbol() )
-                              .type( tree.type );
-                  }
-                  */
-              return tree;
+	                              .type( tree.type );
+	                  }
+	                  */
+	              return tree;
 
-	default:
-	    return tree;
-
-	}
+	    } else {
+	        return tree;
+	    }
     }
 
     /** algo for (4), precondition: choices are direct successors of an `Alternative' node
@@ -539,28 +544,23 @@ public class PatternNormalizer {
      *  precondition: choices are in normal form w.r.t. to (4)
      */
     boolean isSequenceBranch( Tree tree ) {
-	switch( tree ) {
-	case Sequence( _ ):
+	if (tree instanceof Sequence) {
 	    return true;
-	case Alternative( Tree[] trees ): // normal form -> just check first child
-	    switch( trees[ 0 ] ) {
-	    case Sequence( _ ):
-		return true;
-	    default:
-		return false;
-	    }
-	case Bind( _, Tree body ):
+	} else if (tree instanceof Alternative) { // normal form -> just check first child
+	    Tree[] trees = ((Alternative)tree).trees;
+	    return trees[ 0 ] instanceof Sequence;
+	} else if (tree instanceof Bind) {
+	    Tree body = ((Bind)tree).rhs;
 	    return isSequenceBranch( body );
-	default:
+	} else {
 	    return false;
 	}
     }
 
     Tree wrapElement( Tree tree ) {
-	switch( tree ) {
-	case Sequence(_):
+	if (tree instanceof Sequence) {
 	    return tree;
-	default:
+	} else {
 	    return make.Sequence(tree.pos, new Tree[] { tree } );
 	}
     }

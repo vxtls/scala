@@ -2,7 +2,7 @@ package scalac.transformer.matching ;
 
 import scalac.*;
 import scalac.ast.Tree;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 //import scala.compiler.printer.TextTreePrinter ; // DEBUGGING\
     //import scala.compiler.printer.XMLAutomPrinter ; // DEBUGGING\

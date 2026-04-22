@@ -10,7 +10,7 @@ import scalac.ast.Tree;
 import scalac.ast.TreeGen;
 import scalac.util.Name;
 import scalac.util.Names;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 import scalac.transformer.TransMatch.Matcher ;
 import java.util.* ;
@@ -74,8 +74,8 @@ public class Autom2Scala  {
     }
 
     Type funRetType() {
-        switch( funSym.type() ) {
-        case MethodType( _, Type retType ):
+        if (funSym.type() instanceof Type.MethodType) {
+            Type retType = ((Type.MethodType)funSym.type()).result;
             return retType;
         }
         throw new RuntimeException();
@@ -159,10 +159,12 @@ public class Autom2Scala  {
     Tree currentElem() { return gen.Ident( Position.FIRSTPOS, curSym ); }
 
     Tree currentMatches( Label label ) {
-        switch( label ) {
-        case TreeLabel( Tree pat ):
+        if (label instanceof Label.TreeLabel) {
+            Tree pat = ((Label.TreeLabel)label).pat;
             return _cur_match( pat );
-        case SimpleLabel( Tree.Literal lit ):
+        }
+        if (label instanceof Label.SimpleLabel) {
+            Tree.Literal lit = ((Label.SimpleLabel)label).lit;
             return cf.Equals( currentElem(), lit );
         }
         throw new ApplicationError("expected either algebraic or simple label:"+label);

@@ -12,8 +12,8 @@ import scalac.*;
 import scalac.ast.*;
 import scalac.symtab.*;
 
-import PatternNode.*;
-import Tree.*;
+import scalac.transformer.matching.PatternNode.*;
+import scalac.ast.Tree.*;
 
 import scalac.transformer.TransMatch.Matcher ;
 import scalac.util.Name ;
@@ -71,24 +71,24 @@ public class AlgebraicMatcher extends PatternMatcher {
        *  whenever q matches, possibly even more often
        */
     protected boolean superPat(PatternNode p, PatternNode q) {
-        switch (p) {
-            case DefaultPat():
-                switch (q) {
-                    case DefaultPat():
+        if (p instanceof DefaultPat) {
+                if (q instanceof DefaultPat) {
                         return true;
                     //case ConstantPat(_, _):
                     //    return q.type.isSubType(p.type);
                 }
                 return false;
-           case ConstrPat(_):
-                switch (q) {
-                    case ConstrPat(_):
+        }
+        if (p instanceof ConstrPat) {
+                if (q instanceof ConstrPat) {
                         return q.type.isSubType(p.type);
                 }
                 return false;
-           case ConstantPat( Object pval ):
-                switch (q) {
-                    case ConstantPat( Object qval ):
+        }
+        if (p instanceof ConstantPat) {
+                Object pval = ((ConstantPat)p).value;
+                if (q instanceof ConstantPat) {
+                    Object qval = ((ConstantPat)q).value;
                         return pval.equals(qval);
                 }
                 return false;
@@ -97,12 +97,7 @@ public class AlgebraicMatcher extends PatternMatcher {
     }
 
     protected boolean isDefaultPat(PatternNode p) {
-        switch (p) {
-            case DefaultPat():
-                return true;
-            default:
-                return false;
-        }
+        return p instanceof DefaultPat;
     }
 
         boolean isStarApply( Tree.Apply tree ) {
@@ -138,13 +133,11 @@ public class AlgebraicMatcher extends PatternMatcher {
 	//System.err.println("AM.toTree called"+node);
         if (node == null)
             return gen.mkBooleanLit(_m.pos, false);
-        switch (node) {
-        case SeqContainerPat( _, _ ):
+        if (node instanceof SeqContainerPat) {
 	    return  callSequenceMatcher( node,
 					 selector );
-        default:
-	    return super.toTree( node, selector );
         }
+	return super.toTree( node, selector );
     }
 
       /** collects all sequence patterns and returns the default
@@ -158,14 +151,11 @@ public class AlgebraicMatcher extends PatternMatcher {
               do {
                     if( node == null )
                           break;// defaultNode = node;
-                    else
-                          switch( node ) {
-                    case SeqContainerPat( _, _ ):
+                    else if (node instanceof SeqContainerPat) {
                           seqPatNodes.add( node );
                           bodies.add( toTree( node.and ) );
                           node = node.or;
-                          break;
-                    default:
+                    } else {
                           defaultNode = node;
                     }
               } while (defaultNode == null) ;

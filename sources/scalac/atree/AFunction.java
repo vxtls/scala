@@ -12,14 +12,50 @@ import scalac.symtab.Type;
 import scalac.symtab.Symbol;
 
 /** This class represents an attributed function reference. */
-public class AFunction {
+public abstract class AFunction {
 
     //########################################################################
     // Public Cases
 
-    public case Method(ACode object, Symbol method, AInvokeStyle style);
-    public case Primitive(APrimitive primitive);
-    public case NewArray(Type element);
+    public static final class Method extends AFunction {
+        public final ACode object;
+        public final Symbol method;
+        public final AInvokeStyle style;
+
+        private Method(ACode object, Symbol method, AInvokeStyle style) {
+            this.object = object;
+            this.method = method;
+            this.style = style;
+        }
+    }
+
+    public static final class Primitive extends AFunction {
+        public final APrimitive primitive;
+
+        private Primitive(APrimitive primitive) {
+            this.primitive = primitive;
+        }
+    }
+
+    public static final class NewArray extends AFunction {
+        public final Type element;
+
+        private NewArray(Type element) {
+            this.element = element;
+        }
+    }
+
+    public static Method Method(ACode object, Symbol method, AInvokeStyle style) {
+        return new Method(object, method, style);
+    }
+
+    public static Primitive Primitive(APrimitive primitive) {
+        return new Primitive(primitive);
+    }
+
+    public static NewArray NewArray(Type element) {
+        return new NewArray(element);
+    }
 
     //########################################################################
     // Public Methods

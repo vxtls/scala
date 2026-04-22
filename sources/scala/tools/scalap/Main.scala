@@ -19,14 +19,14 @@ object Main {
     var verbose = false;
 
     def usage: Unit = {
-        Console.println("usage: scalap {<option>} <name>");
-        Console.println("where <option> is");
-        Console.println("  -private               print private definitions");
-        Console.println("  -verbose               print out additional information");
-        Console.println("  -version               print out the version number of scalap");
-        Console.println("  -help                  display this usage message");
-        Console.println("  -classpath <pathlist>  specify where to find user class files");
-        Console.println("  -cp <pathlist>         specify where to find user class files");
+        scala.Console.println("usage: scalap {<option>} <name>");
+        scala.Console.println("where <option> is");
+        scala.Console.println("  -private               print private definitions");
+        scala.Console.println("  -verbose               print out additional information");
+        scala.Console.println("  -version               print out the version number of scalap");
+        scala.Console.println("  -help                  display this usage message");
+        scala.Console.println("  -classpath <pathlist>  specify where to find user class files");
+        scala.Console.println("  -cp <pathlist>         specify where to find user class files");
     }
 
     def process(args: Arguments, path: ClassPath)(classname: String): Unit = {
@@ -34,7 +34,7 @@ object Main {
 			if (classname == "scala.AnyRef") "java.lang.Object" else classname));
 		if (file.exists) {
 			if (verbose)
-				Console.println(Console.BOLD + "FILENAME" + Console.RESET +
+				scala.Console.println(scala.Console.BOLD + "FILENAME" + scala.Console.RESET +
 				                " = " + file.getPath);
 			val reader = new ByteArrayReader(file.content);
 			val clazz = new Classfile(reader);
@@ -56,24 +56,24 @@ object Main {
 				    out.flush();
 			}
 		} else if (classname == "scala.Any") {
-			Console.println("package scala;");
-			Console.println("class Any {");
-			Console.println("    def eq(scala.Any): scala.Boolean;");
-			Console.println("    final def ==(scala.Any): scala.Boolean;");
-			Console.println("    final def !=(scala.Any): scala.Boolean;");
-			Console.println("    def equals(scala.Any): scala.Boolean;");
-			Console.println("    def hashCode(): scala.Int;");
-			Console.println("    def toString(): java.lang.String;");
-			Console.println("    final def isInstanceOf[T]: scala.Boolean;");
-			Console.println("    final def asInstanceOf[T]: T;");
-			Console.println("    def match[S, T](f: S => T): T;");
-			Console.println("}");
+			scala.Console.println("package scala;");
+			scala.Console.println("class Any {");
+			scala.Console.println("    def eq(scala.Any): scala.Boolean;");
+			scala.Console.println("    final def ==(scala.Any): scala.Boolean;");
+			scala.Console.println("    final def !=(scala.Any): scala.Boolean;");
+			scala.Console.println("    def equals(scala.Any): scala.Boolean;");
+			scala.Console.println("    def hashCode(): scala.Int;");
+			scala.Console.println("    def toString(): java.lang.String;");
+			scala.Console.println("    final def isInstanceOf[T]: scala.Boolean;");
+			scala.Console.println("    final def asInstanceOf[T]: T;");
+			scala.Console.println("    def match[S, T](f: S => T): T;");
+			scala.Console.println("}");
 		} else if (classname == "scala.All") {
-			Console.println("Type scala.All is artificial; it is a subtype of all types.");
+			scala.Console.println("Type scala.All is artificial; it is a subtype of all types.");
 		} else if (classname == "scala.AllRef") {
-			Console.println("Type scala.AllRef is artificial; it is a subtype of all subtypes of scala.AnyRef.");
+			scala.Console.println("Type scala.AllRef is artificial; it is a subtype of all subtypes of scala.AnyRef.");
 		} else
-			Console.println("class/object not found.");
+			scala.Console.println("class/object not found.");
     }
 
     def main(args: Array[String]) = {
@@ -89,7 +89,7 @@ object Main {
         		                     .withOptionalArg("-cp")
                                      .parse(args);
             if (arguments contains "-version")
-                Console.println("scalap " + VERSION);
+                scala.Console.println("scalap " + VERSION);
             if (arguments contains "-help")
             	usage;
             verbose = arguments contains "-verbose";
@@ -101,7 +101,7 @@ object Main {
             	case Some(path) => new ClassPath { override val classPath = path }
             }
             if (verbose)
-            	Console.println(Console.BOLD + "CLASSPATH" + Console.RESET +
+            	scala.Console.println(scala.Console.BOLD + "CLASSPATH" + scala.Console.RESET +
             	                " = " + path);
            	arguments.getOthers.foreach(process(arguments, path));
         }

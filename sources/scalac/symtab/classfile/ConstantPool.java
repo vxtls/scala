@@ -52,11 +52,16 @@ public class ConstantPool implements ClassfileConstants {
                 }
                 case CONSTANT_CLASS:
                 case CONSTANT_STRING:
+                case CONSTANT_METHODTYPE:
                     in.skip(2);
+                    break;
+                case CONSTANT_METHODHANDLE:
+                    in.skip(3);
                     break;
                 case CONSTANT_FIELDREF:
                 case CONSTANT_METHODREF:
                 case CONSTANT_INTFMETHODREF:
+                case CONSTANT_INVOKEDYNAMIC:
                 case CONSTANT_NAMEANDTYPE:
                 case CONSTANT_INTEGER:
                 case CONSTANT_FLOAT:
@@ -121,6 +126,15 @@ public class ConstantPool implements ClassfileConstants {
                 poolObj[i] = new NameAndType((Name)readPool(in.getChar(index + 1)),
                                              readExternal(in.getChar(index + 3)));
                 break;
+            case CONSTANT_METHODHANDLE:
+                poolObj[i] = new MethodHandle(in.byteAt(index + 1), in.getChar(index + 2));
+                break;
+            case CONSTANT_METHODTYPE:
+                poolObj[i] = readExternal(in.getChar(index + 1));
+                break;
+            case CONSTANT_INVOKEDYNAMIC:
+                poolObj[i] = new InvokeDynamic(in.getChar(index + 1), (NameAndType)readPool(in.getChar(index + 3)));
+                break;
             case CONSTANT_STRING:
             	poolObj[i] = ((Name)readPool(in.getChar(index + 1))).toString();
             	break;
@@ -180,6 +194,26 @@ public class ConstantPool implements ClassfileConstants {
         public NameAndType(Name name, Name sig) {
             this.name = name;
             this.sig = sig;
+        }
+    }
+
+    public static final class MethodHandle {
+        public int refKind;
+        public int refIndex;
+
+        public MethodHandle(int refKind, int refIndex) {
+            this.refKind = refKind;
+            this.refIndex = refIndex;
+        }
+    }
+
+    public static final class InvokeDynamic {
+        public int bootstrapIndex;
+        public NameAndType nameAndType;
+
+        public InvokeDynamic(int bootstrapIndex, NameAndType nameAndType) {
+            this.bootstrapIndex = bootstrapIndex;
+            this.nameAndType = nameAndType;
         }
     }
 }

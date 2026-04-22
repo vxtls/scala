@@ -53,11 +53,11 @@ public class TreeSymbolCloner extends Traverser {
      */
     public boolean mustCloneSymbolOf(Tree tree) {
         // !!! replace Idents in patterns by ValDefs and remove this switch
-        switch (tree) {
-        case Ident(Name name):
-            if (!inPattern || !name.isVariable()) return false; else break;
-        default:
-            if (!tree.definesSymbol()) return false; else break;
+        if (tree instanceof Tree.Ident) {
+            Name name = ((Tree.Ident) tree).name;
+            if (!inPattern || !name.isVariable()) return false;
+        } else {
+            if (!tree.definesSymbol()) return false;
         }
         return !cloner.clones.containsKey(tree.symbol());
     }
@@ -79,21 +79,22 @@ public class TreeSymbolCloner extends Traverser {
     public void traverse(Tree tree) {
         if (mustCloneSymbolOf(tree)) cloneSymbol(tree.symbol());
         // !!!replace Idents in patterns by ValDefs and remove this switch
-        switch (tree) {
-        case PatDef(_, Tree pat, Tree rhs):
+        if (tree instanceof Tree.PatDef) {
+            Tree.PatDef patDef = (Tree.PatDef) tree;
             inPattern = true;
-            traverse(pat);
+            traverse(patDef.pat);
             inPattern = false;
-            traverse(rhs);
+            traverse(patDef.rhs);
             return;
-        case CaseDef(Tree pat, Tree guard, Tree body):
+        } else if (tree instanceof Tree.CaseDef) {
+            Tree.CaseDef caseDef = (Tree.CaseDef) tree;
             inPattern = true;
-            traverse(pat);
+            traverse(caseDef.pat);
             inPattern = false;
-            traverse(guard);
-            traverse(body);
+            traverse(caseDef.guard);
+            traverse(caseDef.body);
             return;
-        default:
+        } else {
             super.traverse(tree);
             return;
         }

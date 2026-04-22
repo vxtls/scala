@@ -14,7 +14,7 @@ import scalac.*;
 import scalac.ast.*;
 import scalac.symtab.*;
 import scalac.util.*;       // Names
-import Tree.*;
+import scalac.ast.Tree.*;
 
 import scalac.transformer.matching.PatternMatcher ;
 import scalac.transformer.matching.TestRegTraverser ;
@@ -122,26 +122,38 @@ public class TransMatch extends OwnerTransformer {
         }
     }
 
+    private boolean isMatchSelect(Select select) {
+        return select.selector == Names.match || select.symbol() == global.definitions.ANY_MATCH;
+    }
+
     public Tree transform(Tree tree) {
         if (tree == null)
             return null;
-        switch (tree) {
-            case Apply(Select( Tree receiver, Names.match ), Tree[] args):
-                if ((args != null) && (args.length == 1))
-                    switch (args[0]) {
-                        case Visitor(CaseDef[] cases):
-                            return transform(transform(receiver), transform(cases), tree.type);
+        if (tree instanceof Apply) {
+            Apply apply = (Apply)tree;
+            Tree fun = apply.fun;
+            Tree[] args = apply.args;
+            if ((args != null) && (args.length == 1) && args[0] instanceof Visitor) {
+                CaseDef[] cases = ((Visitor)args[0]).cases;
+                if (fun instanceof Select) {
+                    Select select = (Select)fun;
+                    Tree receiver = select.qualifier;
+                    if (isMatchSelect(select)) {
+                        return transform(transform(receiver), transform(cases), tree.type);
                     }
-                return tree;
-            case Apply(TypeApply(Select( Tree receiver, Names.match ), Tree[] targs), Tree[] args):
-                if ((args != null) && (args.length == 1))
-                    switch (args[0]) {
-                        case Visitor(CaseDef[] cases):
+                } else if (fun instanceof TypeApply) {
+                    Tree appliedFun = ((TypeApply)fun).fun;
+                    if (appliedFun instanceof Select) {
+                        Select select = (Select)appliedFun;
+                        Tree receiver = select.qualifier;
+                        if (isMatchSelect(select)) {
                             return transform(transform(receiver), transform(cases), tree.type);
+                        }
                     }
-                return tree;
-            default:
-                return super.transform(tree);
+                }
+            }
+            return super.transform(tree);
         }
+        return super.transform(tree);
     }
 }

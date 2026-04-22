@@ -276,8 +276,8 @@ class ZipDir extends AbstractFile {
 
     public String[] list(String prefix) {
         int n = 0;
-        for (Enumeration enum = zipFile.entries(); enum.hasMoreElements();) {
-            ZipEntry    e = (ZipEntry)enum.nextElement();
+        for (Enumeration entriesEnum = zipFile.entries(); entriesEnum.hasMoreElements();) {
+            ZipEntry    e = (ZipEntry)entriesEnum.nextElement();
             if (e.getName().startsWith(prefix)) {
                 String  candidate = e.getName().substring(prefix.length());
                 if (candidate.indexOf(separator) < 0)
@@ -286,8 +286,8 @@ class ZipDir extends AbstractFile {
         }
         String[] filenames = new String[n];
         n = 0;
-        for (Enumeration enum = zipFile.entries(); enum.hasMoreElements();) {
-            ZipEntry    e = (ZipEntry)enum.nextElement();
+        for (Enumeration entriesEnum = zipFile.entries(); entriesEnum.hasMoreElements();) {
+            ZipEntry    e = (ZipEntry)entriesEnum.nextElement();
             if (e.getName().startsWith(prefix)) {
                 String  candidate = e.getName().substring(prefix.length());
                 if (candidate.indexOf(separator) < 0)
@@ -350,9 +350,9 @@ final class JarArchive extends AbstractFile {
         entries = new HashMap();
         if (jarFile == null)
             return;
-        Enumeration enum = jarFile.entries();
-        while (enum.hasMoreElements()) {
-            String candidate = ((JarEntry)enum.nextElement()).getName();
+        Enumeration entriesEnum = jarFile.entries();
+        while (entriesEnum.hasMoreElements()) {
+            String candidate = ((JarEntry)entriesEnum.nextElement()).getName();
             int i = candidate.indexOf('/');
             int j = 0;
             HashMap files = entries;
