@@ -76,7 +76,13 @@ public abstract class TypeSymbol extends Symbol {
     }
 
     public final Symbol addConstructor() {
-        Symbol constr = TermSymbol.newConstructor(this, flags & CONSTRFLAGS);
+        return addConstructor(0);
+    }
+
+    public final Symbol addConstructor(int flags) {
+        Symbol constr = TermSymbol.newConstructor(
+            this,
+            (this.flags & CONSTRFLAGS) | (flags & ACCESSFLAGS));
         constructor = constructor.overloadWith(constr);
         return constr;
     }

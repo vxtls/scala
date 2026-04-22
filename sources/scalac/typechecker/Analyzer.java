@@ -213,7 +213,7 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 
     /** Check that `sym' is accessible as a member of tree `site' in current context.
      */
-    Type checkAccessible(int pos, Symbol sym, Type symtype, Tree site) {
+    Type checkAccessible(int pos, Symbol sym, Type symtype, Tree site, Type sitetype) {
 	if ((sym.owner().flags & INCONSTRUCTOR) != 0 &&
 	    !(sym.kind == TYPE && sym.isParameter())) {
 	    if (site instanceof This) {
@@ -226,19 +226,19 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 	    Type[] alttypes = ((Type.OverloadedType)symtype).alttypes;
 	    int nacc = 0;
 	    for (int i = 0; i < alts.length; i++) {
-		if (isAccessible(alts[i], site)) {
+		if (isAccessible(alts[i], site, sitetype)) {
 		    nacc++;
 		}
 	    }
 	    if (nacc == 0) {
-		error(pos, sym + " cannot be accessed in " + site.type.widen());
+		error(pos, sym + " cannot be accessed in " + sitetype.widen());
 		return Type.ErrorType;
 	    } else {
 		Symbol[] alts1 = new Symbol[nacc];
 		Type[] alttypes1 = new Type[nacc];
 		nacc = 0;
 		for (int i = 0; i < alts.length; i++) {
-		    if (isAccessible(alts[i], site)) {
+		    if (isAccessible(alts[i], site, sitetype)) {
 			alts1[nacc] = alts[i];
 			alttypes1[nacc] = alttypes[i];
 			nacc++;
@@ -247,28 +247,27 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 		return Type.OverloadedType(alts1, alttypes1);
 	    }
 	}
-	if (isAccessible(sym, site)) {
+	if (isAccessible(sym, site, sitetype)) {
 	    return symtype;
 	} else {
-	    error(pos, sym + " cannot be accessed in " + site.type.widen());
+	    error(pos, sym + " cannot be accessed in " + sitetype.widen());
 	    return Type.ErrorType;
 	}
     }
 
     /** Is `sym' accessible as a member of tree `site' in current context?
      */
-    private boolean isAccessible(Symbol sym, Tree site) {
+    private boolean isAccessible(Symbol sym, Tree site, Type sitetype) {
+	Symbol owner = sym.isConstructor() ? sym.constructorClass() : sym.owner();
 	return
 	    (sym.flags & (PRIVATE | PROTECTED)) == 0
 	    ||
-	    accessWithin(sym.owner())
+	    accessWithin(owner)
 	    ||
 	    ((sym.flags & PRIVATE) == 0) &&
-	    site.type.symbol().isSubClass(
-		sym.isConstructor() ? sym.constructorClass()
-		: sym.owner()) &&
 	    (site instanceof Tree.Super ||
-	     isSubClassOfEnclosing(site.type.symbol()));
+	     (sitetype.symbol().isSubClass(owner) &&
+	      isSubClassOfEnclosing(sitetype.symbol())));
     } //where
 
 	/** Are we inside definition of `owner'?
@@ -362,7 +361,8 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 		if (grandparents.length > 0 &&
 		    !parents[0].isSubType(grandparents[0]))
 		    error(constrs[i].pos, "illegal inheritance;\n " + parents[0] +
-			  " does not conform to " + parents[i] + "'s supertype");
+			  " does not conform to " + parents[i] + "'s supertype " +
+			  grandparents[0]);
 	    }
 	    if ((bsym.flags & FINAL) != 0) {
 		error(constrs[i].pos, "illegal inheritance from final class");
@@ -796,7 +796,8 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 		    clazz.isPackage()) {
 		    error(tree.pos, "constructor definition not allowed here");
 		}
-		sym = context.enclClass.owner.addConstructor();
+		sym = context.enclClass.owner.addConstructor(mods & ACCESSFLAGS);
+		sym.flags |= mods;
 	    } else {
 		sym = TermSymbol.define(tree.pos, name, owner, mods, context.scope);
 	    }
@@ -1151,7 +1152,7 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 		    if (selectors[i] != Names.IMPORT_WILDCARD &&
 			tp.lookup(selectors[i]) == Symbol.NONE &&
 			tp.lookup(selectors[i].toTypeName()) == Symbol.NONE)
-			error(tree.pos, NameTransformer.decode(selectors[i]) + " is not a member of " + expr + " of type " + expr.type);
+			error(tree.pos, NameTransformer.decode(selectors[i]) + " is not a member of " + expr);
 		}
 	    } else {
 		throw new ApplicationError();
@@ -1324,7 +1325,8 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 	} else if (tree.type instanceof Type.MethodType) {
 	    // convert unapplied methods to functions.
 	    if ((mode & (EXPRmode | FUNmode)) == EXPRmode &&
-		infer.isCompatible(tree.type, pt)) {
+		(infer.isCompatible(tree.type, pt) ||
+		 pt.symbol() == definitions.UNIT_CLASS)) {
 		checkEtaExpandable(tree.pos, tree.type);
 		return transform(desugarize.etaExpand(tree, tree.type), mode, pt);
 	    } else if ((mode & (CONSTRmode | FUNmode)) == CONSTRmode) {
@@ -1393,7 +1395,7 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 		    if (applyMeth != Symbol.NONE) {
 			Type applyType = checkAccessible(
 			    tree.pos, applyMeth, tree.type.memberType(applyMeth),
-			    tree);
+			    tree, tree.type);
 			tree = make.Select(tree.pos, tree, Names.apply)
 			    .setSymbol(applyMeth)
 			    .setType(applyType);
@@ -1447,7 +1449,7 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 		    if (coerceMeth != Symbol.NONE) {
 			Type coerceType = checkAccessible(
 			    tree.pos, coerceMeth, tree.type.memberType(coerceMeth),
-			    tree);
+			    tree, tree.type);
 			tree = make.Select(tree.pos, tree, coerceMeth.name)
 			    .setSymbol(coerceMeth)
 			    .setType(coerceType);
@@ -1567,7 +1569,9 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 	Type symtype = (sym.isType() ? sym.typeConstructor() : sym.type())
 	    .asSeenFrom(pre, sym.owner());
 	if (qual != Tree.Empty)
-	    symtype = checkAccessible(tree.pos, sym, symtype, qual);
+	    symtype = checkAccessible(tree.pos, sym, symtype, qual, qual.type);
+	else if (sym.owner().isPackage())
+	    symtype = checkAccessible(tree.pos, sym, symtype, qual, sym.owner().type());
 	if (symtype == Type.NoType)
 	    return error(tree.pos, "not found: " + decode(name));
 	//System.out.println(name + ":" + symtype);//DEBUG
@@ -1592,12 +1596,14 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 	    return error(tree.pos,
 			 decode(name) + " is not a member of " + qual.type.widen());
 	} else {
+	    Type qualtype =
+		(qual instanceof Tree.Super) ? context.enclClass.owner.thisType() : qual.type;
 	    Type symtype = (sym.isType() ? sym.typeConstructor() : sym.type())
-		.asSeenFrom(qual.type, sym.owner());
+		.asSeenFrom(qualtype, sym.owner());
 	    if (symtype == Type.NoType)
 		return error(tree.pos, "not found: " + decode(name));
 	    else
-		symtype = checkAccessible(tree.pos, sym, symtype, qual);
+		symtype = checkAccessible(tree.pos, sym, symtype, qual, qualtype);
 	    //System.out.println(sym.name + ":" + symtype);//DEBUG
 	    if (uninst.length != 0) {
 		if (symtype instanceof Type.PolyType) {
@@ -1618,7 +1624,7 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 	    } else {
 		throw new ApplicationError();
 	    }
-	    return mkStable(tree1.setType(symtype), qual.type, mode, pt);
+	    return mkStable(tree1.setType(symtype), qualtype, mode, pt);
 	}
     }
 
@@ -2422,10 +2428,45 @@ public class Analyzer extends Transformer implements Modifiers, Kinds {
 				Symbol constr = c.allConstructors();
 				Tree fn0 = fn1;
 				fn1 = gen.mkRef(fn1.pos, pre, constr);
-				if (fn1 instanceof Select) {
-				    Tree fn1qual = ((Select)fn1).qualifier;
-				    fn1.type = checkAccessible(
-					fn1.pos, constr, fn1.type, fn1qual);
+				Context enclClassOrConstructorContext = Context.NONE;
+				if (constr.owner().isPackage()) {
+				    Context cContext = context;
+				    while (cContext != Context.NONE &&
+					   !(cContext.tree instanceof ClassDef) &&
+					   !(cContext.tree instanceof Template)) {
+					cContext = cContext.outer;
+				    }
+				    enclClassOrConstructorContext = cContext;
+				}
+				if (enclClassOrConstructorContext == Context.NONE) {
+				    if (fn1 instanceof Select) {
+					Tree fn1qual = ((Select)fn1).qualifier;
+					fn1.type = checkAccessible(
+					    fn1.pos, constr, fn1.type, fn1qual, fn1qual.type);
+				    } else if (constr.owner().isPackage()) {
+					fn1.type = checkAccessible(
+					    fn1.pos, constr, fn1.type, Tree.Empty, constr.owner().type());
+				    }
+				} else {
+				    Symbol cowner = enclClassOrConstructorContext.owner;
+				    if (cowner.isConstructor()) {
+					fn1.type = checkAccessible(
+					    fn1.pos,
+					    constr,
+					    fn1.type,
+					    make.Super(
+						tree.pos,
+						Names.EMPTY.toTypeName(),
+						Names.EMPTY.toTypeName()),
+					    cowner.constructorClass().typeConstructor());
+				    } else {
+					fn1.type = checkAccessible(
+					    fn1.pos,
+					    constr,
+					    fn1.type,
+					    enclClassOrConstructorContext.tree,
+					    cowner.typeConstructor());
+				    }
 				}
 				if (tsym == c) {
 				    if (fn0 instanceof AppliedType) {

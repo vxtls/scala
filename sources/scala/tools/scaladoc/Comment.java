@@ -210,7 +210,7 @@ public class Comment extends DefaultHandler {
 
 }
 
-public class HTMLValidator {
+class HTMLValidator {
 
     /** The URL of the file containing the DTD. */
     String dtd;
@@ -256,4 +256,3 @@ public class HTMLValidator {
         catch(Exception e) { System.err.println(e.toString()); }
     }
 }
-

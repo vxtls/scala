@@ -286,11 +286,14 @@ public class TreeChecker {
             assert symbol == currentClass(): show(tree);
             return true;
         } else if (tree instanceof Tree.Select) {
+            Symbol symbol = tree.symbol();
+            if (symbol != null && symbol.isMethod()) return function(tree);
             return location(tree);
         } else if (tree instanceof Tree.Ident) {
             Symbol symbol = tree.symbol();
             if (symbol == definitions.NULL) return true;
             if (symbol == definitions.ZERO) return true;
+            if (symbol != null && symbol.isMethod()) return function(tree);
             return location(tree);
         } else if (tree instanceof Tree.Literal) {
             Object value = ((Tree.Literal)tree).value;

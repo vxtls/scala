@@ -248,6 +248,12 @@ public abstract class Symbol implements Modifiers, Kinds {
     /** Add an auxiliary constructor to class; return created symbol.
      */
     public Symbol addConstructor() {
+        return addConstructor(0);
+    }
+
+    /** Add an auxiliary constructor to class with explicit access flags.
+     */
+    public Symbol addConstructor(int flags) {
         throw new ApplicationError("addConstructor inapplicable for " + this);
     }
 

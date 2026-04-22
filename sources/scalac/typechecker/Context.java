@@ -33,8 +33,9 @@ public class Context {
 	this.owner = owner;
 	this.scope = scope;
 	this.imports = outer.imports;
-	if (tree instanceof Tree.Template ||
-	    tree instanceof Tree.CompoundType) this.enclClass = this;
+	if ((tree instanceof Tree.Template ||
+	     tree instanceof Tree.CompoundType) &&
+	    tree != outer.tree) this.enclClass = this;
 	else this.enclClass = outer.enclClass;
 	this.variance = outer.variance;
 	this.constructorClass = outer.constructorClass;

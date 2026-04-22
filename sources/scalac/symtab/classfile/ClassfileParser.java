@@ -337,6 +337,14 @@ public class ClassfileParser implements ClassfileConstants {
 
     private void patchFoundationClassInfo() {
         Name fullname = c.fullName();
+        if (fullname == Names.scala_AnyVal) {
+            patchClassParents(new Type[] { global.definitions.ANY_TYPE() });
+            return;
+        }
+        if (fullname == Names.scala_ScalaObject) {
+            patchClassParents(new Type[] { global.definitions.JAVA_OBJECT_TYPE() });
+            return;
+        }
         for (int arity = 0; arity < global.definitions.FUNCTION_COUNT; arity++) {
             if (fullname == Names.scala_Function(arity)) {
                 patchFunctionClassInfo(arity);
@@ -361,6 +369,14 @@ public class ClassfileParser implements ClassfileConstants {
         }
         if (fullname == Name.fromString("scala.MatchError")) {
             patchMatchErrorClassInfo();
+        }
+    }
+
+    private void patchClassParents(Type[] parents) {
+        Type info = c.info();
+        if (info instanceof Type.CompoundType) {
+            Type.CompoundType compound = (Type.CompoundType)info;
+            c.setFirstInfo(Type.compoundType(parents, compound.members, c));
         }
     }
 
