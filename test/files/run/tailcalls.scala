@@ -102,7 +102,6 @@ object Test {
     val max = args(0) match {
       case "jvm"  => 2 * 1024 * 1024
       case "int"  =>       64 * 1024
-      case "msil" => 2 * 1024 * 1024
       case target => throw new Error("unknown target '" + target + "'")
     }
     check_success("Object.fun1", Object.fun1(max, max), 0);

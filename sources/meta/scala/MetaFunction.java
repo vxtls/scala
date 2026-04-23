@@ -41,11 +41,33 @@ public class MetaFunction extends AbstractJavaExpander {
         writer.print("+ ?R");
     }
 
+    public void printClassJavaTParams() {
+        if (arity > 0) {
+            writer.print("<");
+            for (int i = 0; i < arity; i++) {
+                if (i > 0) writer.print(", ");
+                writer.print("A").print(i);
+            }
+            writer.print(", R>");
+        } else {
+            writer.print("<R>");
+        }
+    }
+
     public void printApplyScalaSignature() {
         writer.print("(");
         for (int i = 0; i < arity; i++)
             writer.print("?A").print(i).print(", ");
         writer.print(") ?R");
+    }
+
+    public void printApplyJavaSignature() {
+        writer.print("R apply(");
+        for (int i = 0; i < arity; i++) {
+            if (i > 0) writer.print(", ");
+            writer.print("A").print(i).print(" a").print(i);
+        }
+        writer.print(")");
     }
 
     public void printApplyJavaVParams() {

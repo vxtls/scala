@@ -378,7 +378,7 @@ public abstract class Debug {
     //########################################################################
 }
 
-public interface DebugHandler {
+interface DebugHandler {
 
     //########################################################################
     // DebugHandler interface
@@ -388,7 +388,7 @@ public interface DebugHandler {
     //########################################################################
 }
 
-public abstract class DebugAbstractHandler implements DebugHandler {
+abstract class DebugAbstractHandler implements DebugHandler {
 
     //########################################################################
     // DebugAbstractHandler interface
@@ -400,7 +400,7 @@ public abstract class DebugAbstractHandler implements DebugHandler {
     //########################################################################
 }
 
-public class DebugDefaultHandler extends DebugAbstractHandler {
+class DebugDefaultHandler extends DebugAbstractHandler {
 
     //########################################################################
     // DebugDefaultHandler interface
@@ -417,7 +417,7 @@ public class DebugDefaultHandler extends DebugAbstractHandler {
     //########################################################################
 }
 
-public class DebugToStringHandler extends DebugAbstractHandler {
+class DebugToStringHandler extends DebugAbstractHandler {
 
     //########################################################################
     // DebugToStringHandler interface
@@ -434,7 +434,7 @@ public class DebugToStringHandler extends DebugAbstractHandler {
     //########################################################################
 }
 
-public class DebugObject extends DebugAbstractHandler {
+class DebugObject extends DebugAbstractHandler {
 
     //########################################################################
     // DebugObject interface
@@ -455,7 +455,7 @@ public class DebugObject extends DebugAbstractHandler {
     //########################################################################
 }
 
-public class DebugArray extends DebugAbstractHandler {
+class DebugArray extends DebugAbstractHandler {
 
     //########################################################################
     // DebugArray interface
@@ -476,7 +476,7 @@ public class DebugArray extends DebugAbstractHandler {
     //########################################################################
 }
 
-public class DebugSymbol extends DebugAbstractHandler {
+class DebugSymbol extends DebugAbstractHandler {
 
     //########################################################################
     // DebugSymbol interface
@@ -507,7 +507,7 @@ public class DebugSymbol extends DebugAbstractHandler {
     //########################################################################
 }
 
-public class DebugScope extends DebugAbstractHandler {
+class DebugScope extends DebugAbstractHandler {
 
     //########################################################################
     // DebugScope interface
@@ -532,4 +532,3 @@ public class DebugScope extends DebugAbstractHandler {
 
     //########################################################################
 }
-

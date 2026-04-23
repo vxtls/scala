@@ -26,6 +26,7 @@ public class MakeBoxingExplicitPhase extends Phase {
 
     private final Definitions definitions;
     private final TreeChecker checker;
+    private final TransMatch transMatch;
 
     //########################################################################
     // Public Constructors
@@ -35,6 +36,7 @@ public class MakeBoxingExplicitPhase extends Phase {
         super(global, descriptor);
         this.definitions = global.definitions;
         this.checker = new TreeChecker(definitions);
+        this.transMatch = new TransMatch(global);
     }
 
     //########################################################################
@@ -43,6 +45,7 @@ public class MakeBoxingExplicitPhase extends Phase {
     /** Applies this phase to the given compilation units. */
     public void apply(Unit[] units) {
         for (int i = 0; i < units.length; i++) {
+            transMatch.apply(units[i]);
             assert checker.check(units[i]);
             new scalac.atree.ATreeFromSTree(global.definitions)
                 .translate(units[i]); // !!!
