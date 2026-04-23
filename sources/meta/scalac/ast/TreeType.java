@@ -11,7 +11,7 @@ package meta.scalac.ast;
 import meta.java.Type;
 
 /** This class describes types used in tree nodes. */
-public class TreeType extends Type {
+public abstract class TreeType extends Type {
 
     //########################################################################
     // Private Constants
@@ -24,40 +24,82 @@ public class TreeType extends Type {
     private static final String TREE_FULLNAME = TREE_PACKAGE + "." + TREE_NAME;
 
     //########################################################################
-    // Public Cases
+    // Public Constructors
 
-    public case Name(TreeKind kind);
-    public case Tree(TreeKind kind);
-    public case Node(TreeNode node);
+    protected TreeType() {
+    }
+
+    //########################################################################
+    // Public Factories
+
+    public static Name Name(TreeKind kind) {
+        return new Name(kind);
+    }
+
+    public static Tree Tree(TreeKind kind) {
+        return new Tree(kind);
+    }
+
+    public static Node Node(TreeNode node) {
+        return new Node(node);
+    }
 
     //########################################################################
     // Public Methods
 
     /** Returns the type's (possibly fully qualified) name. */
     public String getName(boolean qualified) {
-        switch (this) {
-        case Name(_):
+        if (this instanceof Name) {
             return qualified ? NAME_FULLNAME : NAME_NAME;
-        case Tree(_):
-            return qualified ? TREE_FULLNAME : TREE_NAME;
-        case Node(TreeNode node):
-            return qualified ? TREE_FULLNAME + "." + node.name : node.name;
-        default:
-            return super.getName(qualified);
         }
+        if (this instanceof Tree) {
+            return qualified ? TREE_FULLNAME : TREE_NAME;
+        }
+        if (this instanceof Node) {
+            TreeNode node = ((Node)this).node;
+            return qualified ? TREE_FULLNAME + "." + node.name : node.name;
+        }
+        return super.getName(qualified);
     }
 
     /** Returns the type's owner (its package or enclosing type). */
     public String getOwner() {
-        switch (this) {
-        case Name(_):
+        if (this instanceof Name) {
             return NAME_PACKAGE;
-        case Tree(_):
+        }
+        if (this instanceof Tree) {
             return TREE_PACKAGE;
-        case Node(TreeNode node):
+        }
+        if (this instanceof Node) {
             return TREE_FULLNAME;
-        default:
-            return super.getOwner();
+        }
+        return super.getOwner();
+    }
+
+    //########################################################################
+    // Public Classes
+
+    public static final class Name extends TreeType {
+        public final TreeKind kind;
+
+        private Name(TreeKind kind) {
+            this.kind = kind;
+        }
+    }
+
+    public static final class Tree extends TreeType {
+        public final TreeKind kind;
+
+        private Tree(TreeKind kind) {
+            this.kind = kind;
+        }
+    }
+
+    public static final class Node extends TreeType {
+        public final TreeNode node;
+
+        private Node(TreeNode node) {
+            this.node = node;
         }
     }
 

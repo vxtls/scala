@@ -33,13 +33,19 @@ final class TreeList(ts: Array[Tree]) {
   }
 
   def append(ts: Array[Tree]): unit = {
-    for (val j <- Iterator.range(0, ts.length))
+    var j = 0;
+    while (j < ts.length) {
       append(ts(j));
+      j = j + 1
+    }
   }
 
   def append(tl: TreeList): unit = {
-    for (val j <- Iterator.range(0, ts.length))
+    var j = 0;
+    while (j < ts.length) {
       append(tl.trees(j));
+      j = j + 1
+    }
   }
 
   def clear(): unit = {

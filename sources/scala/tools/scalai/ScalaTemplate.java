@@ -85,8 +85,10 @@ public class ScalaTemplate {
     public Object invoke(Object self, Symbol method, Object[] args) {
         CodePromise code = (CodePromise)vtable.get(method);
         if (code == null) {
-            // !!! generalize use of overridingSymbol in interpreter
             code = (CodePromise)vtable.get(method.overridingSymbol(symbol.thisType(), true));
+        }
+        if (code == null) {
+            code = (CodePromise)vtable.get(method.overridingSymbol(symbol.thisType()));
         }
         assert code != null : Debug.show(symbol) + "->" + Debug.show(method);
         return evaluator.evaluate(code, self, args);

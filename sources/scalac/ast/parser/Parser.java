@@ -16,7 +16,7 @@ import scalac.util.*;
 import scalac.symtab.Modifiers;
 import scalac.ast.*;
 import scalac.atree.AConstant;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 /** A recursive descent parser for the programming language Scala.
  *
@@ -220,15 +220,14 @@ public class Parser implements Tokens {
     Tree makePackaging(int pos, Tree pkg, Tree[] stats) {
 	while (true) {
 	    Template templ = make.Template(pos, Tree.EMPTY_ARRAY, stats);
-	    switch (pkg) {
-	    case Select(Tree qual, Name name):
+            if (pkg instanceof Select) {
+                Select select = (Select) pkg;
 		stats = new Tree[]{
-		    make.PackageDef(pos, make.Ident(pkg.pos, name), templ)};
-		pkg = qual;
-		break;
-	    default:
+		    make.PackageDef(pos, make.Ident(pkg.pos, select.selector), templ)};
+		pkg = select.qualifier;
+            } else {
 		return make.PackageDef(pos, pkg, templ);
-	    }
+            }
 	}
     }
 
@@ -296,26 +295,30 @@ public class Parser implements Tokens {
      *  corresponding to whether this is a for-do or a for-yield.
      */
     Tree makeFor(int pos, Tree[] enums, Name mapName, Name flatmapName, Tree body) {
-        switch (enums[0]) {
-        case PatDef(int mods, Tree pat, Tree rhs):
-            if (enums.length == 1)
-                return makeFor1(pos, mapName, pat, rhs, body);
-            Tree[] newenums = new Tree[enums.length - 1];
-            switch (enums[1]) {
-            case PatDef(int mods2, Tree pat2, Tree rhs2):
-                System.arraycopy(enums, 1, newenums, 0, newenums.length);
-                return makeFor1(pos, flatmapName, pat, rhs,
-                                makeFor(enums[1].pos, newenums, mapName, flatmapName, body));
-            default:
-                System.arraycopy(enums, 2, newenums, 1, newenums.length - 1);
-                newenums[0] = make.PatDef(
-                    enums[0].pos, mods, pat,
-                    makeFor1(enums[1].pos, Names.filter, pat.duplicate(), rhs, enums[1]));
-                return makeFor(pos, newenums, mapName, flatmapName, body);
-            }
-        default:
+        if (!(enums[0] instanceof PatDef)) {
             throw new ApplicationError();
         }
+        PatDef patDef = (PatDef) enums[0];
+        if (enums.length == 1) {
+            return makeFor1(pos, mapName, patDef.pat, patDef.rhs, body);
+        }
+        Tree[] newenums = new Tree[enums.length - 1];
+        if (enums[1] instanceof PatDef) {
+            System.arraycopy(enums, 1, newenums, 0, newenums.length);
+            return makeFor1(
+                pos,
+                flatmapName,
+                patDef.pat,
+                patDef.rhs,
+                makeFor(enums[1].pos, newenums, mapName, flatmapName, body));
+        }
+        System.arraycopy(enums, 2, newenums, 1, newenums.length - 1);
+        newenums[0] = make.PatDef(
+            enums[0].pos,
+            patDef.mods,
+            patDef.pat,
+            makeFor1(enums[1].pos, Names.filter, patDef.pat.duplicate(), patDef.rhs, enums[1]));
+        return makeFor(pos, newenums, mapName, flatmapName, body);
     }
 
     //where
@@ -325,8 +328,8 @@ public class Parser implements Tokens {
                 new Tree[]{makeForCont(pos, pat, body)});
         }
         Tree makeForCont(int pos, Tree pat, Tree body) {
-            switch (pat) {
-            case Ident(Name name1):
+            if (pat instanceof Ident) {
+                Name name1 = ((Ident) pat).name;
                 if (name1.isVariable())
                     return make.Function(
                         pos,
@@ -394,13 +397,19 @@ public class Parser implements Tokens {
     /** Convert tree to formal parameter list
      */
     ValDef[] convertToParams(Tree t) {
-        switch (t) {
-        case Function(ValDef[] params, Tree.Empty):
-            return params;
-        case Ident(_):
-        case Typed(Ident(_), _):
+        if (t instanceof Function) {
+            Function function = (Function) t;
+            if (function.body == Tree.Empty) {
+                return function.vparams;
+            }
+        } else if (t instanceof Ident) {
             return new ValDef[]{convertToParam(t)};
-        case Literal(AConstant.UNIT):
+        } else if (t instanceof Typed) {
+            Typed typed = (Typed) t;
+            if (typed.expr instanceof Ident) {
+                return new ValDef[]{convertToParam(t)};
+            }
+        } else if (t instanceof Literal && ((Literal) t).value == AConstant.UNIT) {
             return Tree.ValDef_EMPTY_ARRAY; // !!!
         }
         syntaxError(t.pos, "malformed formal parameter list", false);
@@ -419,14 +428,16 @@ public class Parser implements Tokens {
     /** Convert tree to formal parameter
      */
     ValDef convertToParam(Tree tree) {
-        switch (tree) {
-        case Ident(Name name):
+        if (tree instanceof Ident) {
+            Name name = ((Ident) tree).name;
             return (ValDef)make.ValDef(
                 tree.pos, Modifiers.PARAM, name, Tree.Empty, Tree.Empty);
-        case Typed(Ident(Name name), Tree tpe):
+        } else if (tree instanceof Typed && ((Typed) tree).expr instanceof Ident) {
+            Typed typed = (Typed) tree;
+            Name name = ((Ident) typed.expr).name;
             return (ValDef)make.ValDef(
-                tree.pos, Modifiers.PARAM, name, tpe, Tree.Empty);
-        default:
+                tree.pos, Modifiers.PARAM, name, typed.tpe, Tree.Empty);
+        } else {
             Tree tpe = syntaxError(tree.pos, "not a legal formal parameter", false);
             return (ValDef)make.ValDef(
                 tree.pos, Modifiers.PARAM, Names.ERROR, tpe, Tree.Empty);
@@ -436,12 +447,13 @@ public class Parser implements Tokens {
     /** Convert (qual)ident to type identifier
      */
     Tree convertToTypeId(Tree t) {
-        switch (t) {
-        case Ident(Name name):
+        if (t instanceof Ident) {
+            Name name = ((Ident) t).name;
             return make.Ident(t.pos, name.toTypeName());
-        case Select(Tree qual, Name name):
-            return make.Select(t.pos, qual, name.toTypeName());
-        default:
+        } else if (t instanceof Select) {
+            Select select = (Select) t;
+            return make.Select(t.pos, select.qualifier, select.selector.toTypeName());
+        } else {
             return t;
         }
     }
@@ -449,12 +461,13 @@ public class Parser implements Tokens {
     /** Convert (qual)ident to constructor identifier
      */
     Tree convertToConstr(Tree t) {
-        switch (t) {
-        case Ident(Name name):
+        if (t instanceof Ident) {
+            Name name = ((Ident) t).name;
             return make.Ident(t.pos, name.toTypeName());
-        case Select(Tree qual, Name name):
-            return make.Select(t.pos, qual, name.toTypeName());
-        default:
+        } else if (t instanceof Select) {
+            Select select = (Select) t;
+            return make.Select(t.pos, select.qualifier, select.selector.toTypeName());
+        } else {
             return syntaxError(t.pos, "class constructor expected", false);
         }
     }
@@ -462,10 +475,9 @@ public class Parser implements Tokens {
     /** Complete unapplied constructor with `()' arguments
      */
     Tree applyConstr(Tree t) {
-        switch (t) {
-        case Apply(_, _):
+        if (t instanceof Apply) {
             return t;
-        default:
+        } else {
             return make.Apply(t.pos, t, Tree.EMPTY_ARRAY);
         }
     }
@@ -923,10 +935,9 @@ public class Parser implements Tokens {
         } else {
             Tree t = postfixExpr();
             if (s.token == EQUALS) {
-                switch (t) {
-                case Ident(_):
-                case Select(_, _):
-                case Apply(_, _):
+                if (t instanceof Ident ||
+                    t instanceof Select ||
+                    t instanceof Apply) {
                     t = make.Assign(s.skipToken(), t, expr());
                 }
             } else if (s.token == COLON) {
@@ -1067,15 +1078,12 @@ public class Parser implements Tokens {
                 t = make.Select(s.skipToken(), t, ident());
                 break;
             case LBRACKET:
-                switch (t) {
-                case Ident(_):
-                case Select(_, _):
+                if (t instanceof Ident || t instanceof Select) {
                     t = make.TypeApply(s.pos, t, typeArgs());
                     break;
-                default:
+                } else {
                     return t;
                 }
-                break;
             case LPAREN:
             case LBRACE:
                 t = make.Apply(s.pos, t, argumentExprs());
@@ -1277,8 +1285,8 @@ public class Parser implements Tokens {
     Tree pattern2() {
         Tree p = pattern3();
         if (s.token == AT && TreeInfo.isVarPattern(p)) {
-            switch (p) {
-            case Ident(Name name):
+            if (p instanceof Ident) {
+                Name name = ((Ident) p).name;
                 if (name == Names.PATTERN_WILDCARD) return pattern3();
             }
             return make.Bind(s.skipToken(), ((Ident)p).name, pattern3());
@@ -1390,7 +1398,6 @@ public class Parser implements Tokens {
             Tree[] ts = Tree.EMPTY_ARRAY;
             if( s.token!= RPAREN )
                 ts = patterns();
-            Tree t = null;
             if ((ts.length == 1)&&!( ts[0] instanceof Tree.Alternative ))  {
                 t = ts[0];
             } else {
@@ -1764,13 +1771,13 @@ public class Parser implements Tokens {
         int pos = s.pos;
         Tree pat = pattern2();
         Tree tp = (s.token == COLON) ? typedOpt() : Tree.Empty;
-        switch (pat) {
-        case Ident(Name name):
+        if (pat instanceof Ident) {
+            Name name = ((Ident) pat).name;
             if (tp == Tree.Empty || s.token == EQUALS)
                 return make.ValDef(pos, mods, name, tp, equalsExpr());
             else
                 return make.ValDef(pos, mods | Modifiers.DEFERRED, name, tp, Tree.Empty);
-        default:
+        } else {
             return make.PatDef(pos, mods, pat, equalsExpr());
         }
     }

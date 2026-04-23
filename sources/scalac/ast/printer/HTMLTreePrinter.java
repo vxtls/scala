@@ -134,18 +134,21 @@ public class HTMLTreePrinter extends TextTreePrinter {
     }
 
     protected void print(Text text) {
-        switch (text) {
-        case Keyword(String name):
+        if (text instanceof Text.KeywordText) {
+            String name = ((Text.KeywordText) text).name;
             startSpan("kw");
             printString(name);
             endSpan();
-            break;
-        case Literal(String str):
+        } else if (text instanceof Text.LiteralText) {
+            String str = ((Text.LiteralText) text).str;
             startSpan("lit");
             printString(str);
             endSpan();
-            break;
-        case Identifier(Symbol symbol, Name name, SymbolUsage usage):
+        } else if (text instanceof Text.IdentifierText) {
+            Text.IdentifierText identifier = (Text.IdentifierText) text;
+            Symbol symbol = identifier.symbol;
+            Name name = identifier.name;
+            SymbolUsage usage = identifier.usage;
             boolean defined = (usage == SymbolUsage.Definition);
             if (defined) startSpan("idDef");
             if (symbol != null) {
@@ -159,8 +162,7 @@ public class HTMLTreePrinter extends TextTreePrinter {
             } else
                 printString(name.toString());
             if (defined) endSpan();
-            break;
-        default:
+        } else {
             super.print(text);
         }
     }

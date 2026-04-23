@@ -13,8 +13,8 @@ import scalac.ast.*;
 import scalac.atree.AConstant;
 import scalac.symtab.*;
 
-import PatternNode.*;
-import Tree.*;
+import scalac.transformer.matching.PatternNode.*;
+import scalac.ast.Tree.*;
 
 import scalac.transformer.TransMatch.Matcher ;
 import scalac.util.Name ;
@@ -67,6 +67,7 @@ public class AlgebraicMatcher extends PatternMatcher {
       }
        */
 
+
     boolean isStarApply( Tree.Apply tree ) {
 	Symbol params[] = tree.fun.type.valueParams();
 	//System.err.println( tree.fun.type.resultType().symbol() );
@@ -100,13 +101,11 @@ public class AlgebraicMatcher extends PatternMatcher {
 	//System.err.println("AM.toTree called"+node);
         if (node == null)
             return gen.mkBooleanLit(_m.pos, false);
-        switch (node) {
-        case SeqContainerPat( _, _ ):
+        if (node instanceof SeqContainerPat) {
 	    return  callSequenceMatcher( node,
 					 selector );
-        default:
-	    return super.toTree( node, selector );
         }
+	return super.toTree( node, selector );
     }
 
       /** collects all sequence patterns and returns the default
@@ -120,14 +119,11 @@ public class AlgebraicMatcher extends PatternMatcher {
               do {
                     if( node == null )
                           break;// defaultNode = node;
-                    else
-                          switch( node ) {
-                    case SeqContainerPat( _, _ ):
+                    else if (node instanceof SeqContainerPat) {
                           seqPatNodes.add( node );
                           bodies.add( toTree( node.and ) );
                           node = node.or;
-                          break;
-                    default:
+                    } else {
                           defaultNode = node;
                     }
               } while (defaultNode == null) ;

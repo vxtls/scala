@@ -38,7 +38,6 @@ import scalac.Global;
 import scalac.Unit;
 import scalac.symtab.Kinds;
 import scalac.symtab.Modifiers;
-import scalac.symtab.NoSymbol;
 import scalac.symtab.Scope;
 import scalac.symtab.Scope.SymbolIterator;
 import scalac.symtab.Symbol;
@@ -49,7 +48,6 @@ import scalac.util.Debug;
 import scalac.util.Name;
 import scalac.util.Names;
 import scalac.util.Strings;
-import SymbolBooleanFunction;
 import scalac.util.ScalaProgramArgumentParser;
 
 /**
@@ -1353,14 +1351,18 @@ public class HTMLGenerator {
     /** Inline a @see documentation tag.
      */
     protected String inlineRefTag(Tag tag) {
-	switch(Tag.parseReference(tag)) {
-	case Bad(String ref):
-	    return ref;
-	case Url(String ref):
-	    return ref;
-	case Literal(String ref):
-	    return ref;
-	case Scala(String container, String member, String label):
+	Tag.RefKind kind = Tag.parseReference(tag);
+	if (kind instanceof Tag.RefKind.Bad)
+	    return ((Tag.RefKind.Bad)kind).ref;
+	if (kind instanceof Tag.RefKind.Url)
+	    return ((Tag.RefKind.Url)kind).ref;
+	if (kind instanceof Tag.RefKind.Literal)
+	    return ((Tag.RefKind.Literal)kind).ref;
+	if (kind instanceof Tag.RefKind.Scala) {
+	    Tag.RefKind.Scala scala = (Tag.RefKind.Scala)kind;
+	    String container = scala.container;
+	    String member = scala.member;
+	    String label = scala.label;
 	    Symbol sym = findSymbolFromString(tag.holder, container, member);
 	    if (sym == Symbol.NONE) {
 		System.err.println("Warning: not found " + tag);
@@ -1374,9 +1376,8 @@ public class HTMLGenerator {
 		String labl = label.equals("") ? sym.nameString() : label;
 		return ahref(definitionURL(sym), ROOT_FRAME, labl);
 	    }
-	default:
-	    throw Debug.abort("illegal case", tag);
 	}
+	throw Debug.abort("illegal case", tag);
     }
 
     /**

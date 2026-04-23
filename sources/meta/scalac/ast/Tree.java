@@ -384,15 +384,10 @@ public class Tree {
     // Public Functions
 
     public static boolean isTree(Type type) {
-        switch (type) {
-        case Array(Type item):
-            return isTree(item);
-        case TreeType.Tree(_):
-        case TreeType.Node(_):
-            return true;
-        default:
-            return false;
+        if (type instanceof Type.Array) {
+            return isTree(((Type.Array)type).item);
         }
+        return type instanceof TreeType.Tree || type instanceof TreeType.Node;
     }
 
     //########################################################################

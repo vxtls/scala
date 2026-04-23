@@ -3,7 +3,7 @@ package scalac.transformer.matching ;
 import scalac.*;
 import scalac.ast.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 import scalac.util.Name;
 import scalac.util.Names;
 
@@ -44,7 +44,7 @@ public class LeftTracerInScala extends TracerInScala {
                                        Modifiers.LABEL );
 
         this.iterSym = new TermSymbol( pos,
-                                        cf.fresh.newName( "iter" ),
+                                       cf.fresh.newName( "iter" ),
                                        owner,
                                        Modifiers.MUTABLE )
             .setType( cf._seqIterType( elementType ) ) ;
@@ -57,31 +57,26 @@ public class LeftTracerInScala extends TracerInScala {
 
         this.accumType = _accumType( elementType );
         this.accumTypeArg = accumType.typeArgs()[0];
-        this.accumSym = new TermSymbol( pos,                  // accumulator
+        this.accumSym = new TermSymbol( pos,
                                         cf.fresh.newName( "acc" ),
                                         owner,
                                         Modifiers.MUTABLE )
             .setType( accumType );
 
-        //this.funSym
-        //    .setType( new Type.MethodType( new Symbol[] {
-        //        accumSym, iterSym, stateSym},
-        //                                   accumType));
-
         this.funSym
-            .setType( new Type.MethodType( new Symbol[] {  // dummy symbol MethodType
+            .setType( new Type.MethodType( new Symbol[] {
                 new TermSymbol( pos,
-                                cf.fresh.newName( "q" ),   // q:int
+                                cf.fresh.newName( "q" ),
                                 funSym,
                                 Modifiers.PARAM )
                 .setType( defs.INT_TYPE() ),
-                new TermSymbol( pos,       // acc:List[T] accumulator
+                new TermSymbol( pos,
                                 cf.fresh.newName( "acc" ),
                                 funSym,
                                 Modifiers.PARAM )
                 .setType( accumType )
             },
-                                           accumType)); // result type = List[T]
+                                           accumType));
 
         this.resultSym = new TermSymbol(pos,
                                         cf.fresh.newName("trace"),
@@ -94,7 +89,6 @@ public class LeftTracerInScala extends TracerInScala {
 
         this.hasnSym = new TermSymbol( pos, HASNEXT, owner, 0)
             .setType( defs.BOOLEAN_TYPE() );
-
     }
 
     /* should throw an exception here really, e.g. MatchError
@@ -133,7 +127,6 @@ public class LeftTracerInScala extends TracerInScala {
                                      hd,
                                      gen.Ident( cf.pos, accumSym ));
 
-        //return callFun( new Tree[] { newAcc , _iter(), gen.mkIntLit( cf.pos, target )} );
         return callFun( new Tree[] { gen.mkIntLit( cf.pos, target.intValue() ), newAcc } );
     }
 
@@ -198,7 +191,6 @@ public class LeftTracerInScala extends TracerInScala {
     Tree getTrace() {
 
         initializeSyms();
-
         return cf.gen.mkBlock( cf.pos, new Tree[] {
             gen.ValDef( iterSym, cf.newIterator( selector, selector.getType() )),
             gen.ValDef( stateSym, gen.mkIntLit( cf.pos, 0) ),
@@ -208,7 +200,7 @@ public class LeftTracerInScala extends TracerInScala {
                                       new Ident[] {
                                           gen.Ident( pos, stateSym ),
                                           gen.Ident( pos, accumSym )
-                                      }, code_body() /* code_body_new ? */ ))},
+                                      }, code_body() ))},
             gen.Ident( cf.pos, resultSym ));
     }
 
@@ -223,8 +215,7 @@ public class LeftTracerInScala extends TracerInScala {
                                  defs.BOOLEAN_TYPE() );
 
         if( CollectVariableTraverser.containsBinding( pat )) {
-            switch( pat ) {
-            case Sequence(Tree[] pats):
+            if (pat instanceof Sequence) {
                 return gen.mkBooleanLit(cf.pos, true);
             }
         }

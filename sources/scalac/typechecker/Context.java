@@ -50,16 +50,15 @@ public class Context {
     }
 
     boolean isTopLevel() {
-	switch (tree) {
-	case Block(_, _):
+	if (tree instanceof Tree.Block) {
 	    return false;
-	case Template(_, _):
-	    return outer.tree instanceof Tree.PackageDef;
-	case Empty:
-	    return true;
-	default:
-	    return outer.isTopLevel();
 	}
+	if (tree instanceof Tree.Template) {
+	    return outer.tree instanceof Tree.PackageDef;
+	}
+	if (tree == Tree.Empty) {
+	    return true;
+	}
+	return outer.isTopLevel();
     }
 }
-

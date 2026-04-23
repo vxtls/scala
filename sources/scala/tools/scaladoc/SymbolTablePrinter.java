@@ -273,14 +273,11 @@ public abstract class SymbolTablePrinter extends scalac.symtab.SymbolTablePrinte
      */
     public SymbolTablePrinter printType0(Type type) {
         printCommonPart(type);
-        switch (type) {
-        case ThisType(_):
-        case SingleType(_,_):
+        if (type instanceof Type.ThisType || type instanceof Type.SingleType) {
             print(".type");
             return this;
-        default:
-            return this;
         }
+        return this;
     }
 
     /** Prints the given type with the given inner string. */
@@ -296,8 +293,10 @@ public abstract class SymbolTablePrinter extends scalac.symtab.SymbolTablePrinte
      * @param inner
      */
     public SymbolTablePrinter printType0(Type type, String inner) {
-        switch (type) {
-        case MethodType(Symbol[] vparams, Type result):
+        if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            Symbol[] vparams = methodType.vparams;
+            Type result = methodType.result;
             print('(');
             for (int i = 0; i < vparams.length; i++) {
                 if (i > 0) print(", ");
@@ -306,7 +305,11 @@ public abstract class SymbolTablePrinter extends scalac.symtab.SymbolTablePrinte
             }
             print(')');
             return printType(result, inner);
-        case PolyType(Symbol[] tparams, Type result):
+        }
+        if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)type;
+            Symbol[] tparams = polyType.tparams;
+            Type result = polyType.result;
             if (tparams.length != 0 || global.debug) {
                 print('[');
                 for (int i = 0; i < tparams.length; i++) {
@@ -316,13 +319,12 @@ public abstract class SymbolTablePrinter extends scalac.symtab.SymbolTablePrinte
                 print(']');
             }
             return printType(result, inner);
-        default:
-            if (inner != null) {
-                if (!inner.startsWith(":")) space();
-                print(inner).space();
-            }
-            return printType0(type);
         }
+        if (inner != null) {
+            if (!inner.startsWith(":")) space();
+            print(inner).space();
+        }
+        return printType0(type);
     }
 
     /**
@@ -358,28 +360,32 @@ public abstract class SymbolTablePrinter extends scalac.symtab.SymbolTablePrinte
      * @param type
      */
     public SymbolTablePrinter printCommonPart(Type type) {
-        switch (type) {
-	case ErrorType:
+        if (type == Type.ErrorType) {
 	    print("<error>");
             return this;
-
-	case AnyType:
+	}
+	if (type == Type.AnyType) {
 	    print("<any type>");
             return this;
-
-	case NoType:
+	}
+	if (type == Type.NoType) {
 	    print("<notype>");
             return this;
-
-	case ThisType(Symbol sym):
+	}
+	if (type instanceof Type.ThisType) {
+	    Symbol sym = ((Type.ThisType)type).sym;
             if (sym == Symbol.NONE) print("<local>.this");
             if ((sym.isAnonymousClass() || sym.isCompoundSym()) && !global.debug)
 		print("this");
             printUsedSymbolName(sym);
             print(".this"); // vincent
             return this;
-
-	case TypeRef(Type pre, Symbol sym, Type[] args):
+	}
+	if (type instanceof Type.TypeRef) {
+	    Type.TypeRef typeRef = (Type.TypeRef)type;
+	    Type pre = typeRef.pre;
+	    Symbol sym = typeRef.sym;
+	    Type[] args = typeRef.args;
 	    if (!global.debug) {
                 if (type.isFunctionType()) {
                     printFunctionType(args);
@@ -396,58 +402,64 @@ public abstract class SymbolTablePrinter extends scalac.symtab.SymbolTablePrinte
                 print(']');
             }
             return this;
-
-	case SingleType(Type pre, Symbol sym):
+	}
+	if (type instanceof Type.SingleType) {
+	    Type.SingleType singleType = (Type.SingleType)type;
+	    Type pre = singleType.pre;
+	    Symbol sym = singleType.sym;
             printPrefix(pre, sym);
             printUsedSymbolName(sym);
             return this;
-
-	case ConstantType(Type base, AConstant value):
-	    printType(base);
+	}
+	if (type instanceof Type.ConstantType) {
+	    printType(((Type.ConstantType)type).base);
 // 	    print("(");
 // 	    print(value.toString());
 // 	    print(")");
 	    return this;
-
-	case CompoundType(Type[] parts, Scope members):
+	}
+	if (type instanceof Type.CompoundType) {
+	    Type.CompoundType compoundType = (Type.CompoundType)type;
+	    Type[] parts = compoundType.parts;
+	    Scope members = compoundType.members;
 	    printTypes(parts," with ");
             space();
             return printScope(members, true); // vincent
-
-	case MethodType(_, _):
+	}
+	if (type instanceof Type.MethodType) {
 	    return printType0(type);
-
-	case PolyType(_, _):
+	}
+	if (type instanceof Type.PolyType) {
 	    return printType0(type);
-
-	case OverloadedType(Symbol[] alts, Type[] alttypes):
+	}
+	if (type instanceof Type.OverloadedType) {
+	    Type[] alttypes = ((Type.OverloadedType)type).alttypes;
             return printTypes(alttypes, " <and> ");
-
-	case TypeVar(Type origin, Constraint constr):
-            printType(origin);
+	}
+	if (type instanceof Type.TypeVar) {
+            printType(((Type.TypeVar)type).origin);
             print("?");
             return this;
-
-	case UnboxedType(int kind):
+	}
+	if (type instanceof Type.UnboxedType) {
+	    int kind = ((Type.UnboxedType)type).tag;
 	    print(type.unboxedName(kind).toString());
             return this;
-
-	case UnboxedArrayType(Type elemtp):
-	    printType(elemtp);
-            print("[]");
+	}
+	if (type instanceof Type.UnboxedArrayType) {
+	    printType(((Type.UnboxedArrayType)type).elemtp);
+	    print("[]");
             return this;
-
-	case LazyType():
+	}
+	if (type instanceof Type.LazyType) {
             if (!global.debug) print("?");
             String classname = type.getClass().getName();
             print("<lazy type ").print(classname).print(">");
             return this;
-
-	default:
-            String classname = type.getClass().getName();
-	    print("<unknown type ").print(classname).print(">");
-            return this;
         }
+        String classname = type.getClass().getName();
+	print("<unknown type ").print(classname).print(">");
+        return this;
     }
 
     //########################################################################
@@ -483,15 +495,12 @@ public abstract class SymbolTablePrinter extends scalac.symtab.SymbolTablePrinte
      */
     public SymbolTablePrinter printPrefix0(Type prefix) {
         printCommonPart(prefix);
-        switch (prefix) {
-        case ThisType(_):
-        case SingleType(_,_):
+        if (prefix instanceof Type.ThisType || prefix instanceof Type.SingleType) {
             print(".");
             return this;
-        default:
-            print("#");
-            return this;
         }
+        print("#");
+        return this;
     }
 
     //########################################################################

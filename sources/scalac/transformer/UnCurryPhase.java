@@ -9,7 +9,6 @@
 package scalac.transformer;
 
 import scalac.*;
-import scalac.parser.*;
 import scalac.symtab.*;
 import scalac.checkers.*;
 
@@ -38,37 +37,51 @@ public class UnCurryPhase extends Phase implements Modifiers {
     /** - (ps_1)...(ps_n)T ==> (ps_1,...,ps_n)T
      */
     Type uncurry(Type tp) {
-	switch (tp) {
-	case MethodType(Symbol[] params, Type tp1):
+	if (tp instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)tp;
+            Symbol[] params = methodType.vparams;
+            Type tp1 = methodType.result;
 	    Type newtp1 = uncurry(tp1);
-	    switch (newtp1) {
-	    case MethodType(Symbol[] params1, Type tp2):
+	    if (newtp1 instanceof Type.MethodType) {
+                Type.MethodType nextMethodType = (Type.MethodType)newtp1;
+                Symbol[] params1 = nextMethodType.vparams;
+                Type tp2 = nextMethodType.result;
 		Symbol[] newparams = new Symbol[params.length + params1.length];
 		System.arraycopy(params, 0, newparams, 0, params.length);
 		System.arraycopy(params1, 0, newparams, params.length, params1.length);
 		return Type.MethodType(newparams, tp2);
-	    default:
+	    } else {
 		if (newtp1 == tp1) return tp;
 		else return Type.MethodType(params, newtp1);
 	    }
-	case PolyType(Symbol[] tparams, Type tp1):
+        }
+	if (tp instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)tp;
+            Symbol[] tparams = polyType.tparams;
+            Type tp1 = polyType.result;
 	    Type newtp1 = uncurry(tp1);
-	    switch (tp1) {
-	    case MethodType(_, _):
+	    if (tp1 instanceof Type.MethodType) {
 		if (newtp1 == tp1) return tp;
 		else return Type.PolyType(tparams, newtp1);
-	    default:
+	    } else {
 		newtp1 = Type.MethodType(Symbol.EMPTY_ARRAY, newtp1);
 		if (tparams.length == 0) return newtp1;
 		else return Type.PolyType(tparams, newtp1);
 	    }
-	case OverloadedType(_, _):
+        }
+	if (tp instanceof Type.OverloadedType) {
 	    return new Type.Map() {
 		public Type apply(Type t) { return uncurry(t); }
 	    }.map(tp);
-	case ConstantType(Type base, _):
+        }
+	if (tp instanceof Type.ConstantType) {
+            Type base = ((Type.ConstantType)tp).base;
 	    return base;
-        case CompoundType(Type[] parents, Scope scope):
+        }
+        if (tp instanceof Type.CompoundType) {
+            Type.CompoundType compoundType = (Type.CompoundType)tp;
+            Type[] parents = compoundType.parts;
+            Scope scope = compoundType.members;
             Symbol symbol = tp.symbol();
             if (!symbol.isClass() || symbol.isCompoundSym()) return tp;
             Scope clone = new Scope();
@@ -79,22 +92,24 @@ public class UnCurryPhase extends Phase implements Modifiers {
                 clone.enterOrOverload(member);
             }
             return Type.compoundType(parents, clone, symbol);
-	default:
-	    return tp;
 	}
+	return tp;
     }
 
     boolean isUnaccessedConstant(Symbol symbol) {
         if (!symbol.isTerm()) return false;
         if ((symbol.flags & ACCESSED) != 0) return false;
-        switch (symbol.type()) {
-        case PolyType(Symbol[] params, ConstantType(_, _)):
-            return params.length == 0;
-        case ConstantType(_, _):
-            return true;
-        default:
-            return false;
+        Type symbolType = symbol.type();
+        if (symbolType instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)symbolType;
+            if (polyType.result instanceof Type.ConstantType) {
+                return polyType.tparams.length == 0;
+            }
         }
+        if (symbolType instanceof Type.ConstantType) {
+            return true;
+        }
+        return false;
     }
 
     public Checker[] postCheckers(Global global) {

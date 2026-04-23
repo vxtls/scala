@@ -94,37 +94,33 @@ public class TreeChecker {
 
     /** Checks the template. Returns true. */
     private boolean template(Tree tree) {
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return true;
-
-        case ClassDef(_, _, AbsTypeDef[] tparams, ValDef[][] vparams, _, Template(_, Tree[] body)):
+        } else if (tree instanceof Tree.ClassDef) {
+            Tree.ClassDef classDef = (Tree.ClassDef)tree;
             Symbol symbol = tree.symbol();
             assert symbol != null && symbol.isClass(): show(tree);
-            assert vparams.length == 1: show(tree);
-            containSymbols(tparams, symbol.typeParams());
-            containSymbols(vparams[0],symbol.valueParams());
+            assert classDef.vparams.length == 1: show(tree);
+            containSymbols(classDef.tparams, symbol.typeParams());
+            containSymbols(classDef.vparams[0],symbol.valueParams());
             registerSymbol(symbol);
             scopeInsertParametersOf(symbol);
             pushClass(symbol);
-            member(body);
+            member(classDef.impl.body);
             popClass();
             scopeRemoveParametersOf(symbol);
             return true;
-
-        case PackageDef(Tree packaged, Template(Tree[] bases, Tree[] body)):
-            Symbol symbol = packaged.symbol();
-            assert symbol != null && symbol.isPackage(): show(packaged);
-            assert bases.length == 0: show(tree);
+        } else if (tree instanceof Tree.PackageDef) {
+            Tree.PackageDef packageDef = (Tree.PackageDef)tree;
+            Symbol symbol = packageDef.packaged.symbol();
+            assert symbol != null && symbol.isPackage(): show(packageDef.packaged);
+            assert packageDef.impl.parents.length == 0: show(tree);
             pushOwner(symbol);
-            template(body);
+            template(packageDef.impl.body);
             popOwner();
             return true;
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        throw Debug.abort("illegal case", tree);
     }
 
     //########################################################################
@@ -138,15 +134,12 @@ public class TreeChecker {
 
     /** Checks the member. Returns true. */
     private boolean member(Tree tree) {
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return true;
-
-        case ClassDef(_, _, _, _, _, _):
+        } else if (tree instanceof Tree.ClassDef) {
             return template(tree);
-
-        case ValDef(_, _, _, Tree rhs):
+        } else if (tree instanceof Tree.ValDef) {
+            Tree rhs = ((Tree.ValDef)tree).rhs;
             Symbol symbol = tree.symbol();
             assert symbol != null && symbol.isTerm(): show(tree);
             assert rhs == Tree.Empty: show(tree);
@@ -154,25 +147,23 @@ public class TreeChecker {
             pushMember(symbol);
             popMember();
             return true;
-
-        case DefDef(_, _, AbsTypeDef[]tparams, ValDef[][]vparams, _, Tree rhs):
+        } else if (tree instanceof Tree.DefDef) {
+            Tree.DefDef defDef = (Tree.DefDef)tree;
             Symbol symbol = tree.symbol();
             assert symbol != null && symbol.isMethod(): show(tree);
-            assert vparams.length == 1: show(tree);
-            containSymbols(tparams, symbol.typeParams());
-            containSymbols(vparams[0],symbol.valueParams());
-            assert symbol.isDeferred() == (rhs == Tree.Empty): show(tree);
+            assert defDef.vparams.length == 1: show(tree);
+            containSymbols(defDef.tparams, symbol.typeParams());
+            containSymbols(defDef.vparams[0],symbol.valueParams());
+            assert symbol.isDeferred() == (defDef.rhs == Tree.Empty): show(tree);
             registerSymbol(symbol);
             scopeInsertParametersOf(symbol);
             pushMember(symbol);
-            if (!symbol.isDeferred()) expression(rhs, symbol.resultType());
+            if (!symbol.isDeferred()) expression(defDef.rhs, symbol.resultType());
             popMember();
             scopeRemoveParametersOf(symbol);
             return true;
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        throw Debug.abort("illegal case", tree);
     }
 
     //########################################################################
@@ -180,24 +171,20 @@ public class TreeChecker {
 
     /** Checks the statement. Returns true. */
     private boolean statement(Set locals, Tree tree) {
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return true;
-
-        case ValDef(_, _, _, Tree rhs):
+        } else if (tree instanceof Tree.ValDef) {
+            Tree.ValDef valDef = (Tree.ValDef)tree;
             Symbol symbol = tree.symbol();
             assert symbol != null && symbol.isTerm(): show(tree);
             scopeInsertVVariable(symbol, false);
             locals.add(symbol);
             pushOwner(symbol);
-            expression(rhs, symbol.type());
+            expression(valDef.rhs, symbol.type());
             popOwner();
             return true;
-
-        default:
-            return expression(tree, tree.type());
         }
+        return expression(tree, tree.type());
     }
 
     //########################################################################
@@ -207,99 +194,100 @@ public class TreeChecker {
     private boolean expression(Tree tree, Type expected) {
         // !!! conforms(tree, expected);
         expected = tree.type();
-        switch (tree) {
-
-        case LabelDef(_, Ident[] idents, Tree rhs):
+        if (tree == Tree.Empty) {
+            return true;
+        } else if (tree instanceof Tree.LabelDef) {
+            Tree.LabelDef labelDef = (Tree.LabelDef)tree;
             Symbol symbol = tree.symbol();
             assert symbol != null && symbol.isLabel(): show(tree);
             Symbol[] params = symbol.type().valueParams();
-            assert params.length == idents.length: show(tree)
+            assert params.length == labelDef.params.length: show(tree)
                 + format("params", Debug.show(params));
-            for (int i = 0; i < idents.length; i++) {
-                location(idents[i]);
-                conforms(idents[i], definitions.ANY_TYPE(), params[i].type());
-                Symbol local = idents[i].symbol();
-                assert local != null && !local.isModule(): show(idents[i]);
+            for (int i = 0; i < labelDef.params.length; i++) {
+                location(labelDef.params[i]);
+                conforms(labelDef.params[i], definitions.ANY_TYPE(), params[i].type());
+                Symbol local = labelDef.params[i].symbol();
+                assert local != null && !local.isModule(): show(labelDef.params[i]);
             }
             conforms(tree, symbol.resultType());
             scopeInsertLabel(symbol);
-            expression(rhs, symbol.resultType());
+            expression(labelDef.rhs, symbol.resultType());
             scopeRemoveLabel(symbol);
             return true;
-
-        case Block(Tree[] statements, Tree value):
+        } else if (tree instanceof Tree.Block) {
+            Tree.Block block = (Tree.Block)tree;
             Set locals = new HashSet();
-            for (int i = 0; i < statements.length; i++)
-                statement(locals, statements[i]);
-            expression(value, expected);
+            for (int i = 0; i < block.stats.length; i++)
+                statement(locals, block.stats[i]);
+            expression(block.expr, expected);
             for (Iterator i = locals.iterator(); i.hasNext(); )
                 scopeRemoveVVariable((Symbol)i.next());
             return true;
-
-        case Assign(Tree lhs, Tree rhs):
-            location(lhs);
-            expression(rhs, lhs.type().widen());
+        } else if (tree instanceof Tree.Assign) {
+            Tree.Assign assign = (Tree.Assign)tree;
+            location(assign.lhs);
+            expression(assign.rhs, assign.lhs.type().widen());
             return true;
-
-        case If(Tree cond, Tree thenp, Tree elsep):
-            expression(cond, definitions.BOOLEAN_TYPE());
-            expression(thenp, expected);
-            expression(elsep, expected);
+        } else if (tree instanceof Tree.If) {
+            Tree.If ifTree = (Tree.If)tree;
+            expression(ifTree.cond, definitions.BOOLEAN_TYPE());
+            expression(ifTree.thenp, expected);
+            expression(ifTree.elsep, expected);
             return true;
-
-        case Switch(Tree test, _, Tree[] bodies, Tree otherwise):
-            expression(test, definitions.INT_TYPE());
-            for (int i = 0; i < bodies.length; i++)
-                expression(bodies[i], expected);
-            expression(otherwise, expected);
+        } else if (tree instanceof Tree.Switch) {
+            Tree.Switch switchTree = (Tree.Switch)tree;
+            expression(switchTree.test, definitions.INT_TYPE());
+            for (int i = 0; i < switchTree.bodies.length; i++)
+                expression(switchTree.bodies[i], expected);
+            expression(switchTree.otherwise, expected);
             return true;
-
-        case Return(Tree value):
+        } else if (tree instanceof Tree.Return) {
+            Tree value = ((Tree.Return)tree).expr;
             Symbol symbol = tree.symbol();
             assert symbol != null && symbol.isMethod(): show(tree);
             assert currentMember() == symbol: show(tree);
             return expression(value, currentMember().resultType());
-
-        case Throw(Tree value):
-            return expression(value, definitions.JAVA_THROWABLE_TYPE());
-
-        case New(Template(Tree[] bases, Tree[] body)):
-            assert bases.length == 1 && body.length == 0: show(tree);
-            Tree fun = TreeInfo.methPart(bases[0]);
+        } else if (tree instanceof Tree.Throw) {
+            return expression(((Tree.Throw)tree).expr, definitions.JAVA_THROWABLE_TYPE());
+        } else if (tree instanceof Tree.New) {
+            Template templ = ((Tree.New)tree).templ;
+            assert templ.parents.length == 1 && templ.body.length == 0: show(tree);
+            Tree fun = TreeInfo.methPart(templ.parents[0]);
             assert fun instanceof Tree.Ident: show(tree);
             Symbol symbol = fun.symbol();
             assert symbol != null && symbol.isInitializer(): show(tree);
-            return expression(bases[0], definitions.UNIT_TYPE());
-
-        case Apply(Tree vfun, Tree[] vargs):
+            return expression(templ.parents[0], definitions.UNIT_TYPE());
+        } else if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree vfun = apply.fun;
+            Tree[] vargs = apply.args;
             vapply(tree, vfun.type(), vargs);
-            switch (vfun) {
-            case TypeApply(Tree tfun, Tree[] targs):
+            if (vfun instanceof Tree.TypeApply) {
+                Tree.TypeApply typeApply = (Tree.TypeApply)vfun;
+                Tree tfun = typeApply.fun;
                 Symbol symbol = tfun.symbol();
                 assert symbol != null && !symbol.isLabel(): show(tree);
-                tapply(tree, tfun.type(), targs);
+                tapply(tree, tfun.type(), typeApply.args);
                 return function(tfun);
-            default:
-                return function(vfun);
             }
-
-        case Super(_, _):
-        case This(_):
+            return function(vfun);
+        } else if (tree instanceof Tree.Super || tree instanceof Tree.This) {
             Symbol symbol = tree.symbol();
             assert symbol != null && symbol.isClass(): show(tree);
             assert symbol == currentClass(): show(tree);
             return true;
-
-        case Select(_, _):
-        case Ident(_):
+        } else if (tree instanceof Tree.Select) {
+            Symbol symbol = tree.symbol();
+            if (symbol != null && symbol.isMethod()) return function(tree);
             return location(tree);
-
-        case Literal(_):
+        } else if (tree instanceof Tree.Ident) {
+            Symbol symbol = tree.symbol();
+            if (symbol != null && symbol.isMethod()) return function(tree);
+            return location(tree);
+        } else if (tree instanceof Tree.Literal) {
             return true;
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        throw Debug.abort("illegal case", tree);
     }
 
     /** Checks the type application. Returns true. */
@@ -336,20 +324,15 @@ public class TreeChecker {
         Symbol symbol = tree.symbol();
         assert symbol != null && symbol.isTerm(): show(tree);
         assert symbol.isMethod(): show(tree);
-        switch (tree) {
-
-        case Select(Tree qualifier, _):
+        if (tree instanceof Tree.Select) {
             return selection(tree);
-
-        case Ident(_):
+        } else if (tree instanceof Tree.Ident) {
             if (symbol.isInitializer()) return true;
             assert labels.contains(symbol): show(tree);
             assert symbol.owner() == currentMember(): show(tree);
             return true;
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        throw Debug.abort("illegal case", tree);
     }
 
     /** Checks the location. Returns true. */
@@ -357,20 +340,15 @@ public class TreeChecker {
         Symbol symbol = tree.symbol();
         assert symbol != null && symbol.isTerm(): show(tree);
         assert !symbol.isMethod(): show(tree);
-        switch (tree) {
-
-        case Select(_, _):
+        if (tree instanceof Tree.Select) {
             return selection(tree);
-
-        case Ident(_):
+        } else if (tree instanceof Tree.Ident) {
             if (symbol.isModule()) return true;
             assert vvars.contains(symbol): show(tree);
             assert symbol.owner() == currentMember(): show(tree);
             return true;
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        throw Debug.abort("illegal case", tree);
     }
 
     //########################################################################
@@ -378,19 +356,16 @@ public class TreeChecker {
 
     /** Checks the selection. Returns true. */
     private boolean selection(Tree tree) {
-        switch (tree) {
-
-        case Select(Tree qualifier, _):
+        if (tree instanceof Tree.Select) {
+            Tree qualifier = ((Tree.Select)tree).qualifier;
             Symbol symbol = tree.symbol();
             assert symbol != null && symbol.isTerm(): show(tree);
             Symbol owner = symbol.owner();
             assert owner.isClassType(): show(tree);
             assert qualifier.type().baseType(owner) != Type.NoType: show(tree);
             return expression(qualifier, qualifier.type());
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        throw Debug.abort("illegal case", tree);
     }
 
     //########################################################################

@@ -208,14 +208,13 @@ public class Definitions {
     public final Symbol ARRAY_CLASS;
     public final Type   ARRAY_TYPE(Type element) {
         Type type = ARRAY_TYPE.type().resultType();
-        switch (type) {
-        case TypeRef(Type prefix, Symbol clasz, _):
-            return Type.typeRef(prefix, clasz, new Type[]{element});
-        case UnboxedArrayType(_):
+        if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            return Type.typeRef(typeRef.pre, typeRef.sym, new Type[]{element});
+        } else if (type instanceof Type.UnboxedArrayType) {
             return Type.UnboxedArrayType(element);
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** The scala.Predef module */
@@ -627,8 +626,9 @@ public class Definitions {
 	}
 	Symbol sym = scope.lookup(fullname.subName(i, fullname.length()));
         if (!sym.isModule()) {
-            switch (sym.type()) {
-            case OverloadedType(Symbol[] alts, Type[] alttypes):
+            Type symType = sym.type();
+            if (symType instanceof Type.OverloadedType) {
+                Symbol[] alts = ((Type.OverloadedType)symType).alts;
                 for (int k = 0; k < alts.length; k++)
                     if ((sym = alts[k]).isModule()) break;
             }
@@ -731,7 +731,21 @@ public class Definitions {
     /** Returns the term member of given class with given name. */
     private Symbol loadTerm(Symbol clasz, Name name) {
         Symbol sym = clasz.lookup(name);
-        assert sym.isTerm() && !sym.isOverloaded(): clasz+"."+name+" -> "+sym;
+        assert sym.isTerm(): clasz+"."+name+" -> "+sym;
+        if (sym.isOverloaded()) {
+            Symbol[] alts = sym.alternativeSymbols();
+            Symbol method = Symbol.NONE;
+            for (int i = 0; i < alts.length; i++) {
+                if (!isMethodLike(alts[i].type())) continue;
+                if (method != Symbol.NONE) {
+                    method = Symbol.ERROR;
+                    break;
+                }
+                method = alts[i];
+            }
+            if (method != Symbol.NONE && method != Symbol.ERROR) return method;
+        }
+        assert !sym.isOverloaded(): clasz+"."+name+" -> "+sym;
         return sym;
     }
 
@@ -744,16 +758,27 @@ public class Definitions {
         assert sym.isTerm(): Debug.show(clasz,"."+name+" - ",vargs," -> ",sym);
         Symbol[] alts = sym.alternativeSymbols();
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].type()) {
-            case PolyType(_, MethodType(Symbol[] vparams, _)):
+            Type altType = alts[i].type();
+            if (altType instanceof Type.PolyType
+                && ((Type.PolyType)altType).result instanceof Type.MethodType) {
+                Symbol[] vparams =
+                    ((Type.MethodType)((Type.PolyType)altType).result).vparams;
                 if (Type.isSameAs(Symbol.type(vparams), vargs)) return alts[i];
                 continue;
-            case MethodType(Symbol[] vparams, _):
+            } else if (altType instanceof Type.MethodType) {
+                Symbol[] vparams = ((Type.MethodType)altType).vparams;
                 if (Type.isSameAs(Symbol.type(vparams), vargs)) return alts[i];
                 continue;
             }
         }
         throw Debug.abort(Debug.show(clasz,"."+name+" - ",vargs," -> ",alts));
+    }
+
+    private boolean isMethodLike(Type type) {
+        if (type instanceof Type.MethodType) return true;
+        if (type instanceof Type.PolyType)
+            return isMethodLike(((Type.PolyType)type).result);
+        return false;
     }
 
 

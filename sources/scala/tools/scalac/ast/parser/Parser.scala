@@ -422,8 +422,10 @@ class Parser(unit: Unit) {
   */
   def convertToParams(ts: Array[Tree]): Array[Tree$ValDef] = {
     val res = new Array[Tree$ValDef](ts.length);
-    for (val i <- Iterator.range(0, res.length))
+    { var i = 0; while (i < res.length) {
       res(i) = convertToParam(ts(i));
+      i = i + 1
+    }}
     res;
   }
 

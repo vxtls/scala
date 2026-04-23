@@ -12,18 +12,21 @@ import ch.epfl.lamp.util.Position;
 
 import scalac.*;
 import scalac.ast.*;
+import scalac.atree.AConstant;
 import scalac.util.*;
 import scalac.symtab.*;
-import PatternNode.*;
-import Tree.*;
+import scalac.transformer.matching.PatternNode.*;
+import scalac.ast.Tree.*;
 
 class CodeFactory extends PatternTool {
 
     public int pos = Position.FIRSTPOS ;
+    private final Symbol owner;
 
-    public CodeFactory( Unit unit, int pos ) {
+    public CodeFactory( Unit unit, int pos, Symbol owner ) {
 	super( unit );
 	this.pos = pos;
+        this.owner = owner;
     }
 
     // --------- these are new
@@ -93,12 +96,10 @@ class CodeFactory extends PatternTool {
 
 	Type tpe1 = tpe.widen().baseType( defs.ITERATOR_CLASS );
 
-	switch( tpe1 ) {
-	case TypeRef(_,_,Type[] args):
-	    return args[ 0 ];
-	default:
-	    throw new ApplicationError("arg "+tpe+" not subtype of Iterator[ A ]");
+	if (tpe1 instanceof Type.TypeRef) {
+	    return ((Type.TypeRef)tpe1).args[ 0 ];
 	}
+	throw new ApplicationError("arg "+tpe+" not subtype of Iterator[ A ]");
 
     }
 
@@ -149,35 +150,74 @@ class CodeFactory extends PatternTool {
 
      // unused
        public Tree Negate(Tree tree) {
-       switch (tree) {
-       case Literal(BOOLEAN(boolean value)):
-       return gen.mkBooleanLit(tree.pos, !value);
+       if (tree instanceof Literal) {
+       AConstant value = ((Literal)tree).value;
+       if (value instanceof AConstant.BooleanValue)
+       return gen.mkBooleanLit(tree.pos, !((AConstant.BooleanValue)value).value);
        }
        return gen.mkApply__(gen.Select(tree, defs.BOOLEAN_NOT()));
        }
 
     protected Tree And(Tree left, Tree right) {
-        switch (left) {
-	case Literal(BOOLEAN(boolean value)):
-	    return value ? right : left;
+        if (left instanceof Literal) {
+	    AConstant value = ((Literal)left).value;
+	    if (value instanceof AConstant.BooleanValue)
+	        return ((AConstant.BooleanValue)value).value ? right : left;
         }
-        switch (right) {
-	case Literal(BOOLEAN(boolean value)):
-	    if (value) return left;
+        if (right instanceof Literal) {
+	    AConstant value = ((Literal)right).value;
+	    if (value instanceof AConstant.BooleanValue && ((AConstant.BooleanValue)value).value) return left;
         }
-        return gen.mkApply_V(gen.Select(left, defs.BOOLEAN_AND()), new Tree[]{right});
+        Symbol result = new TermSymbol(
+            pos,
+            fresh.newName(Name.fromString("$pm$and")),
+            owner,
+            Modifiers.SYNTHETIC | Modifiers.MUTABLE).setType(defs.BOOLEAN_TYPE());
+        Tree resultRef = gen.Ident(pos, result);
+        Tree[] stats = {
+            gen.ValDef(result, gen.mkBooleanLit(pos, false))
+        };
+        Tree thenp = gen.mkBlock(
+            pos,
+            gen.Assign(resultRef.duplicate(), right),
+            resultRef.duplicate());
+        return gen.mkBlock(
+            pos,
+            stats,
+            gen.If(left, thenp, resultRef.duplicate(), defs.BOOLEAN_TYPE()));
     }
 
     protected Tree Or(Tree left, Tree right) {
-        switch (left) {
-	case Literal(BOOLEAN(boolean value)):
-	    return value ? left : right;
+        if (left instanceof Literal) {
+	    AConstant value = ((Literal)left).value;
+	    if (value instanceof AConstant.BooleanValue)
+	        return ((AConstant.BooleanValue)value).value ? left : right;
         }
-        switch (right) {
-	case Literal(BOOLEAN(boolean value)):
-	    if (!value) return left;
+        if (right instanceof Literal) {
+	    AConstant value = ((Literal)right).value;
+	    if (value instanceof AConstant.BooleanValue && !((AConstant.BooleanValue)value).value) return left;
         }
-        return gen.mkApply_V(gen.Select(left, defs.BOOLEAN_OR()), new Tree[]{right});
+        Symbol result = new TermSymbol(
+            pos,
+            fresh.newName(Name.fromString("$pm$or")),
+            owner,
+            Modifiers.SYNTHETIC | Modifiers.MUTABLE).setType(defs.BOOLEAN_TYPE());
+        Tree resultRef = gen.Ident(pos, result);
+        Tree[] stats = {
+            gen.ValDef(result, gen.mkBooleanLit(pos, false))
+        };
+        Tree thenp = gen.mkBlock(
+            pos,
+            gen.Assign(resultRef.duplicate(), gen.mkBooleanLit(pos, true)),
+            resultRef.duplicate());
+        Tree elsep = gen.mkBlock(
+            pos,
+            gen.Assign(resultRef.duplicate(), right),
+            resultRef.duplicate());
+        return gen.mkBlock(
+            pos,
+            stats,
+            gen.If(left, thenp, elsep, defs.BOOLEAN_TYPE()));
     }
 
     protected Tree Equals(Tree left, Tree right) {

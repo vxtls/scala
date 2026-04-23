@@ -52,27 +52,26 @@ public class Environment {
     public Class getClass(Symbol symbol) {
         assert symbol.isClass(): Debug.show(symbol);
         Template value = lookupTemplate(symbol);
-        switch (value) {
-        case Global(ScalaTemplate template):
-            return template.getProxy();
-        case JavaClass(Class clasz):
-            return clasz;
-        default:
-            throw Debug.abort("illegal case", value);
+        if (value instanceof Template.Global) {
+            return ((Template.Global)value).template.getProxy();
         }
+        if (value instanceof Template.JavaClass) {
+            return ((Template.JavaClass)value).clasz;
+        }
+        throw Debug.abort("illegal case", value);
     }
 
     public Class getClass(Type type) {
-        switch (type) {
-        case TypeRef(_, Symbol symbol, _):
-            return getClass(symbol);
-        case UnboxedType(int kind):
-            return mirror.getClass(kind);
-        case UnboxedArrayType(Type element):
-            return mirror.getArray(getClass(element));
-        default:
-            throw Debug.abort("illegal case", type);
+        if (type instanceof Type.TypeRef) {
+            return getClass(((Type.TypeRef)type).sym);
         }
+        if (type instanceof Type.UnboxedType) {
+            return mirror.getClass(((Type.UnboxedType)type).tag);
+        }
+        if (type instanceof Type.UnboxedArrayType) {
+            return mirror.getArray(getClass(((Type.UnboxedArrayType)type).elemtp));
+        }
+        throw Debug.abort("illegal case", type);
     }
 
     //########################################################################
@@ -186,7 +185,7 @@ public class Environment {
     private void loadOwner(String what, Symbol symbol) {
         assert Debug.log("search ", what, ": ", symbol);
         assert symbol.owner().isType() : Debug.show(symbol);
-        assert!symbol.owner().isExternal() : Debug.show(symbol);
+        assert !symbol.owner().isExternal() : Debug.show(symbol);
         loadTemplate(symbol.owner());
     }
 

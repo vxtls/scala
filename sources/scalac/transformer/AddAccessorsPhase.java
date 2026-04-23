@@ -85,8 +85,9 @@ public class AddAccessorsPhase extends Phase {
 
         /** Transforms the given tree. */
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case ClassDef(_, _, _, _, _, Template impl): {
+            if (tree instanceof Tree.ClassDef) {
+                Tree.ClassDef classDef = (Tree.ClassDef)tree;
+                Template impl = classDef.impl;
                 Symbol clasz = tree.symbol();
                 // transform parents and body
                 Tree[] parents = transform(impl.parents);
@@ -111,14 +112,32 @@ public class AddAccessorsPhase extends Phase {
                 body = Tree.concat(accessors.toArray(), body);
                 impl = gen.Template(clasz.pos, impl.symbol(), parents, body);
                 return gen.ClassDef(clasz, impl);
-            }
-            case Select(Tree qualifier, _):
-                if (!tree.symbol().owner().isPrimaryConstructor()) break;
-                qualifier = transform(qualifier);
+            } else if (tree instanceof Tree.Select) {
+                Tree.Select select = (Tree.Select)tree;
+                if (!tree.symbol().owner().isPrimaryConstructor()) return super.transform(tree);
+                Tree qualifier = transform(select.qualifier);
                 Symbol method = (Symbol)methods.get(tree.symbol());
                 if (method == null)
                     method = createAccessorMethod(tree.symbol());
                 return gen.Apply(gen.Select(tree.pos, qualifier, method));
+            } else if (tree instanceof Tree.Bind) {
+                Tree.Bind bind = (Tree.Bind)tree;
+                bind.rhs = transform(bind.rhs);
+                return tree;
+            } else if (tree instanceof Tree.Alternative) {
+                Tree.Alternative alternative = (Tree.Alternative)tree;
+                alternative.trees = transform(alternative.trees);
+                return tree;
+            } else if (tree instanceof Tree.CaseDef) {
+                Tree.CaseDef caseDef = (Tree.CaseDef)tree;
+                caseDef.pat = transform(caseDef.pat);
+                caseDef.guard = transform(caseDef.guard);
+                caseDef.body = transform(caseDef.body);
+                return tree;
+            } else if (tree instanceof Tree.Visitor) {
+                Tree.Visitor visitor = (Tree.Visitor)tree;
+                visitor.cases = (Tree.CaseDef[])transform(visitor.cases);
+                return tree;
             }
             return super.transform(tree);
         }

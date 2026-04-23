@@ -23,9 +23,11 @@ ast/parser/Tokens.java
 ast/DefaultTreeFactory.java
 ast/LazyTreeCopier.java
 ast/StrictTreeCopier.java
+ast/GenTransformer.java
 ast/Transformer.java
 ast/Traverser.java
 ast/Tree.java
+ast/GenTreeCloner.java
 ast/TreeCloner.java
 ast/TreeCopier.java
 ast/TreeFactory.java
@@ -64,9 +66,6 @@ backend/Primitive.java
 backend/Primitives.java
 backend/jvm/GenJVMPhase.java
 backend/jvm/GenJVM.java
-backend/msil/GenMSIL.java
-backend/msil/GenMSILPhase.java
-backend/msil/TypeCreator.java
 
 checkers/CheckNames.java
 checkers/CheckOwners.java
@@ -77,8 +76,6 @@ checkers/Checker.java
 checkers/TreeChecker.java
 
 symtab/classfile/AttributeParser.java
-symtab/classfile/CLRPackageParser.java
-symtab/classfile/CLRClassParser.java
 symtab/classfile/ClassParser.java
 symtab/classfile/ClassfileConstants.java
 symtab/classfile/ClassfileParser.java
@@ -100,6 +97,12 @@ symtab/NameMangler.java
 symtab/Scope.java
 symtab/SourceCompleter.java
 symtab/SymSet.java
+symtab/TermSymbol.java
+symtab/TypeSymbol.java
+symtab/AliasTypeSymbol.java
+symtab/AbsTypeSymbol.java
+symtab/ClassSymbol.java
+symtab/CyclicReference.java
 symtab/Symbol.java
 symtab/SymbolCloner.java
 symtab/SymbolSubstTypeMap.java
@@ -171,7 +174,20 @@ util/FreshNameCreator.java
 util/Name.java
 util/NameTransformer.java
 util/Names.java
+util/CommandParser.java
+util/ArgumentParser.java
 util/OptionParser.java
+util/UnknownArgumentParser.java
+util/ScalaFileArgumentParser.java
+util/ScalaProgramArgumentParser.java
+util/VersionOptionParser.java
+util/HelpOptionParser.java
+util/UnknownOptionParser.java
+util/BooleanOptionParser.java
+util/StringOptionParser.java
+util/PhaseSetOptionParser.java
+util/PrintOptionParser.java
+util/ChoiceOptionParser.java
 util/PrefixMatcher.java
 util/Reporter.java
 util/SourceRepresentation.java

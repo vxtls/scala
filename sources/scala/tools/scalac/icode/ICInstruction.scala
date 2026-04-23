@@ -134,18 +134,19 @@ case class CALL_PRIMITIVE(primitive: APrimitive) extends ICInstruction {
   /** Returns a string representation of this instruction */
   override def toString(): String ="CALL "+primitive.toString();
 
-  override def consumed = primitive match {
-    case (APrimitive$Negation(_)) => 1;
-    case (APrimitive$Test(_,_,true)) => 1;
-    case (APrimitive$Test(_,_,false)) => 2;
-    case (APrimitive$Comparison(_,_)) => 2;
-    case (APrimitive$Arithmetic(_,_)) => 2;
-    case (APrimitive$Logical(_,_)) => 2;
-    case (APrimitive$Shift(_,_)) => 2;
-    case (APrimitive$Conversion(_,_)) => 1;
-    case (APrimitive$ArrayLength(_)) => 1;
-    case (APrimitive$StringConcat(_,_)) => 2;
-  }
+  override def consumed =
+    if (primitive.isInstanceOf[APrimitive$Negation]) 1
+    else if (primitive.isInstanceOf[APrimitive$Test]) {
+      if (primitive.asInstanceOf[APrimitive$Test].zero) 1 else 2
+    }
+    else if (primitive.isInstanceOf[APrimitive$Comparison]) 2
+    else if (primitive.isInstanceOf[APrimitive$Arithmetic]) 2
+    else if (primitive.isInstanceOf[APrimitive$Logical]) 2
+    else if (primitive.isInstanceOf[APrimitive$Shift]) 2
+    else if (primitive.isInstanceOf[APrimitive$Conversion]) 1
+    else if (primitive.isInstanceOf[APrimitive$ArrayLength]) 1
+    else if (primitive.isInstanceOf[APrimitive$StringConcat]) 2
+    else throw new MatchError("ICInstruction.scala", 0);
   override def produced = 1;
 }
 

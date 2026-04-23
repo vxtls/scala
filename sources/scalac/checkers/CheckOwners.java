@@ -13,7 +13,7 @@ import scalac.ast.*;
 import scalac.symtab.*;
 import scalac.Global;
 import scalac.util.Debug;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 /**
  * Check that the owner of symbols is set correctly.
@@ -61,17 +61,15 @@ public class CheckOwners extends Checker {
         Symbol templSymbol = templ.symbol();
         Tree[] body = templ.body;
         for (int i = 0; i < body.length; ++i) {
-            switch (body[i]) {
-            case PackageDef(_,_):
-            case ClassDef(_,_,_,_,_,_):
-            case ModuleDef(_,_,_,_):
-            case DefDef(_,_,_,_,_,_):
-            case ValDef(_,_,_,_):
-            case AbsTypeDef(_,_,_, _):
-            case AliasTypeDef(_,_,_, _):
+            if (body[i] instanceof PackageDef
+                || body[i] instanceof ClassDef
+                || body[i] instanceof ModuleDef
+                || body[i] instanceof DefDef
+                || body[i] instanceof ValDef
+                || body[i] instanceof AbsTypeDef
+                || body[i] instanceof AliasTypeDef) {
                 traverse(body[i], owner);
-                break;
-            default:
+            } else {
                 traverse(body[i], templSymbol);
             }
         }
@@ -90,64 +88,46 @@ public class CheckOwners extends Checker {
     }
 
     public void traverse(Tree tree) {
-	switch(tree) {
-	case PackageDef(Tree packaged, Template impl):
+	if (tree instanceof PackageDef) {
+            PackageDef packageDef = (PackageDef)tree;
             check(tree);
-            traverse(packaged);
-            traverse(impl, packaged.symbol());
-            break;
-
-        case ClassDef(int mods,
-                      Name name,
-                      AbsTypeDef[] tparams,
-                      ValDef[][] vparams,
-		      Tree tpe,
-                      Template impl): {
+            traverse(packageDef.packaged);
+            traverse(packageDef.impl, packageDef.packaged.symbol());
+        } else if (tree instanceof ClassDef) {
+            ClassDef classDef = (ClassDef)tree;
             check(tree);
-            traverse(tparams, tree.symbol().primaryConstructor());
-            traverse(vparams, tree.symbol().primaryConstructor());
-	    traverse(tpe);
-            traverse(impl, tree.symbol());
-        } break;
-
-        case ModuleDef(int mods, Name name, Tree tpe, Template impl): {
+            traverse(classDef.tparams, tree.symbol().primaryConstructor());
+            traverse(classDef.vparams, tree.symbol().primaryConstructor());
+	    traverse(classDef.tpe);
+            traverse(classDef.impl, tree.symbol());
+        } else if (tree instanceof ModuleDef) {
+            ModuleDef moduleDef = (ModuleDef)tree;
             check(tree);
-            traverse(tpe);
-            traverse(impl, tree.symbol().moduleClass());
-        } break;
-
-        case DefDef(int mods,
-                    Name name,
-                    AbsTypeDef[] tparams,
-                    ValDef[][] vparams,
-                    Tree tpe,
-                    Tree rhs): {
+            traverse(moduleDef.tpe);
+            traverse(moduleDef.impl, tree.symbol().moduleClass());
+        } else if (tree instanceof DefDef) {
+            DefDef defDef = (DefDef)tree;
             check(tree);
-            traverse(tparams, tree.symbol());
-            traverse(vparams, tree.symbol());
-            traverse(tpe, tree.symbol());
-            traverse(rhs, tree.symbol());
-        } break;
-
-        case ValDef(int mods, Name name, Tree tpe, Tree rhs): {
+            traverse(defDef.tparams, tree.symbol());
+            traverse(defDef.vparams, tree.symbol());
+            traverse(defDef.tpe, tree.symbol());
+            traverse(defDef.rhs, tree.symbol());
+        } else if (tree instanceof ValDef) {
+            ValDef valDef = (ValDef)tree;
             check(tree);
-            traverse(tpe);
-            traverse(rhs, tree.symbol());
-        } break;
-
-        case AbsTypeDef(int mods, Name name, Tree rhs, Tree lobound): {
+            traverse(valDef.tpe);
+            traverse(valDef.rhs, tree.symbol());
+        } else if (tree instanceof AbsTypeDef) {
+            AbsTypeDef absTypeDef = (AbsTypeDef)tree;
             check(tree);
-            traverse(rhs, tree.symbol());
-	    traverse(lobound, tree.symbol());
-        } break;
-
-        case AliasTypeDef(int mods, Name name, AbsTypeDef[] tparams, Tree rhs): {
+            traverse(absTypeDef.rhs, tree.symbol());
+	    traverse(absTypeDef.lobound, tree.symbol());
+        } else if (tree instanceof AliasTypeDef) {
+            AliasTypeDef aliasTypeDef = (AliasTypeDef)tree;
             check(tree);
-            traverse(tparams, tree.symbol());
-            traverse(rhs, tree.symbol());
-        } break;
-
-	default:
+            traverse(aliasTypeDef.tparams, tree.symbol());
+            traverse(aliasTypeDef.rhs, tree.symbol());
+        } else {
 	    super.traverse(tree);
         }
     }

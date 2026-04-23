@@ -11,7 +11,7 @@ package scalac.symtab.classfile;
 import ch.epfl.lamp.util.Position;
 import scalac.util.*;
 import scalac.symtab.*;
-import Type.*;
+import scalac.symtab.Type.*;
 
 
 public class JavaTypeCreator implements JavaTypeFactory {

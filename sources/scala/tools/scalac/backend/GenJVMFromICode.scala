@@ -269,30 +269,33 @@ class GenJVMFromICode(global: scalac_Global) {
 	jcode.emitALOAD_0();
 
 
-      case CONSTANT(AConstant$BOOLEAN(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant$BYTE(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant$SHORT(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant$CHAR(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant$INT(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant$LONG(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant$FLOAT(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant$DOUBLE(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant$STRING(v)) =>
-	jcode.emitPUSH(v);
-      case CONSTANT(AConstant.NULL) =>
-	jcode.emitACONST_NULL();
-      case CONSTANT(AConstant.UNIT) =>
-	; // ??
-      case CONSTANT(AConstant.ZERO) =>
-	; // ??
+      case CONSTANT(constant) =>
+	if (constant.isInstanceOf[AConstant$BOOLEAN])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$BOOLEAN].value);
+	else if (constant.isInstanceOf[AConstant$BYTE])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$BYTE].value);
+	else if (constant.isInstanceOf[AConstant$SHORT])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$SHORT].value);
+	else if (constant.isInstanceOf[AConstant$CHAR])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$CHAR].value);
+	else if (constant.isInstanceOf[AConstant$INT])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$INT].value);
+	else if (constant.isInstanceOf[AConstant$LONG])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$LONG].value);
+	else if (constant.isInstanceOf[AConstant$FLOAT])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$FLOAT].value);
+	else if (constant.isInstanceOf[AConstant$DOUBLE])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$DOUBLE].value);
+	else if (constant.isInstanceOf[AConstant$STRING])
+	  jcode.emitPUSH(constant.asInstanceOf[AConstant$STRING].value);
+	else if (constant == AConstant.NULL)
+	  jcode.emitACONST_NULL();
+	else if (constant == AConstant.UNIT)
+	  (); // ??
+	else if (constant == AConstant.ZERO)
+	  (); // ??
+	else
+	  throw new MatchError("GenJVMFromICode.scala", 0);
 
       case LOAD_ARRAY_ITEM() => {
 	// depend the type of the elements of the array
@@ -339,83 +342,83 @@ class GenJVMFromICode(global: scalac_Global) {
 	  jcode.emitPUTFIELD(className, fieldName, typeStoJ(field.getType()));
       }
 
-      case CALL_PRIMITIVE(APrimitive$Negation(ATypeKind.I4)) => jcode.emitINEG();
-      case CALL_PRIMITIVE(APrimitive$Negation(ATypeKind.I8)) => jcode.emitLNEG();
-      case CALL_PRIMITIVE(APrimitive$Negation(ATypeKind.R4)) => jcode.emitFNEG();
-      case CALL_PRIMITIVE(APrimitive$Negation(ATypeKind.R8)) => jcode.emitDNEG();
-
-      //case CALL_PRIMITIVE(APrimitive$Test(*))
-      // !! Regarder les Test
-
-      //case CALL_PRIMITIVE(AComparisonOp(*))
-      // !! Regarder les comparison
-
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.ADD, ATypeKind.I4)) => jcode.emitIADD();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.ADD, ATypeKind.I8)) => jcode.emitLADD();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.ADD, ATypeKind.R4)) => jcode.emitFADD();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.ADD, ATypeKind.R8)) => jcode.emitDADD();
-
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.SUB, ATypeKind.I4)) => jcode.emitISUB();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.SUB, ATypeKind.I8)) => jcode.emitLSUB();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.SUB, ATypeKind.R4)) => jcode.emitFSUB();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.SUB, ATypeKind.R8)) => jcode.emitDSUB();
-
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.MUL, ATypeKind.I4)) => jcode.emitIMUL();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.MUL, ATypeKind.I8)) => jcode.emitLMUL();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.MUL, ATypeKind.R4)) => jcode.emitFMUL();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.MUL, ATypeKind.R8)) => jcode.emitDMUL();
-
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.DIV, ATypeKind.I4)) => jcode.emitIDIV();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.DIV, ATypeKind.I8)) => jcode.emitLDIV();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.DIV, ATypeKind.R4)) => jcode.emitFDIV();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.DIV, ATypeKind.R8)) => jcode.emitDDIV();
-
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.REM, ATypeKind.I4)) => jcode.emitIREM();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.REM, ATypeKind.I8)) => jcode.emitLREM();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.REM, ATypeKind.R4)) => jcode.emitFREM();
-      case CALL_PRIMITIVE(APrimitive$Arithmetic(AArithmeticOp.REM, ATypeKind.R8)) => jcode.emitDREM();
-
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.AND, ATypeKind.I4)) => jcode.emitIAND();
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.AND, ATypeKind.BOOL)) => jcode.emitIAND(); // ??? is that true
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.AND, ATypeKind.I8)) => jcode.emitLAND();
-
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.OR, ATypeKind.I4)) => jcode.emitIOR();
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.OR, ATypeKind.BOOL)) => jcode.emitIOR(); // ??? is that true
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.OR, ATypeKind.I8)) => jcode.emitLOR();
-
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.XOR, ATypeKind.I4)) => jcode.emitIXOR();
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.XOR, ATypeKind.BOOL)) => jcode.emitIXOR(); // ??? is that true
-      case CALL_PRIMITIVE(APrimitive$Logical(ALogicalOp.XOR, ATypeKind.I8)) => jcode.emitLXOR();
-
-      case CALL_PRIMITIVE(APrimitive$Shift(AShiftOp.ASL, ATypeKind.I4)) => jcode.emitISHL();
-      case CALL_PRIMITIVE(APrimitive$Shift(AShiftOp.ASL, ATypeKind.I8)) => jcode.emitLSHL();
-
-      case CALL_PRIMITIVE(APrimitive$Shift(AShiftOp.ASR, ATypeKind.I4)) => jcode.emitISHR();
-      case CALL_PRIMITIVE(APrimitive$Shift(AShiftOp.ASR, ATypeKind.I8)) => jcode.emitLSHR();
-
-      case CALL_PRIMITIVE(APrimitive$Shift(AShiftOp.LSR, ATypeKind.I4)) => jcode.emitIUSHR();
-      case CALL_PRIMITIVE(APrimitive$Shift(AShiftOp.LSR, ATypeKind.I8)) => jcode.emitLUSHR();
-
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I4, ATypeKind.I8)) => jcode.emitI2L();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I4, ATypeKind.R4)) => jcode.emitI2F();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I4, ATypeKind.R8)) => jcode.emitI2D();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I8, ATypeKind.I4)) => jcode.emitL2I();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I8, ATypeKind.R4)) => jcode.emitL2F();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I8, ATypeKind.R8)) => jcode.emitL2D();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.R4, ATypeKind.I4)) => jcode.emitF2I();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.R4, ATypeKind.I8)) => jcode.emitF2L();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.R4, ATypeKind.R8)) => jcode.emitF2D();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.R8, ATypeKind.I4)) => jcode.emitD2I();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.R8, ATypeKind.I8)) => jcode.emitD2L();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.R8, ATypeKind.R4)) => jcode.emitD2F();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I4, ATypeKind.I1)) => jcode.emitI2B();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I4, ATypeKind.U2)) => jcode.emitI2C();
-      case CALL_PRIMITIVE(APrimitive$Conversion(ATypeKind.I4, ATypeKind.I2)) => jcode.emitI2S();
-
-      case CALL_PRIMITIVE(APrimitive$ArrayLength(_)) => jcode.emitARRAYLENGTH();
-
-      case CALL_PRIMITIVE(APrimitive$StringConcat(_,_)) =>
-	; // !!!
+      case CALL_PRIMITIVE(primitive) =>
+	if (primitive.isInstanceOf[APrimitive$Negation]) {
+	  val p = primitive.asInstanceOf[APrimitive$Negation];
+	  if (p.kind == ATypeKind.I4) jcode.emitINEG();
+	  else if (p.kind == ATypeKind.I8) jcode.emitLNEG();
+	  else if (p.kind == ATypeKind.R4) jcode.emitFNEG();
+	  else if (p.kind == ATypeKind.R8) jcode.emitDNEG();
+	  else throw new MatchError("GenJVMFromICode.scala", 0);
+	} else if (primitive.isInstanceOf[APrimitive$Arithmetic]) {
+	  val p = primitive.asInstanceOf[APrimitive$Arithmetic];
+	  if (p.op == AArithmeticOp.ADD && p.kind == ATypeKind.I4) jcode.emitIADD();
+	  else if (p.op == AArithmeticOp.ADD && p.kind == ATypeKind.I8) jcode.emitLADD();
+	  else if (p.op == AArithmeticOp.ADD && p.kind == ATypeKind.R4) jcode.emitFADD();
+	  else if (p.op == AArithmeticOp.ADD && p.kind == ATypeKind.R8) jcode.emitDADD();
+	  else if (p.op == AArithmeticOp.SUB && p.kind == ATypeKind.I4) jcode.emitISUB();
+	  else if (p.op == AArithmeticOp.SUB && p.kind == ATypeKind.I8) jcode.emitLSUB();
+	  else if (p.op == AArithmeticOp.SUB && p.kind == ATypeKind.R4) jcode.emitFSUB();
+	  else if (p.op == AArithmeticOp.SUB && p.kind == ATypeKind.R8) jcode.emitDSUB();
+	  else if (p.op == AArithmeticOp.MUL && p.kind == ATypeKind.I4) jcode.emitIMUL();
+	  else if (p.op == AArithmeticOp.MUL && p.kind == ATypeKind.I8) jcode.emitLMUL();
+	  else if (p.op == AArithmeticOp.MUL && p.kind == ATypeKind.R4) jcode.emitFMUL();
+	  else if (p.op == AArithmeticOp.MUL && p.kind == ATypeKind.R8) jcode.emitDMUL();
+	  else if (p.op == AArithmeticOp.DIV && p.kind == ATypeKind.I4) jcode.emitIDIV();
+	  else if (p.op == AArithmeticOp.DIV && p.kind == ATypeKind.I8) jcode.emitLDIV();
+	  else if (p.op == AArithmeticOp.DIV && p.kind == ATypeKind.R4) jcode.emitFDIV();
+	  else if (p.op == AArithmeticOp.DIV && p.kind == ATypeKind.R8) jcode.emitDDIV();
+	  else if (p.op == AArithmeticOp.REM && p.kind == ATypeKind.I4) jcode.emitIREM();
+	  else if (p.op == AArithmeticOp.REM && p.kind == ATypeKind.I8) jcode.emitLREM();
+	  else if (p.op == AArithmeticOp.REM && p.kind == ATypeKind.R4) jcode.emitFREM();
+	  else if (p.op == AArithmeticOp.REM && p.kind == ATypeKind.R8) jcode.emitDREM();
+	  else throw new MatchError("GenJVMFromICode.scala", 0);
+	} else if (primitive.isInstanceOf[APrimitive$Logical]) {
+	  val p = primitive.asInstanceOf[APrimitive$Logical];
+	  if (p.op == ALogicalOp.AND && p.kind == ATypeKind.I4) jcode.emitIAND();
+	  else if (p.op == ALogicalOp.AND && p.kind == ATypeKind.BOOL) jcode.emitIAND();
+	  else if (p.op == ALogicalOp.AND && p.kind == ATypeKind.I8) jcode.emitLAND();
+	  else if (p.op == ALogicalOp.OR && p.kind == ATypeKind.I4) jcode.emitIOR();
+	  else if (p.op == ALogicalOp.OR && p.kind == ATypeKind.BOOL) jcode.emitIOR();
+	  else if (p.op == ALogicalOp.OR && p.kind == ATypeKind.I8) jcode.emitLOR();
+	  else if (p.op == ALogicalOp.XOR && p.kind == ATypeKind.I4) jcode.emitIXOR();
+	  else if (p.op == ALogicalOp.XOR && p.kind == ATypeKind.BOOL) jcode.emitIXOR();
+	  else if (p.op == ALogicalOp.XOR && p.kind == ATypeKind.I8) jcode.emitLXOR();
+	  else throw new MatchError("GenJVMFromICode.scala", 0);
+	} else if (primitive.isInstanceOf[APrimitive$Shift]) {
+	  val p = primitive.asInstanceOf[APrimitive$Shift];
+	  if (p.op == AShiftOp.ASL && p.kind == ATypeKind.I4) jcode.emitISHL();
+	  else if (p.op == AShiftOp.ASL && p.kind == ATypeKind.I8) jcode.emitLSHL();
+	  else if (p.op == AShiftOp.ASR && p.kind == ATypeKind.I4) jcode.emitISHR();
+	  else if (p.op == AShiftOp.ASR && p.kind == ATypeKind.I8) jcode.emitLSHR();
+	  else if (p.op == AShiftOp.LSR && p.kind == ATypeKind.I4) jcode.emitIUSHR();
+	  else if (p.op == AShiftOp.LSR && p.kind == ATypeKind.I8) jcode.emitLUSHR();
+	  else throw new MatchError("GenJVMFromICode.scala", 0);
+	} else if (primitive.isInstanceOf[APrimitive$Conversion]) {
+	  val p = primitive.asInstanceOf[APrimitive$Conversion];
+	  if (p.src == ATypeKind.I4 && p.dst == ATypeKind.I8) jcode.emitI2L();
+	  else if (p.src == ATypeKind.I4 && p.dst == ATypeKind.R4) jcode.emitI2F();
+	  else if (p.src == ATypeKind.I4 && p.dst == ATypeKind.R8) jcode.emitI2D();
+	  else if (p.src == ATypeKind.I8 && p.dst == ATypeKind.I4) jcode.emitL2I();
+	  else if (p.src == ATypeKind.I8 && p.dst == ATypeKind.R4) jcode.emitL2F();
+	  else if (p.src == ATypeKind.I8 && p.dst == ATypeKind.R8) jcode.emitL2D();
+	  else if (p.src == ATypeKind.R4 && p.dst == ATypeKind.I4) jcode.emitF2I();
+	  else if (p.src == ATypeKind.R4 && p.dst == ATypeKind.I8) jcode.emitF2L();
+	  else if (p.src == ATypeKind.R4 && p.dst == ATypeKind.R8) jcode.emitF2D();
+	  else if (p.src == ATypeKind.R8 && p.dst == ATypeKind.I4) jcode.emitD2I();
+	  else if (p.src == ATypeKind.R8 && p.dst == ATypeKind.I8) jcode.emitD2L();
+	  else if (p.src == ATypeKind.R8 && p.dst == ATypeKind.R4) jcode.emitD2F();
+	  else if (p.src == ATypeKind.I4 && p.dst == ATypeKind.I1) jcode.emitI2B();
+	  else if (p.src == ATypeKind.I4 && p.dst == ATypeKind.U2) jcode.emitI2C();
+	  else if (p.src == ATypeKind.I4 && p.dst == ATypeKind.I2) jcode.emitI2S();
+	  else throw new MatchError("GenJVMFromICode.scala", 0);
+	} else if (primitive.isInstanceOf[APrimitive$ArrayLength]) {
+	  jcode.emitARRAYLENGTH();
+	} else if (primitive.isInstanceOf[APrimitive$StringConcat]) {
+	  ; // !!!
+	} else {
+	  throw new MatchError("GenJVMFromICode.scala", 0);
+	}
 
       case CALL_METHOD(method, style) => {
 	var calledMethod : JMethod = null;
