@@ -234,7 +234,9 @@ all		: interpreter
 all		: scaladoc
 all		: scalap
 all		: dtd2scala
+ifneq ($(wildcard $(ANT_JARFILE)),)
 all		: scala4ant
+endif
 all		: scalatest
 
 fjbg		: $(FJBG_JARFILE)
@@ -419,8 +421,9 @@ cvs-fix-perms		:
 	@$(make) sc target=UTIL UTIL_SC_FILES='$?'
 	touch $@
 
-.latest%scalac-jc	: $(SCALAC_JC_FILES)
-	@$(make) jc target=SCALAC SCALAC_JC_FILES='$?'
+.latest%scalac-jc	: .latest%lamplib-jc .latest%util-jc .latest%library-jc
+.latest%scalac-jc	: $(SCALAC_JC_PREREQS) $(SCALAC_JC_FILES)
+	@$(make) jc target=SCALAC SCALAC_JC_FILES='$(subst $$,$$$$,$(filter %.java,$?))'
 	touch $@
 
 .latest%scalac-sc	: .latest%library-sc .latest%scalac-jc $(SCALAC_SC_FILES)
@@ -447,6 +450,7 @@ cvs-fix-perms		:
 .latest-scalac-sc	: .latest-bootstrap
 .latest-interpreter-jc	: system
 .latest-scaladoc-jc	: system
+.latest-scaladoc-sc	: .latest-scaladoc-jc
 .latest-scaladoc-sc	: .latest-scalac-sc
 .latest-scalap-sc	: system
 .latest-scalap-sc	: .latest-scalac-sc

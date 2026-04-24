@@ -132,7 +132,9 @@ public class TailCallPhase extends Phase {
                 Tree[] vargs = apply.args;
                 if (fun instanceof Tree.TypeApply) {
                     Tree.TypeApply typeApply = (Tree.TypeApply)fun;
-                    if (!Type.isSameAs(Tree.typeOf(typeApply.args), types)) return tree;
+                    if (method == null || types == null) return tree;
+                    Type[] argTypes = Tree.typeOf(typeApply.args);
+                    if (!Type.isSameAs(argTypes, types)) return tree;
                     return transform(tree, typeApply.fun, vargs);
                 }
                 return transform(tree, fun, vargs);

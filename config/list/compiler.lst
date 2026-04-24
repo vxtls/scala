@@ -94,7 +94,6 @@ symtab/AliasTypeSymbol.java
 symtab/AbsTypeSymbol.java
 symtab/ClassSymbol.java
 symtab/Symbol.java
-symtab/NoSymbol.java
 symtab/SymbolCloner.java
 symtab/SymbolComparator.java
 symtab/SymbolLoader.java

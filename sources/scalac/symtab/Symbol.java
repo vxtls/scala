@@ -34,7 +34,7 @@ public abstract class Symbol implements Modifiers, Kinds {
     public static final Symbol ERROR = new ErrorSymbol();
 
     /** The absent symbol */
-    public static final NoSymbol NONE = new NoSymbol();
+    public static final Symbol NONE = new NoSymbol();
     static {
         Type.localThisType = Type.ThisType(NONE);
     }
@@ -1564,6 +1564,49 @@ final class ErrorSymbol extends Symbol {
 
 }
 
+/** The class of Symbol.NONE
+ */
+final class NoSymbol extends Symbol {
+
+    /** Constructor */
+    public NoSymbol() {
+        super(Kinds.NONE, Position.NOPOS, Names.NOSYMBOL, null, 0, 0);
+        super.setInfo(Type.NoType);
+    }
+
+    /** Set type */
+    public Symbol setInfo(Type info) {
+        assert info == Type.NoType : info;
+        return this;
+    }
+
+    /** Return the next enclosing class */
+    public Symbol enclClass() {
+        return this;
+    }
+
+    /** Return the next enclosing method */
+    public Symbol enclMethod() {
+        return this;
+    }
+
+    public Symbol owner() {
+        throw new ApplicationError();
+    }
+
+    public Type thisType() {
+        return Type.NoPrefix;
+    }
+
+    public void reset(Type completer) {
+    }
+
+    protected Symbol cloneSymbolImpl(Symbol owner, int attrs) {
+        throw Debug.abort("illegal clone", this);
+    }
+
+}
+
 /** A base class for values indexed by phases. */
 abstract class IntervalList {
 
@@ -1609,4 +1652,20 @@ class TypeIntervalList extends IntervalList {
         assert info != null;
     }
 
+}
+
+/** A class for closures indexed by phases. */
+class ClosureIntervalList extends IntervalList {
+
+    /** Previous interval */
+    public final ClosureIntervalList prev;
+    /** Closure valid during this interval */
+    public final Type[] closure;
+
+    public ClosureIntervalList(ClosureIntervalList prev, Type[] closure, Phase start) {
+        super(prev, start);
+        this.prev = prev;
+        this.closure = closure;
+        assert closure != null;
+    }
 }
