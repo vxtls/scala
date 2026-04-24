@@ -197,7 +197,8 @@ public class ClassfileParser implements ClassfileConstants {
         Symbol s = new TermSymbol(Position.NOPOS, name, owner, mods);
         s.setFirstInfo(type);
         attrib.readAttributes(s, type, FIELD_ATTR);
-        ((flags & 0x0008) != 0 ? statics : locals).enterOrOverload(s);
+        if (!isFoundationNullaryBridge(name))
+            ((flags & 0x0008) != 0 ? statics : locals).enterOrOverload(s);
     }
 
     private boolean shouldTreatAsJavaCaseClass(Symbol clazz) {
@@ -273,6 +274,9 @@ public class ClassfileParser implements ClassfileConstants {
             setParamOwners(type, s);
             s.setFirstInfo(type);
             attrib.readAttributes(s, type, METH_ATTR);
+            Type parameterlessType = foundationParameterlessType(name, s.type());
+            if (parameterlessType != null)
+                s.setFirstInfo(parameterlessType);
             if (shouldHideMethod(s, flags, useParameterlessType))
                 s.flags |= Modifiers.BRIDGE;
             if ((s.flags & Modifiers.BRIDGE) == 0)
@@ -330,6 +334,78 @@ public class ClassfileParser implements ClassfileConstants {
             return Type.PolyType(polyType.tparams, asParameterlessType(polyType.result));
         }
         return type;
+    }
+
+    private boolean isFoundationNullaryBridge(Name name) {
+        return foundationNullaryResult(name) != null;
+    }
+
+    private Type foundationParameterlessType(Name name, Type type) {
+        if (!isNullaryMethodType(type))
+            return null;
+        Type result = foundationNullaryResult(name);
+        return result == null ? null : Type.PolyType(Symbol.EMPTY_ARRAY, result);
+    }
+
+    private Type foundationNullaryResult(Name name) {
+        Name fullname = c.fullName();
+        if (fullname == Names.scala_Boolean)
+            return name == Names.BANG ? global.definitions.BOOLEAN_CLASS.typeConstructor() : null;
+
+        if (fullname == Names.scala_Double)
+            return (name == Names.PLUS || name == Names.MINUS) ? global.definitions.DOUBLE_CLASS.typeConstructor() : null;
+
+        if (fullname == Names.scala_Float) {
+            if (name == Names.PLUS || name == Names.MINUS)
+                return global.definitions.FLOAT_CLASS.typeConstructor();
+            if (name == Names.coerceToDouble)
+                return global.definitions.DOUBLE_CLASS.typeConstructor();
+            return null;
+        }
+
+        if (fullname == Names.scala_Long) {
+            if (name == Names.PLUS || name == Names.MINUS || name == Names.TILDE)
+                return global.definitions.LONG_CLASS.typeConstructor();
+            if (name == Names.coerceToDouble)
+                return global.definitions.DOUBLE_CLASS.typeConstructor();
+            if (name == Names.coerceToFloat)
+                return global.definitions.FLOAT_CLASS.typeConstructor();
+            return null;
+        }
+
+        if (fullname == Names.scala_Int) {
+            if (name == Names.PLUS || name == Names.MINUS || name == Names.TILDE)
+                return global.definitions.INT_CLASS.typeConstructor();
+            if (name == Names.coerceToDouble)
+                return global.definitions.DOUBLE_CLASS.typeConstructor();
+            if (name == Names.coerceToFloat)
+                return global.definitions.FLOAT_CLASS.typeConstructor();
+            if (name == Names.coerceToLong)
+                return global.definitions.LONG_CLASS.typeConstructor();
+            return null;
+        }
+
+        if (fullname == Names.scala_Byte || fullname == Names.scala_Short || fullname == Names.scala_Char) {
+            if (name == Names.PLUS || name == Names.MINUS || name == Names.TILDE || name == Names.coerceToInt)
+                return global.definitions.INT_CLASS.typeConstructor();
+            if (name == Names.coerceToDouble)
+                return global.definitions.DOUBLE_CLASS.typeConstructor();
+            if (name == Names.coerceToFloat)
+                return global.definitions.FLOAT_CLASS.typeConstructor();
+            if (name == Names.coerceToLong)
+                return global.definitions.LONG_CLASS.typeConstructor();
+            if (fullname == Names.scala_Byte && name == Names.coerceToShort)
+                return global.definitions.SHORT_CLASS.typeConstructor();
+            if (fullname == Names.scala_Char &&
+                (name == Name.fromString("isDigit") ||
+                 name == Name.fromString("isLetter") ||
+                 name == Name.fromString("isLetterOrDigit") ||
+                 name == Name.fromString("isWhitespace")))
+                return global.definitions.BOOLEAN_CLASS.typeConstructor();
+            return null;
+        }
+
+        return null;
     }
 
     private void setParamOwners(Type type, Symbol owner) {
