@@ -7,8 +7,8 @@ import scalac.ast.*;
 import scalac.atree.AConstant;
 import scalac.util.*;
 import scalac.symtab.*;
-import PatternNode.*;
-import Tree.*;
+import scalac.transformer.matching.PatternNode.*;
+import scalac.ast.Tree.*;
 
 import java.util.Vector ;
 

@@ -28,66 +28,53 @@ public class TreeInfo {
     }
 
     public static boolean isOwnerDefinition(Tree tree) {
-	switch (tree) {
-	case PackageDef(_, _):
-	case ClassDef(_, _, _, _, _, _):
-	case ModuleDef(_, _, _, _):
-	case DefDef(_, _, _, _, _, _):
-	case Import(_, _):
-	    return true;
-	default:
-	    return false;
-	}
+	return tree instanceof Tree.PackageDef ||
+	       tree instanceof Tree.ClassDef ||
+	       tree instanceof Tree.ModuleDef ||
+	       tree instanceof Tree.DefDef ||
+	       tree instanceof Tree.Import;
     }
 
     public static boolean isDefinition(Tree tree) {
-	switch (tree) {
-	case PackageDef(_, _):
-	case ClassDef(_, _, _, _, _, _):
-	case ModuleDef(_, _, _, _):
-	case DefDef(_, _, _, _, _, _):
-	case ValDef(_, _, _, _):
-	case AbsTypeDef(_, _, _, _):
-	case AliasTypeDef(_, _, _, _):
-	case Import(_, _):
-	    return true;
-	default:
-	    return false;
-	}
+	return tree instanceof Tree.PackageDef ||
+	       tree instanceof Tree.ClassDef ||
+	       tree instanceof Tree.ModuleDef ||
+	       tree instanceof Tree.DefDef ||
+	       tree instanceof Tree.ValDef ||
+	       tree instanceof Tree.AbsTypeDef ||
+	       tree instanceof Tree.AliasTypeDef ||
+	       tree instanceof Tree.Import;
     }
 
     public static boolean isDeclaration(Tree tree) {
-	switch (tree) {
-	case DefDef(_, _, _, _, _, Tree rhs):
-	    return rhs == Tree.Empty;
-	case ValDef(_, _, _, Tree rhs):
-	    return rhs == Tree.Empty;
-	case AbsTypeDef(_, _, _, _):
-	case AliasTypeDef(_, _, _, _):
-	    return true;
-	default:
-	    return false;
+	if (tree instanceof Tree.DefDef) {
+	    return ((Tree.DefDef) tree).rhs == Tree.Empty;
+	} else if (tree instanceof Tree.ValDef) {
+	    return ((Tree.ValDef) tree).rhs == Tree.Empty;
+	} else {
+	    return tree instanceof Tree.AbsTypeDef ||
+	           tree instanceof Tree.AliasTypeDef;
 	}
     }
 
     /** Is tree a pure definition?
      */
     public static boolean isPureDef(Tree tree) {
-	switch (tree) {
-	case Tree.Empty:
-	case ClassDef(_, _, _, _, _, _):
-	case ModuleDef(_, _, _, _):
-	case AbsTypeDef(_, _, _, _):
-	case AliasTypeDef(_, _, _, _):
-	case Import(_, _):
+	if (tree == Tree.Empty ||
+	    tree instanceof Tree.ClassDef ||
+	    tree instanceof Tree.ModuleDef ||
+	    tree instanceof Tree.AbsTypeDef ||
+	    tree instanceof Tree.AliasTypeDef ||
+	    tree instanceof Tree.Import) {
 	    return true;
-	case DefDef(_, Name name, _, _, _, _):
-	    return name != Names.CONSTRUCTOR;
-	case ValDef(int mods, _, _, Tree rhs):
-	    return (mods & Modifiers.MUTABLE) == 0 && isPureExpr(rhs);
-	case DocDef(_, Tree definition):
-	    return isPureDef(definition);
-	default:
+	} else if (tree instanceof Tree.DefDef) {
+	    return ((Tree.DefDef) tree).name != Names.CONSTRUCTOR;
+	} else if (tree instanceof Tree.ValDef) {
+	    Tree.ValDef valDef = (Tree.ValDef) tree;
+	    return (valDef.mods & Modifiers.MUTABLE) == 0 && isPureExpr(valDef.rhs);
+	} else if (tree instanceof Tree.DocDef) {
+	    return isPureDef(((Tree.DocDef) tree).definition);
+	} else {
 	    return false;
 	}
     }
@@ -95,25 +82,25 @@ public class TreeInfo {
     /** Is tree a stable & pure expression?
      */
     public static boolean isPureExpr(Tree tree) {
-	switch (tree) {
-	case Empty:
-	case This(_):
-	case Super(_, _):
+	if (tree == Tree.Empty ||
+	    tree instanceof Tree.This ||
+	    tree instanceof Tree.Super ||
+	    tree instanceof Tree.Literal) {
 	    return true;
-	case Ident(_):
+	} else if (tree instanceof Tree.Ident) {
 	    assert tree.type != null : tree.toString();
 	    return tree.symbol().isStable();
-	case Select(Tree qual, _):
-	    return tree.symbol().isStable() && isPureExpr(qual);
-	case Apply(Tree fn, Tree[] args):
-	    return isPureExpr(fn) && args.length == 0;
-	case TypeApply(Tree fn, Tree[] targs):
-	    return isPureExpr(fn);
-	case Typed(Tree expr, _):
-	    return isPureExpr(expr);
-	case Literal(_):
-	    return true;
-	default:
+	} else if (tree instanceof Tree.Select) {
+	    Tree.Select select = (Tree.Select) tree;
+	    return tree.symbol().isStable() && isPureExpr(select.qualifier);
+	} else if (tree instanceof Tree.Apply) {
+	    Tree.Apply apply = (Tree.Apply) tree;
+	    return isPureExpr(apply.fun) && apply.args.length == 0;
+	} else if (tree instanceof Tree.TypeApply) {
+	    return isPureExpr(((Tree.TypeApply) tree).fun);
+	} else if (tree instanceof Tree.Typed) {
+	    return isPureExpr(((Tree.Typed) tree).expr);
+	} else {
 	    return false;
 	}
     }
@@ -121,15 +108,14 @@ public class TreeInfo {
     /** Is tree a pure constructor?
      */
     public static boolean isPureConstr(Tree tree) {
-	switch (tree) {
-	case Ident(_):
-	case Select(_, _):
+	if (tree instanceof Tree.Ident || tree instanceof Tree.Select) {
  	    return tree.symbol() != null && tree.symbol().isPrimaryConstructor();
-	case TypeApply(Tree constr, _):
-	    return isPureConstr(constr);
-	case Apply(Tree fn, Tree[] args):
-	    return args.length == 0 && isPureConstr(fn);
-	default:
+	} else if (tree instanceof Tree.TypeApply) {
+	    return isPureConstr(((Tree.TypeApply) tree).fun);
+	} else if (tree instanceof Tree.Apply) {
+	    Tree.Apply apply = (Tree.Apply) tree;
+	    return apply.args.length == 0 && isPureConstr(apply.fun);
+	} else {
 	    return false;
 	}
     }
@@ -137,14 +123,13 @@ public class TreeInfo {
     /** Is tree a self constructor call?
      */
     public static boolean isSelfConstrCall(Tree tree) {
-	switch (tree) {
-	case Ident(Name name):
-	    return name == Names.CONSTRUCTOR;
-	case TypeApply(Tree constr, _):
-	    return isSelfConstrCall(constr);
-	case Apply(Tree constr, _):
-	    return isSelfConstrCall(constr);
-	default:
+	if (tree instanceof Tree.Ident) {
+	    return ((Tree.Ident) tree).name == Names.CONSTRUCTOR;
+	} else if (tree instanceof Tree.TypeApply) {
+	    return isSelfConstrCall(((Tree.TypeApply) tree).fun);
+	} else if (tree instanceof Tree.Apply) {
+	    return isSelfConstrCall(((Tree.Apply) tree).fun);
+	} else {
 	    return false;
 	}
     }
@@ -152,23 +137,15 @@ public class TreeInfo {
     /** Is tree a variable pattern
      */
     public static boolean isVarPattern(Tree pat) {
-	switch (pat) {
-	case Ident(Name name):
-	    return name.isVariable();
-	default:
-	    return false;
-	}
+	return pat instanceof Tree.Ident &&
+	       ((Tree.Ident) pat).name.isVariable();
     }
 
     /** Is tree a this node which belongs to `enclClass'?
      */
     public static boolean isSelf(Tree tree, Symbol enclClass) {
-	switch (tree) {
-	case This(_):
-	    return tree.symbol() == enclClass;
-	default:
-	    return false;
-	}
+	return tree instanceof Tree.This &&
+	       tree.symbol() == enclClass;
     }
 
     /** The method symbol of an application node, or Symbol.NONE, if none exists.
@@ -182,41 +159,39 @@ public class TreeInfo {
     /** The method part of an application node
      */
     public static Tree methPart(Tree tree) {
-	switch (tree) {
-	case Apply(Tree fn, _):
-	    return methPart(fn);
-	case TypeApply(Tree fn, _):
-	    return methPart(fn);
-	case AppliedType(Tree fn, _):
-	    return methPart(fn);
-	default:
+	if (tree instanceof Tree.Apply) {
+	    return methPart(((Tree.Apply) tree).fun);
+	} else if (tree instanceof Tree.TypeApply) {
+	    return methPart(((Tree.TypeApply) tree).fun);
+	} else if (tree instanceof Tree.AppliedType) {
+	    return methPart(((Tree.AppliedType) tree).tpe);
+	} else {
 	    return tree;
 	}
     }
 
-    /** The symbol with name `name' imported from import clause `tree'.
-     */
+    /** The symbol with name `name' imported from import clause `tree'. */
     public static Symbol importedSymbol(Tree tree, Name name) {
-	switch (tree) {
-	case Import(Tree expr, Name[] selectors):
-	    Type pre = tree.symbol().type();
-	    boolean renamed = false;
-	    for (int i = 0; i < selectors.length; i = i + 2) {
-		if (i + 1 < selectors.length && name.toTermName() == selectors[i + 1]) {
-		    if (name.isTypeName())
-			return pre.lookupNonPrivate(selectors[i].toTypeName());
-		    else
-			return pre.lookupNonPrivate(selectors[i]);
-		} else if (name.toTermName() == selectors[i]) {
-		    renamed = true;
-		} else if (selectors[i] == Names.IMPORT_WILDCARD && !renamed) {
-		    return pre.lookupNonPrivate(name);
-		}
-	    }
-	    return Symbol.NONE;
-	default:
-	    throw new ApplicationError();
-	}
+        if (tree instanceof Tree.Import) {
+            Tree.Import importTree = (Tree.Import)tree;
+            Type pre = tree.symbol().type();
+            boolean renamed = false;
+            Name[] selectors = importTree.selectors;
+            for (int i = 0; i < selectors.length; i = i + 2) {
+                if (i + 1 < selectors.length && name.toTermName() == selectors[i + 1]) {
+                    if (name.isTypeName())
+                        return pre.lookupNonPrivate(selectors[i].toTypeName());
+                    else
+                        return pre.lookupNonPrivate(selectors[i]);
+                } else if (name.toTermName() == selectors[i]) {
+                    renamed = true;
+                } else if (selectors[i] == Names.IMPORT_WILDCARD && !renamed) {
+                    return pre.lookupNonPrivate(name);
+                }
+            }
+            return Symbol.NONE;
+        }
+        throw new ApplicationError();
     }
 
 
@@ -233,28 +208,29 @@ public class TreeInfo {
        *  precondition: tree is a pattern
        */
       public static boolean isSequenceValued( Tree tree, LinkedList recVars ) {
-            switch( tree ) {
-            case Bind(_, Tree t):
+            if( tree instanceof Tree.Bind ) {
+                  Tree t = ((Tree.Bind) tree).rhs;
                   recVars.addFirst( tree.symbol() );
                   boolean res = isSequenceValued( t );
                   recVars.removeFirst();
                   return res;
-            case Sequence(_):
+            } else if( tree instanceof Tree.Sequence ) {
                   return true;
-            case Alternative(Tree[] ts):
+            } else if( tree instanceof Tree.Alternative ) {
+                  Tree[] ts = ((Tree.Alternative) tree).trees;
                   for( int i = 0; i < ts.length; i++ ) {
                         if( isSequenceValued( ts[ i ] ) )
                               return true;
                   }
                   return false;
-            case Ident(Name n): // if Ident is a recursive var, then true
+            } else if( tree instanceof Tree.Ident ) {
                   return recVars.contains( tree.symbol() );
-            case Apply( _, _ ):
-            case Literal( _ ):
-	    case Select(_,_):
-            case Typed(_,_):
+            } else if( tree instanceof Tree.Apply ||
+                       tree instanceof Tree.Literal ||
+	               tree instanceof Tree.Select ||
+                       tree instanceof Tree.Typed ) {
 		return false;
-            default:
+            } else {
                   throw new scalac.ApplicationError("Unexpected pattern "+tree.getClass());
             }
       }
@@ -262,35 +238,29 @@ public class TreeInfo {
     /** returns true if the argument is an empty sequence pattern
      */
     public static boolean isEmptySequence( Tree tree ) {
-	switch( tree ) {
-	case Sequence( Tree ts[] ):
-	    return ( ts.length == 0 );
-	default:
-	    return false;
-	}
+	return tree instanceof Tree.Sequence &&
+	       ((Tree.Sequence) tree).trees.length == 0;
     }
       /** this test should correspond to the one used in TransMatch phase */
       public static boolean isRegularPattern( Tree tree ) {
-	    switch (tree) {
-	    case Alternative(_):
-                  return true;
-	    case Bind(_, Tree pat):
-                  return isRegularPattern( pat );
-	    case Ident(_):
-                  return false;
-	    case CaseDef(Tree pat, _, _):
-                  isRegularPattern(pat);
-                  break;
-	    case Sequence( Tree[] trees):
-                  return true;
-            case Apply( _, Tree[] trees ):
-                  for( int i = 0; i < trees.length; i++ )
-                        if( isRegularPattern( trees[i] ) )
-                              return true;
-            case Literal( _ ):
-                  return false;
-
-	    }
+		    if (tree instanceof Tree.Alternative) {
+	                  return true;
+		    } else if (tree instanceof Tree.Bind) {
+	                  return isRegularPattern(((Tree.Bind) tree).rhs);
+		    } else if (tree instanceof Tree.Ident) {
+	                  return false;
+		    } else if (tree instanceof Tree.CaseDef) {
+	                  isRegularPattern(((Tree.CaseDef) tree).pat);
+		    } else if (tree instanceof Tree.Sequence) {
+	                  return true;
+            } else if (tree instanceof Tree.Apply) {
+	                  Tree[] trees = ((Tree.Apply) tree).args;
+	                  for( int i = 0; i < trees.length; i++ )
+	                        if( isRegularPattern( trees[i] ) )
+	                              return true;
+            } else if (tree instanceof Tree.Literal) {
+	                  return false;
+		    }
             return false;
       }
 

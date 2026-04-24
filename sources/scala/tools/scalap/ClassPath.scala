@@ -24,7 +24,10 @@ class ClassPath {
 
     /** the default class path
      */
-    val classPath = System.getProperty("scala.class.path");
+    val classPath = {
+        val cp = System.getProperty("scala.class.path");
+        if (cp == null) System.getProperty("java.class.path") else cp
+    };
 
     /** the default boot class path
      */
@@ -65,7 +68,10 @@ class ClassPath {
                 val k = extdirs.indexOf(PATH_SEP, i);
                 val dirname = extdirs.substring(i, k);
                 if ((dirname != null) && (dirname.length() > 0)) {
-                    val iter = Iterator.fromArray(new File(dirname).list());
+                    val entries = new File(dirname).list();
+                    val iter =
+                        if (entries == null) Iterator.empty[String]
+                        else Iterator.fromArray(entries);
                     val dname = if (dirname.endsWith(FILE_SEP)) dirname else dirname + FILE_SEP;
                     while (iter.hasNext) {
                         val entry = iter.next;
@@ -82,6 +88,8 @@ class ClassPath {
      *  of existing class file locations
      */
     protected def decompose(p: String): List[String] = {
+        if (p == null || p.length() == 0)
+            return Nil;
         val path = if (p.endsWith(PATH_SEP)) p else p + PATH_SEP;
         var components: List[String] = Nil;
         var i = 0;

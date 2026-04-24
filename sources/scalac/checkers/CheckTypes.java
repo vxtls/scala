@@ -40,8 +40,10 @@ public class CheckTypes extends Checker {
 	verify(tree, tree.type != null, "non-null type", "type of tree is not null");
 
         if (tree.type != null) {
-            switch (tree.type) {
-            case TypeRef(Type pre, Symbol sym, Type[] args):
+            if (tree.type instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tree.type;
+                Symbol sym = typeRef.sym;
+                Type[] args = typeRef.args;
                 if (sym.kind == Kinds.CLASS)
                     verify(tree,
                            sym.typeParams().length == args.length,
@@ -49,20 +51,18 @@ public class CheckTypes extends Checker {
                            "Type " + Debug.show(sym)
                            + " expects " + sym.typeParams().length + " type arguments"
                            + " but is given " + args.length);
-                break;
             }
 
-            switch (tree) {
-            case ClassDef(_, _, _, _, Tree tpe, _):
-                checkIsTypeTerm(tree, tpe); break;
-            case ModuleDef(_, _, Tree tpe, _):
-                checkIsTypeTerm(tree, tpe); break;
-            case ValDef(_, _, Tree tpe, _):
-                checkIsTypeTerm(tree, tpe); break;
-            case DefDef(_, _, _, _, Tree tpe, _):
-                checkIsTypeTerm(tree, tpe); break;
-            case Typed(_, Tree tpe):
-                checkIsTypeTerm(tree, tpe); break;
+            if (tree instanceof Tree.ClassDef) {
+                checkIsTypeTerm(tree, ((Tree.ClassDef)tree).tpe);
+            } else if (tree instanceof Tree.ModuleDef) {
+                checkIsTypeTerm(tree, ((Tree.ModuleDef)tree).tpe);
+            } else if (tree instanceof Tree.ValDef) {
+                checkIsTypeTerm(tree, ((Tree.ValDef)tree).tpe);
+            } else if (tree instanceof Tree.DefDef) {
+                checkIsTypeTerm(tree, ((Tree.DefDef)tree).tpe);
+            } else if (tree instanceof Tree.Typed) {
+                checkIsTypeTerm(tree, ((Tree.Typed)tree).tpe);
             }
         }
     }

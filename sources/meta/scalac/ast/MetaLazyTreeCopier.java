@@ -33,6 +33,13 @@ public class MetaLazyTreeCopier extends AbstractTreeMethodExpander {
             writer.println(")");
             writer.println("return t;").undent();
         }
+        if (node.name.equals("Sequence") || node.name.equals("Alternative")) {
+            for (int i = 0; i < fields.length; i++)
+                writer.println("t." + fields[i] + " = " + fields[i] + ";");
+            writer.println("return t;");
+            writer.rbrace();
+            return;
+        }
         writer.print("return copier.");
         node.printCall(writer, "tree", withSymbol).println(";");
         writer.rbrace();

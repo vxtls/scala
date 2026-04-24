@@ -45,14 +45,13 @@ public class Scope {
                 return symbol;
             } else {
                 Symbol symbol = iterator.next();
-                switch (symbol.type()) {
-                case OverloadedType(Symbol[] alts, _):
-                    alternatives = alts;
+                Type symbolType = symbol.type();
+                if (symbolType instanceof Type.OverloadedType) {
+                    alternatives = ((Type.OverloadedType)symbolType).alts;
                     index = 0;
                     return next();
-                default:
-                    return symbol;
                 }
+                return symbol;
             }
         }
     }
@@ -255,8 +254,9 @@ public class Scope {
     public boolean contains(Symbol sym) {
         Entry e = lookupEntry(sym.name);
         if (e.sym == sym) return true;
-        switch (e.sym.type()) {
-        case OverloadedType(Symbol[] alts, _):
+        Type entryType = e.sym.type();
+        if (entryType instanceof Type.OverloadedType) {
+            Symbol[] alts = ((Type.OverloadedType)entryType).alts;
             for (int i = 0; i < alts.length; i++)
                 if (alts[i] == sym) return true;
         }
@@ -329,8 +329,7 @@ public class Scope {
 
     public static Scope EMPTY = new Scope();
 }
-
-public class ErrorScope extends Scope {
+class ErrorScope extends Scope {
 
     private final Symbol owner;
 

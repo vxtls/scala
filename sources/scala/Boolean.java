@@ -13,7 +13,6 @@ package scala;
 public abstract class Boolean extends AnyVal {
 
     public final boolean value;
-
     public Boolean(boolean value) {
         this.value = value;
     }

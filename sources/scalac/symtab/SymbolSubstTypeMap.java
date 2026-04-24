@@ -58,6 +58,16 @@ public class SymbolSubstTypeMap extends Type.Map {
     }
 
     public void insertSymbol(Symbol key, Symbol value) {
+        Object existing = symbols.get(key);
+        if (existing != null) {
+            Symbol existingSymbol = (Symbol)existing;
+            assert existingSymbol == value ||
+                existingSymbol.owner().isConstructor() &&
+                value.owner().isConstructor() &&
+                existingSymbol.owner().constructorClass() ==
+                value.owner().constructorClass() : Debug.show(key);
+            return;
+        }
         assert !symbols.containsKey(key) : Debug.show(key);
         assert !types.containsKey(key) : Debug.show(key);
         symbols.put(key, value);
@@ -149,32 +159,35 @@ public class SymbolSubstTypeMap extends Type.Map {
     // Public Methods - Applying the substitutions
 
     public Type apply(Type type) {
-        switch (type) {
-
-        case TypeRef(NoPrefix, Symbol symbol, Type[] args):
+        if (type instanceof Type.TypeRef &&
+            (((Type.TypeRef)type).pre == Type.NoPrefix ||
+             ((Type.TypeRef)type).pre instanceof Type.ThisType)) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            Symbol symbol = typeRef.sym;
             Object value = types.get(symbol);
             if (value != null) return (Type)value;
             value = symbols.get(symbol);
             if (value == null) return super.map(type);
-            Type prefix = ((Type.TypeRef)type).pre;
-            return Type.typeRef(apply(prefix), (Symbol)value, map(args));
-
-        case SingleType(NoPrefix, Symbol symbol):
+            Type prefix = typeRef.pre;
+            return Type.typeRef(apply(prefix), (Symbol)value, map(typeRef.args));
+        } else if (type instanceof Type.SingleType &&
+                   (((Type.SingleType)type).pre == Type.NoPrefix ||
+                    ((Type.SingleType)type).pre instanceof Type.ThisType)) {
+            Type.SingleType singleType = (Type.SingleType)type;
+            Symbol symbol = singleType.sym;
             Object value = types.get(symbol);
             if (value != null) return (Type)value;
             value = symbols.get(symbol);
             if (value == null) return super.map(type);
-            Type prefix = ((Type.SingleType)type).pre;
+            Type prefix = singleType.pre;
             return Type.singleType(apply(prefix), (Symbol)value);
-
-        case ThisType(Symbol symbol):
+        } else if (type instanceof Type.ThisType) {
+            Symbol symbol = ((Type.ThisType)type).sym;
             Object value = symbols.get(symbol);
             if (value == null) return super.map(type);
             return Type.ThisType((Symbol)value);
-
-        default:
-            return super.map(type);
         }
+        return super.map(type);
     }
 
     //########################################################################

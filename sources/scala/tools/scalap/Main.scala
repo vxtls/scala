@@ -8,7 +8,8 @@
 
 package scala.tools.scalap;
 
-import java.io._;
+import java.io.OutputStreamWriter;
+import scala.Console;
 
 
 /** The main object used to execute scalap on the command-line.

@@ -351,154 +351,173 @@ public class ATreePrinter {
 
     /** Prints the code. */
     public ATreePrinter printCode(ACode code) {
-        switch (code) {
-        case Void:
+        if (code == ACode.Void) {
             return print("<void>");
-        case This(Symbol clasz):
-            return printSymbol(clasz).print('.').print("this");
-        case Constant(AConstant constant):
-            return printConstant(constant);
-        case Load(ALocation location):
-            return printLocation(location);
-        case Store(ALocation location, ACode value):
-            printLocation(location).space().print('=').space();
-            return printCode(value);
-        case Apply(AFunction function, Type[] targs, ACode[] vargs):
-            printFunction(function);
-            if (targs.length > 0){
+        } else if (code instanceof ACode.This) {
+            return printSymbol(((ACode.This) code).clasz).print('.').print("this");
+        } else if (code instanceof ACode.Constant) {
+            return printConstant(((ACode.Constant) code).constant);
+        } else if (code instanceof ACode.Load) {
+            return printLocation(((ACode.Load) code).location);
+        } else if (code instanceof ACode.Store) {
+            ACode.Store store = (ACode.Store) code;
+            printLocation(store.location).space().print('=').space();
+            return printCode(store.value);
+        } else if (code instanceof ACode.Apply) {
+            ACode.Apply apply = (ACode.Apply) code;
+            printFunction(apply.function);
+            if (apply.targs.length > 0){
                 print('[');
-                for (int i = 0; i < targs.length; i++)
-                    (i == 0 ? this : print(',').space()).printType(targs[i]);
+                for (int i = 0; i < apply.targs.length; i++)
+                    (i == 0 ? this : print(',').space()).printType(apply.targs[i]);
                 print(']');
             }
             print('(');
-            for (int i = 0; i < vargs.length; i++)
-                (i == 0 ? this : print(',').space()).printCode(vargs[i]);
+            for (int i = 0; i < apply.vargs.length; i++)
+                (i == 0 ? this : print(',').space()).printCode(apply.vargs[i]);
             print(')');
             return this;
-        case IsAs(ACode value, Type type, boolean cast):
-            printCode(value).print('.').print(cast ? "as" : "is");
-            return print('[').printType(type).print(']');
-        case If(ACode test, ACode success, ACode failure):
-            print("if").space().print('(').printCode(test).print(')').lbrace();
-            printCode(success).line();
+        } else if (code instanceof ACode.IsAs) {
+            ACode.IsAs isAs = (ACode.IsAs) code;
+            printCode(isAs.value).print('.').print(isAs.cast ? "as" : "is");
+            return print('[').printType(isAs.type).print(']');
+        } else if (code instanceof ACode.If) {
+            ACode.If ifCode = (ACode.If) code;
+            print("if").space().print('(').printCode(ifCode.test).print(')').lbrace();
+            printCode(ifCode.success).line();
             rbrace().space().print("else").space().lbrace();
-            printCode(failure).line();
+            printCode(ifCode.failure).line();
             return rbrace();
-        case Switch(ACode test, int[][] tags, ACode[] bodies):
-            print("switch").space().print('(').printCode(test).print(')');
+        } else if (code instanceof ACode.Switch) {
+            ACode.Switch switchCode = (ACode.Switch) code;
+            print("switch").space().print('(').printCode(switchCode.test).print(')');
             lbrace();
-            for (int i = 0; i < tags.length; i++) {
-                for (int j = 0; j < tags[i].length; j++)
-                    print("case").space().print(tags[i][j]).print(':').line();
-                indent().printCode(bodies[i]).undent().line();
+            for (int i = 0; i < switchCode.tags.length; i++) {
+                for (int j = 0; j < switchCode.tags[i].length; j++)
+                    print("case").space().print(switchCode.tags[i][j]).print(':').line();
+                indent().printCode(switchCode.bodies[i]).undent().line();
             }
             print("case").space().print('_').print(':').line();
-            indent().printCode(bodies[tags.length]).undent();
+            indent().printCode(switchCode.bodies[switchCode.tags.length]).undent();
             return rbrace();
-        case Synchronized(ACode lock, ACode value):
+        } else if (code instanceof ACode.Synchronized) {
+            ACode.Synchronized sync = (ACode.Synchronized) code;
             print("synchronized").space();
-            print('(').printCode(lock).print(')');
-            return lbrace().printCode(value).rbrace();
-        case Block(Symbol[] locals, ACode[] statements, ACode value):
+            print('(').printCode(sync.lock).print(')');
+            return lbrace().printCode(sync.value).rbrace();
+        } else if (code instanceof ACode.Block) {
+            ACode.Block block = (ACode.Block) code;
             lbrace();
-            for (int i = 0; i < locals.length; i++) {
-                print("var").space().printSymbol(locals[i]);
-                print(":").space().printType(locals[i].type());
+            for (int i = 0; i < block.locals.length; i++) {
+                print("var").space().printSymbol(block.locals[i]);
+                print(":").space().printType(block.locals[i].type());
                 println(";");
             }
-            for (int i = 0; i < statements.length; i++)
-                printCode(statements[i]).println(';');
-            return printCode(value).line().rbrace();
-        case Label(Symbol label, Symbol[] locals, ACode value):
-            print("label").space().printSymbol(label).print('(');
-            for (int i = 0; i < locals.length; i++)
-                (i == 0 ? this : print(',').space()).printSymbol(locals[i]);
+            for (int i = 0; i < block.statements.length; i++)
+                printCode(block.statements[i]).println(';');
+            return printCode(block.value).line().rbrace();
+        } else if (code instanceof ACode.Label) {
+            ACode.Label label = (ACode.Label) code;
+            print("label").space().printSymbol(label.label).print('(');
+            for (int i = 0; i < label.locals.length; i++)
+                (i == 0 ? this : print(',').space()).printSymbol(label.locals[i]);
             print(')').space().print('=').lbrace();
-            return printCode(value).rbrace();
-        case Goto(Symbol label, ACode[] vargs):
-            print("goto").space().printSymbol(label).print('(');
-            for (int i = 0; i < vargs.length; i++)
-                (i == 0 ? this : print(',').space()).printCode(vargs[i]);
+            return printCode(label.value).rbrace();
+        } else if (code instanceof ACode.Goto) {
+            ACode.Goto gotoCode = (ACode.Goto) code;
+            print("goto").space().printSymbol(gotoCode.label).print('(');
+            for (int i = 0; i < gotoCode.vargs.length; i++)
+                (i == 0 ? this : print(',').space()).printCode(gotoCode.vargs[i]);
             return print(')');
-        case Return(Symbol function, ACode value):
-            print("return").symtab.printSymbolUniqueId(function).space();
-            return printCode(value);
-        case Throw(ACode value):
-            return print("throw").space().printCode(value);
-        case Drop(ACode value, Type type):
-            print("drop").print('[').printType(type).print(']').space();
-            return printCode(value);
-        default:
+        } else if (code instanceof ACode.Return) {
+            ACode.Return returnCode = (ACode.Return) code;
+            print("return").symtab.printSymbolUniqueId(returnCode.function).space();
+            return printCode(returnCode.value);
+        } else if (code instanceof ACode.Throw) {
+            return print("throw").space().printCode(((ACode.Throw) code).value);
+        } else if (code instanceof ACode.Drop) {
+            ACode.Drop drop = (ACode.Drop) code;
+            print("drop").print('[').printType(drop.type).print(']').space();
+            return printCode(drop.value);
+        } else {
             throw Debug.abort("unknown case", code);
         }
     }
 
     /** Prints the location. */
     public ATreePrinter printLocation(ALocation location) {
-        switch (location) {
-        case Module(Symbol module):
-            return printSymbol(module);
-        case Field(Void, Symbol field, true):
-            return printSymbol(field.owner()).print('.').printSymbol(field);
-        case Field(ACode object, Symbol field, boolean isStatic):
-            printCode(object).print('.');
-            if (isStatic) print("<static>").space();
-            return printSymbol(field);
-        case Local(Symbol local, _):
-            return printSymbol(local);
-        case ArrayItem(ACode array, ACode index):
-            return printCode(array).print('(').printCode(index).print(')');
-        default:
+        if (location instanceof ALocation.Module) {
+            return printSymbol(((ALocation.Module) location).module);
+        } else if (location instanceof ALocation.Field) {
+            ALocation.Field field = (ALocation.Field) location;
+            if (field.object == ACode.Void && field.isStatic) {
+                return printSymbol(field.field.owner()).print('.').printSymbol(field.field);
+            }
+            printCode(field.object).print('.');
+            if (field.isStatic) print("<static>").space();
+            return printSymbol(field.field);
+        } else if (location instanceof ALocation.Local) {
+            return printSymbol(((ALocation.Local) location).local);
+        } else if (location instanceof ALocation.ArrayItem) {
+            ALocation.ArrayItem arrayItem = (ALocation.ArrayItem) location;
+            return printCode(arrayItem.array).print('(').printCode(arrayItem.index).print(')');
+        } else {
             throw Debug.abort("unknown case", location);
         }
     }
 
     /** Prints the function. */
     public ATreePrinter printFunction(AFunction function) {
-        switch (function) {
-        case Method(Void, Symbol method, AInvokeStyle.New):
-            return print("new").space().printSymbol(method);
-        case Method(Void, Symbol method, AInvokeStyle.Static(false)):
-            return printSymbol(method.owner()).print('.').printSymbol(method);
-        case Method(This(Symbol c), Symbol method, AInvokeStyle.Static(true)):
-            printSymbol(c).print('.').print("super").print('.');
-            return printSymbol(method);
-        case Method(ACode object, Symbol method, AInvokeStyle style):
-            printCode(object).print('.');
-            if (style != AInvokeStyle.Dynamic) print("<" +style+ ">").space();
-            return printSymbol(method);
-        case Primitive(APrimitive primitive):
-            return printPrimitive(primitive);
-        case NewArray(Type element):
-            return print("new").space().printType(element).print("[]");
-        default:
+        if (function instanceof AFunction.Method) {
+            AFunction.Method method = (AFunction.Method) function;
+            if (method.object == ACode.Void && method.style == AInvokeStyle.New) {
+                return print("new").space().printSymbol(method.method);
+            } else if (method.object == ACode.Void && method.style == AInvokeStyle.Static(false)) {
+                return printSymbol(method.method.owner()).print('.').printSymbol(method.method);
+            } else if (method.object instanceof ACode.This && method.style == AInvokeStyle.Static(true)) {
+                printSymbol(((ACode.This) method.object).clasz).print('.').print("super").print('.');
+                return printSymbol(method.method);
+            }
+            printCode(method.object).print('.');
+            if (method.style != AInvokeStyle.Dynamic) print("<" + method.style + ">").space();
+            return printSymbol(method.method);
+        } else if (function instanceof AFunction.Primitive) {
+            return printPrimitive(((AFunction.Primitive) function).primitive);
+        } else if (function instanceof AFunction.NewArray) {
+            return print("new").space().printType(((AFunction.NewArray) function).element).print("[]");
+        } else {
             throw Debug.abort("unknown case", function);
         }
     }
 
     /** Prints the primitive. */
     public ATreePrinter printPrimitive(APrimitive primitive) {
-        switch (primitive) {
-        case Negation(ATypeKind kind):
-            return printPrimitiveOp("NEG", kind);
-        case Test(ATestOp op, ATypeKind kind, boolean zero):
-            return printPrimitiveOp(op.toString() + (zero ? "Z" : ""), kind);
-        case Comparison(AComparisonOp op, ATypeKind kind):
-            return printPrimitiveOp(op.toString(), kind);
-        case Arithmetic(AArithmeticOp op, ATypeKind kind):
-            return printPrimitiveOp(op.toString(), kind);
-        case Logical(ALogicalOp op, ATypeKind kind):
-            return printPrimitiveOp(op.toString(), kind);
-        case Shift(AShiftOp op, ATypeKind kind):
-            return printPrimitiveOp(op.toString(), kind);
-        case Conversion(ATypeKind src, ATypeKind dst):
-            return printPrimitiveOp("CONV", src, dst);
-        case ArrayLength(ATypeKind kind):
-            return printPrimitiveOp("LENGTH", kind);
-        case StringConcat(ATypeKind lf, ATypeKind rg):
-            return printPrimitiveOp("CONCAT", lf, rg);
-        default:
+        if (primitive instanceof APrimitive.Negation) {
+            return printPrimitiveOp("NEG", ((APrimitive.Negation) primitive).kind);
+        } else if (primitive instanceof APrimitive.Test) {
+            APrimitive.Test test = (APrimitive.Test) primitive;
+            return printPrimitiveOp(test.op.toString() + (test.zero ? "Z" : ""), test.kind);
+        } else if (primitive instanceof APrimitive.Comparison) {
+            APrimitive.Comparison comparison = (APrimitive.Comparison) primitive;
+            return printPrimitiveOp(comparison.op.toString(), comparison.kind);
+        } else if (primitive instanceof APrimitive.Arithmetic) {
+            APrimitive.Arithmetic arithmetic = (APrimitive.Arithmetic) primitive;
+            return printPrimitiveOp(arithmetic.op.toString(), arithmetic.kind);
+        } else if (primitive instanceof APrimitive.Logical) {
+            APrimitive.Logical logical = (APrimitive.Logical) primitive;
+            return printPrimitiveOp(logical.op.toString(), logical.kind);
+        } else if (primitive instanceof APrimitive.Shift) {
+            APrimitive.Shift shift = (APrimitive.Shift) primitive;
+            return printPrimitiveOp(shift.op.toString(), shift.kind);
+        } else if (primitive instanceof APrimitive.Conversion) {
+            APrimitive.Conversion conversion = (APrimitive.Conversion) primitive;
+            return printPrimitiveOp("CONV", conversion.src, conversion.dst);
+        } else if (primitive instanceof APrimitive.ArrayLength) {
+            return printPrimitiveOp("LENGTH", ((APrimitive.ArrayLength) primitive).kind);
+        } else if (primitive instanceof APrimitive.StringConcat) {
+            APrimitive.StringConcat concat = (APrimitive.StringConcat) primitive;
+            return printPrimitiveOp("CONCAT", concat.lf, concat.rg);
+        } else {
             throw Debug.abort("unknown case", primitive);
         }
     }
@@ -518,32 +537,31 @@ public class ATreePrinter {
 
     /** Prints the constant. */
     public ATreePrinter printConstant(AConstant constant) {
-        switch (constant) {
-        case UNIT:
+        if (constant == AConstant.UNIT) {
             return print("()");
-        case BOOLEAN(boolean value):
-            return print(value);
-        case BYTE(byte value):
-            return print(value);
-        case SHORT(short value):
-            return print(value);
-        case CHAR(char value):
-            return print('\'').print(value).print('\'');
-        case INT(int value):
-            return print(value);
-        case LONG(long value):
-            return print(value);
-        case FLOAT(float value):
-            return print(value);
-        case DOUBLE(double value):
-            return print(value);
-        case STRING(String value):
-            return print('\"').print(SourceRepresentation.escape(value)).print('\"');
-        case NULL:
+        } else if (constant instanceof AConstant.BooleanValue) {
+            return print(((AConstant.BooleanValue) constant).value);
+        } else if (constant instanceof AConstant.ByteValue) {
+            return print(((AConstant.ByteValue) constant).value);
+        } else if (constant instanceof AConstant.ShortValue) {
+            return print(((AConstant.ShortValue) constant).value);
+        } else if (constant instanceof AConstant.CharValue) {
+            return print('\'').print(((AConstant.CharValue) constant).value).print('\'');
+        } else if (constant instanceof AConstant.IntValue) {
+            return print(((AConstant.IntValue) constant).value);
+        } else if (constant instanceof AConstant.LongValue) {
+            return print(((AConstant.LongValue) constant).value);
+        } else if (constant instanceof AConstant.FloatValue) {
+            return print(((AConstant.FloatValue) constant).value);
+        } else if (constant instanceof AConstant.DoubleValue) {
+            return print(((AConstant.DoubleValue) constant).value);
+        } else if (constant instanceof AConstant.StringValue) {
+            return print('\"').print(SourceRepresentation.escape(((AConstant.StringValue) constant).value)).print('\"');
+        } else if (constant == AConstant.NULL) {
             return print("null");
-        case ZERO:
+        } else if (constant == AConstant.ZERO) {
             return print("<zero>");
-        default:
+        } else {
             throw Debug.abort("unknown case", constant);
         }
     }

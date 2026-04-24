@@ -9,7 +9,6 @@ package scalac.util;
 
 import scalac.symtab.Symbol;
 import scalac.symtab.SymbolNameWriter;
-import scalac.symtab.ClassSymbol;
 
 public class Names {
 
@@ -25,7 +24,7 @@ public class Names {
     private static final String TUPLE_FIELD_PREFIX = "_";
     private static final String TYPE_PREFIX = "type$";
 
-    public static Name ALIAS(ClassSymbol clasz) {
+    public static Name ALIAS(Symbol clasz) {
         return Name.fromString(ALIAS_PREFIX + clasz.name).toTypeName();
     }
 
@@ -144,6 +143,11 @@ public class Names {
     public static final Name box = Name.fromString("box");
     public static final Name checkCastability = Name.fromString("checkCastability");
     public static final Name coerce = Name.fromString("coerce");
+    public static final Name coerceToDouble = Name.fromString("coerceToDouble");
+    public static final Name coerceToFloat = Name.fromString("coerceToFloat");
+    public static final Name coerceToLong = Name.fromString("coerceToLong");
+    public static final Name coerceToInt = Name.fromString("coerceToInt");
+    public static final Name coerceToShort = Name.fromString("coerceToShort");
     public static final Name defaultValue = Name.fromString("defaultValue");
     public static final Name elem = Name.fromString("elem");
     public static final Name elements = Name.fromString("elements");
@@ -162,6 +166,7 @@ public class Names {
     public static final Name isDefinedAt = Name.fromString("isDefinedAt");
     public static final Name isEmpty = Name.fromString("isEmpty");
     public static final Name java = Name.fromString("java");
+    public static final Name java_lang = Name.fromString("java.lang");
     public static final Name lang = Name.fromString("lang");
     public static final Name length = Name.fromString("length");
     public static final Name match = Name.fromString("match");
@@ -175,6 +180,7 @@ public class Names {
     public static final Name print = Name.fromString("print");
     public static final Name runtime = Name.fromString("runtime");
     public static final Name scala = Name.fromString("scala");
+    public static final Name scala_Predef = Name.fromString("scala.Predef");
     public static final Name xml = Name.fromString("xml");
     public static final Name synchronized_ = Name.fromString("synchronized");
     public static final Name caseArity = Name.fromString("caseArity");

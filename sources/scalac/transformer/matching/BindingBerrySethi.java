@@ -6,7 +6,7 @@ import scalac.ApplicationError ;
 import scalac.ast.Tree ;
 import scalac.util.Name ;
 import scalac.util.Names ;
-import Tree.* ;
+import scalac.ast.Tree.* ;
 
 import java.util.* ;
 
@@ -33,12 +33,10 @@ public class BindingBerrySethi extends BerrySethi {
             int dest = destI.intValue() ;
             Vector arrows, revArrows;
             Label revLabel = new Label.Pair( srcI, label  );
-            switch( label ) {
-            case DefaultLabel:
+            if (label == Label.DefaultLabel) {
                   arrows = defaultq[ src ];
                   revArrows = defaultqRev[ dest ];
-                  break;
-            default:
+            } else {
                   arrows = (Vector) deltaq[ src ].get( label );
                   if( arrows == null )
                         deltaq[ src ].put( label,
@@ -57,14 +55,10 @@ public class BindingBerrySethi extends BerrySethi {
       void seenLabel( Tree pat, Label label ) {
             Integer i = new Integer( ++pos );
             seenLabel( pat, i, label );
-            switch( pat ) {
-            case Apply(_, _):
-            case Literal( _ ):
-            case Select(_, _):
-            case Typed(_,_):
+            if (pat instanceof Apply || pat instanceof Literal || pat instanceof Select || pat instanceof Typed) {
                   this.varAt.put( i, activeBinders.clone() ); // below @ ?
-                  break;
-            case Ident( Name name ):
+            } else if (pat instanceof Ident) {
+                  Name name = ((Ident)pat).name;
                   assert ( pat.symbol() == Global.instance.definitions.PATTERN_WILDCARD )||( name.toString().indexOf("$") > -1 ) : "found variable label "+name;
 
                   Vector binders = (Vector) activeBinders.clone();
@@ -74,9 +68,8 @@ public class BindingBerrySethi extends BerrySethi {
                   }
                   */
                   this.varAt.put( i, binders );
-                  break;
-            default:
-                throw new ApplicationError("unexpected atom:"+pat.getClass());
+            } else {
+                  throw new ApplicationError("unexpected atom:"+pat.getClass());
             }
       }
 
@@ -108,8 +101,8 @@ public class BindingBerrySethi extends BerrySethi {
 
             this.finalTag = finalTag ;
             //System.out.println( "enter automatonFrom("+ pat +")");
-            switch( pat ) {
-            case Sequence( Tree[] subexpr ):
+            if (pat instanceof Sequence) {
+                  Tree[] subexpr = ((Sequence)pat).trees;
 
                   initialize( subexpr );
 

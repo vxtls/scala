@@ -12,6 +12,7 @@ PhaseDescriptor.java
 Unit.java
 
 ast/DefaultTreeFactory.java
+ast/GenTransformer.java
 ast/LazyTreeCopier.java
 ast/StrictTreeCopier.java
 ast/Transformer.java
@@ -20,6 +21,7 @@ ast/Tree.java
 ast/TreeCloner.java
 ast/TreeCopier.java
 ast/TreeFactory.java
+ast/GenTreeCloner.java
 ast/TreeGen.java
 ast/TreeInfo.java
 ast/TreeList.java
@@ -52,13 +54,12 @@ backend/Primitive.java
 backend/Primitives.java
 backend/jvm/GenJVMPhase.java
 backend/jvm/GenJVM.java
-backend/msil/GenMSIL.java
-backend/msil/GenMSILPhase.java
-backend/msil/TypeCreator.java
 
 checkers/CheckSymbols.java
 checkers/CheckTreeNodes.java
 checkers/CheckTypes.java
+checkers/CheckOwners.java
+checkers/CheckNames.java
 checkers/Checker.java
 checkers/TreeChecker.java
 
@@ -66,8 +67,6 @@ framework/History.java
 framework/Promise.java
 
 symtab/classfile/AttributeParser.java
-symtab/classfile/CLRPackageParser.java
-symtab/classfile/CLRClassParser.java
 symtab/classfile/ClassParser.java
 symtab/classfile/ClassfileConstants.java
 symtab/classfile/ClassfileParser.java
@@ -81,6 +80,7 @@ symtab/classfile/Pickle.java
 symtab/classfile/UnPickle.java
 
 symtab/ClosureHistory.java
+symtab/CyclicReference.java
 symtab/Definitions.java
 symtab/EntryTags.java
 symtab/Kinds.java
@@ -88,6 +88,16 @@ symtab/Modifiers.java
 symtab/Scope.java
 symtab/SourceCompleter.java
 symtab/SymSet.java
+symtab/TermSymbol.java
+symtab/ConstructorSymbol.java
+symtab/ModuleSymbol.java
+symtab/ModuleClassSymbol.java
+symtab/LinkedModuleSymbol.java
+symtab/LinkedClassSymbol.java
+symtab/TypeSymbol.java
+symtab/AliasTypeSymbol.java
+symtab/AbsTypeSymbol.java
+symtab/ClassSymbol.java
 symtab/Symbol.java
 symtab/SymbolCloner.java
 symtab/SymbolComparator.java
@@ -97,6 +107,20 @@ symtab/SymbolSubstTypeMap.java
 symtab/SymbolTablePrinter.java
 symtab/Type.java
 symtab/TypeTags.java
+
+util/ArgumentParser.java
+util/BooleanOptionParser.java
+util/ChoiceOptionParser.java
+util/CommandParser.java
+util/HelpOptionParser.java
+util/PhaseSetOptionParser.java
+util/PrintOptionParser.java
+util/ScalaFileArgumentParser.java
+util/ScalaProgramArgumentParser.java
+util/StringOptionParser.java
+util/UnknownArgumentParser.java
+util/UnknownOptionParser.java
+util/VersionOptionParser.java
 
 transformer/AddAccessorsPhase.java
 transformer/AddConstructors.java

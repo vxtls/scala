@@ -14,42 +14,34 @@ import meta.java.JavaWriter;
  * This class describes the possible links between a given field of a
  * tree and the symbol of that tree.
  */
-public class TreeFieldLink {
+public final class TreeFieldLink {
 
     //########################################################################
     // Public Cases
 
     /** Field is linked to the symbol's flags */
-    public case SymFlags;
+    public static final TreeFieldLink SymFlags = new TreeFieldLink("flags");
 
     /** Field is linked to the symbol's name */
-    public case SymName;
+    public static final TreeFieldLink SymName = new TreeFieldLink("name");
+
+    private final String link;
+
+    private TreeFieldLink(String link) {
+        this.link = link;
+    }
 
     //########################################################################
     // Public Methods
 
     /** Returns the field or method to invoke to get the linked value. */
     public String getLink() {
-        switch (this) {
-        case SymFlags:
-            return "flags";
-        case SymName:
-            return "name";
-        default:
-            throw new Error("unknown case: " + this);
-        }
+        return link;
     }
 
     /** Returns the name of this link. */
     public String toString() {
-        switch (this) {
-        case SymFlags:
-            return "flags";
-        case SymName:
-            return "name";
-        default:
-            throw new Error("unknown case: " + this);
-        }
+        return link;
     }
 
     public JavaWriter print(JavaWriter writer, TreeField symbol) {
