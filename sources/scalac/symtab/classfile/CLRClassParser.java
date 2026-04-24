@@ -264,16 +264,19 @@ public class CLRClassParser extends SymbolLoader {
     }
 
     protected void setParamOwners(scalac.symtab.Type type, Symbol owner) {
-	switch (type) {
-	case PolyType(Symbol[] params, scalac.symtab.Type restype):
-	    for (int i = 0; i < params.length; i++) params[i].setOwner(owner);
-	    setParamOwners(restype, owner);
-	    return;
-	case MethodType(Symbol[] params, scalac.symtab.Type restype):
-	    for (int i = 0; i < params.length; i++) params[i].setOwner(owner);
-	    setParamOwners(restype, owner);
-	    return;
-	}
+        if (type instanceof scalac.symtab.Type.PolyType) {
+            scalac.symtab.Type.PolyType polyType =
+                (scalac.symtab.Type.PolyType)type;
+            Symbol[] params = polyType.tparams;
+            for (int i = 0; i < params.length; i++) params[i].setOwner(owner);
+            setParamOwners(polyType.result, owner);
+        } else if (type instanceof scalac.symtab.Type.MethodType) {
+            scalac.symtab.Type.MethodType methodType =
+                (scalac.symtab.Type.MethodType)type;
+            Symbol[] params = methodType.vparams;
+            for (int i = 0; i < params.length; i++) params[i].setOwner(owner);
+            setParamOwners(methodType.result, owner);
+        }
     }
 
     protected scalac.symtab.Type getClassType(Type type) {

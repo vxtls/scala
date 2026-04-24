@@ -22,40 +22,40 @@ public abstract class AbstractTreeCaseExpander extends AbstractTreeExpander {
     // Public Methods
 
     public void printTreeSwitch() {
-        writer.println("switch (tree) {");
-        writer.println();
-        printTreeCases();
-        writer.println("default:");
-        writer.indent();
+        for (int i = 0; i < tree.nodes.length; i++) {
+            printTreeCase(tree.nodes[i], i == 0);
+            writer.println();
+        }
+        writer.print("else").lbrace();
         writer.print("throw ").print(t_Debug).
             println(".abort(\"unknown tree\", tree);");
-        writer.undent();
-        writer.println("}");
+        writer.rbrace();
     }
 
     public void printTreeCases() {
         for (int i = 0; i < tree.nodes.length; i++) {
-            printTreeCase(tree.nodes[i]);
+            printTreeCase(tree.nodes[i], i == 0);
             writer.println();
         }
     }
 
-    public void printTreeCase(TreeNode node) {
-        printTreeCaseHeader(node);
-        writer.println().indent();
+    public void printTreeCase(TreeNode node, boolean first) {
+        printTreeCaseHeader(node, first);
+        writer.println();
         printTreeCaseBody(node);
         printTreeCaseFooter(node);
-        writer.undent();
     }
 
-    public void printTreeCaseHeader(TreeNode node) {
-        node.printCase(writer, false);
+    public void printTreeCaseHeader(TreeNode node, boolean first) {
+        writer.print(first ? "if (" : "else if (");
+        node.printInstanceTest(writer, "tree").print(")").lbrace();
+        node.printExtractor(writer, "tree", false);
     }
 
     public abstract void printTreeCaseBody(TreeNode node);
 
     public void printTreeCaseFooter(TreeNode node) {
-        // do nothing
+        writer.rbrace();
     }
 
     //########################################################################

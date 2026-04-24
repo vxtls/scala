@@ -6,8 +6,8 @@ import scalac.util.Name;
 import scalac.symtab.Symbol ;
 import scalac.ast.Traverser ;
 
-import Tree.Ident;
-import Tree.Bind;
+import scalac.ast.Tree.Ident;
+import scalac.ast.Tree.Bind;
 
 
 abstract class VariableTraverser extends Traverser {
@@ -29,8 +29,8 @@ abstract class VariableTraverser extends Traverser {
 
 
       public void traverse(Tree tree) {
-            switch (tree) {
-            case Ident(Name name):
+            if (tree instanceof Ident) {
+                  Name name = ((Ident)tree).name;
                   Symbol sym;
 
                   if( isVariableName( name )
@@ -38,8 +38,10 @@ abstract class VariableTraverser extends Traverser {
                         handleVariableSymbol( sym );
 
                   return;
-
-            case Bind(Name name, Tree subtree):
+            }
+            if (tree instanceof Bind) {
+                  Name name = ((Bind)tree).name;
+                  Tree subtree = ((Bind)tree).rhs;
                   Symbol sym;
 
                   if( isVariableName( name )
@@ -49,12 +51,11 @@ abstract class VariableTraverser extends Traverser {
                   traverse( subtree );
 
                   return;
-
-            case Select(_,_):
-                  return;
-            default:
-                  super.traverse( tree );
             }
+            if (tree instanceof Tree.Select) {
+                  return;
+            }
+            super.traverse( tree );
       }
 
 

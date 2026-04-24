@@ -10,12 +10,10 @@ import java.util.HashSet;
 class NoSeqVariableTraverser extends CollectVariableTraverser {
 
       public void traverse(Tree tree) {
-            switch (tree) {
-            case Sequence(_):
+            if (tree instanceof Tree.Sequence) {
                   return ;
-            default:
-                  super.traverse( tree );
             }
+            super.traverse( tree );
       }
 
       public NoSeqVariableTraverser() {

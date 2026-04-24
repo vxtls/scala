@@ -9,86 +9,94 @@
 
 package scala.tools.scalai;
 
-import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 
 import scalac.symtab.Symbol;
 import scalac.util.Debug;
 
-public class Function {
+public abstract class Function {
 
-    //########################################################################
-    // Public Cases
-
-    public case Global(CodePromise code);
-    public case Member(Symbol symbol);
-    public case Label(Symbol symbol);
-
-    public case JavaConstructor(Constructor constructor);
-    public case JavaMethod(Method method);
-
-    public case Pos;
-    public case Neg;
-    public case Throw;
-    public case StringPlus;
-    public case Eq;
-    public case EqEq;
-    public case BangEq;
-    public case HashCode;
-    public case ToString;
-
-    //########################################################################
-    // Public Methods
-
-    public String toString() {
-        switch (this) {
-
-        case Global(CodePromise code):
-            return "Global(" + code + ")";
-
-        case Member(Symbol symbol):
-            return "Member(" + Debug.show(symbol) + ")";
-
-        case Label(Symbol symbol):
-            return "Label(" + Debug.show(symbol) + ")";
-
-        case JavaMethod(Method method):
-            return "JavaMethod(" + method + ")";
-
-        case JavaConstructor(Constructor constructor):
-            return "JavaConstructor(" + constructor + ")";
-
-        case Pos:
-            return "Pos";
-
-        case Neg:
-            return "Neg";
-
-        case Throw:
-            return "Throw";
-
-        case StringPlus:
-            return "StringPlus";
-
-        case Eq:
-            return "Eq";
-
-        case EqEq:
-            return "EqEq";
-
-        case BangEq:
-            return "BangEq";
-
-        case HashCode:
-            return "HashCode";
-
-        case ToString:
-            return "ToString";
-
-        default:
-            throw Debug.abort("illegal function", this);
-        }
+    public static final class Global extends Function {
+        public final CodePromise code;
+        private Global(CodePromise code) { this.code = code; }
     }
 
-    //########################################################################
+    public static final class Member extends Function {
+        public final Symbol symbol;
+        private Member(Symbol symbol) { this.symbol = symbol; }
+    }
+
+    public static final class Label extends Function {
+        public final Symbol symbol;
+        private Label(Symbol symbol) { this.symbol = symbol; }
+    }
+
+    public static final class JavaConstructor extends Function {
+        public final Constructor constructor;
+        private JavaConstructor(Constructor constructor) { this.constructor = constructor; }
+    }
+
+    public static final class JavaMethod extends Function {
+        public final Method method;
+        private JavaMethod(Method method) { this.method = method; }
+    }
+
+    public static final class Pos extends Function { private Pos() {} }
+    public static final Pos Pos = new Pos();
+
+    public static final class Neg extends Function { private Neg() {} }
+    public static final Neg Neg = new Neg();
+
+    public static final class Throw extends Function { private Throw() {} }
+    public static final Throw Throw = new Throw();
+
+    public static final class StringPlus extends Function { private StringPlus() {} }
+    public static final StringPlus StringPlus = new StringPlus();
+
+    public static final class Eq extends Function { private Eq() {} }
+    public static final Eq Eq = new Eq();
+
+    public static final class EqEq extends Function { private EqEq() {} }
+    public static final EqEq EqEq = new EqEq();
+
+    public static final class BangEq extends Function { private BangEq() {} }
+    public static final BangEq BangEq = new BangEq();
+
+    public static final class HashCode extends Function { private HashCode() {} }
+    public static final HashCode HashCode = new HashCode();
+
+    public static final class ToString extends Function { private ToString() {} }
+    public static final ToString ToString = new ToString();
+
+    public static Global Global(CodePromise code) { return new Global(code); }
+    public static Member Member(Symbol symbol) { return new Member(symbol); }
+    public static Label Label(Symbol symbol) { return new Label(symbol); }
+    public static JavaConstructor JavaConstructor(Constructor constructor) {
+        return new JavaConstructor(constructor);
+    }
+    public static JavaMethod JavaMethod(Method method) { return new JavaMethod(method); }
+
+    public String toString() {
+        if (this instanceof Global)
+            return "Global(" + ((Global)this).code + ")";
+        if (this instanceof Member)
+            return "Member(" + Debug.show(((Member)this).symbol) + ")";
+        if (this instanceof Label)
+            return "Label(" + Debug.show(((Label)this).symbol) + ")";
+        if (this instanceof JavaMethod)
+            return "JavaMethod(" + ((JavaMethod)this).method + ")";
+        if (this instanceof JavaConstructor)
+            return "JavaConstructor(" + ((JavaConstructor)this).constructor + ")";
+        if (this == Pos) return "Pos";
+        if (this == Neg) return "Neg";
+        if (this == Throw) return "Throw";
+        if (this == StringPlus) return "StringPlus";
+        if (this == Eq) return "Eq";
+        if (this == EqEq) return "EqEq";
+        if (this == BangEq) return "BangEq";
+        if (this == HashCode) return "HashCode";
+        if (this == ToString) return "ToString";
+        throw Debug.abort("illegal function", this);
+    }
 }

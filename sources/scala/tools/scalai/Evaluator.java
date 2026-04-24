@@ -155,123 +155,130 @@ public class Evaluator {
     // Private Methods - evaluate
 
     private Object evaluate(Code code) {
-        switch (code) {
-
-        case Block(Code[] stats, Code value):
-            for (int i = 0; i < stats.length; i++) evaluate(stats[i]);
-            return evaluate(value);
-
-        case Label(Symbol symbol, Variable[] variables, Code expression):
+        if (code instanceof Code.Block) {
+            Code.Block block = (Code.Block)code;
+            for (int i = 0; i < block.stats.length; i++) evaluate(block.stats[i]);
+            return evaluate(block.value);
+        }
+        if (code instanceof Code.Label) {
+            Code.Label label = (Code.Label)code;
             while (true)
                 try {
-                    return evaluate(expression);
+                    return evaluate(label.expression);
                 } catch (LabelException exception) {
-                    if (exception.symbol != symbol) throw exception;
-                    for (int i = 0; i < variables.length; i++) {
+                    if (exception.symbol != label.symbol) throw exception;
+                    for (int i = 0; i < label.variables.length; i++) {
                         // !!! null
-                        store(null, variables[i], exception.args[i]);
+                        store(null, label.variables[i], exception.args[i]);
                     }
                 }
-
-        case Synchronized(Code object, Code expression):
-            Object value = evaluate(object);
-            synchronized (value) { return evaluate(expression); }
-
-        case If(Code cond, Code thenp, Code elsep):
-            Object value = evaluate(cond);
+        }
+        if (code instanceof Code.Synchronized) {
+            Code.Synchronized sync = (Code.Synchronized)code;
+            Object value = evaluate(sync.object);
+            synchronized (value) { return evaluate(sync.expression); }
+        }
+        if (code instanceof Code.If) {
+            Code.If branch = (Code.If)code;
+            Object value = evaluate(branch.cond);
             assert value instanceof Boolean : value.getClass();
-            return evaluate(((Boolean)value).booleanValue() ? thenp : elsep);
-
-        case Switch(Code test, int[] tags, Code[] bodies, Code otherwise):
-            Object value = evaluate(test);
+            return evaluate(((Boolean)value).booleanValue() ? branch.thenp : branch.elsep);
+        }
+        if (code instanceof Code.Switch) {
+            Code.Switch switchCode = (Code.Switch)code;
+            Object value = evaluate(switchCode.test);
             assert value instanceof Integer : value.getClass();
             int tag = ((Integer)value).intValue();
-            for (int i = 0; i < tags.length; i++)
-                if (tags[i] == tag) return evaluate(bodies[i]);
-            return evaluate(otherwise);
-
-        case Literal(Object value):
-            return value;
-
-        case Load(Code target, Variable variable):
-            return load(evaluate(target), variable);
-
-        case Store(Code target, Variable variable, Code expression):
-            store(evaluate(target), variable, evaluate(expression));
+            for (int i = 0; i < switchCode.tags.length; i++)
+                if (switchCode.tags[i] == tag) return evaluate(switchCode.bodies[i]);
+            return evaluate(switchCode.otherwise);
+        }
+        if (code instanceof Code.Literal) {
+            return ((Code.Literal)code).value;
+        }
+        if (code instanceof Code.Load) {
+            Code.Load load = (Code.Load)code;
+            return load(evaluate(load.target), load.variable);
+        }
+        if (code instanceof Code.Store) {
+            Code.Store store = (Code.Store)code;
+            store(evaluate(store.target), store.variable, evaluate(store.expression));
             return RunTime.box_uvalue();
-
-        case Invoke(Code target, Function function, Code[] arguments, int pos):
-            Object object = evaluate(target);
-            Object[] args = new Object[arguments.length];
+        }
+        if (code instanceof Code.Invoke) {
+            Code.Invoke invoke = (Code.Invoke)code;
+            Object object = evaluate(invoke.target);
+            Object[] args = new Object[invoke.arguments.length];
             for (int i = 0; i < args.length; i++)
-                args[i] = evaluate(arguments[i]);
-            stack.pos = pos;
-            return invoke(object, function, args);
-
-        case Create(ScalaTemplate template):
+                args[i] = evaluate(invoke.arguments[i]);
+            stack.pos = invoke.pos;
+            return invoke(object, invoke.function, args);
+        }
+        if (code instanceof Code.Create) {
+            ScalaTemplate template = ((Code.Create)code).template;
             return invoke(null, template.getConstructor(),
                 new Object[] {template.getHandler()});
-
-        case CreateArray(Class component, Code size):
-            Object length = evaluate(size);
+        }
+        if (code instanceof Code.CreateArray) {
+            Code.CreateArray createArray = (Code.CreateArray)code;
+            Object length = evaluate(createArray.size);
             assert length instanceof Integer : length.getClass();
-            return Array.newInstance(component, ((Integer)length).intValue());
-
-        case IsAs(Code target, Type type, Class clasz, boolean cast):
-            Object object = evaluate(target);
-            if (object == null) return cast ? null : Boolean.FALSE;
-            boolean test = isInstanceOf(object, type, clasz);
-            return cast
-                ? (test ? object : throw_(getCastException(object, type)))
+            return Array.newInstance(createArray.component, ((Integer)length).intValue());
+        }
+        if (code instanceof Code.IsAs) {
+            Code.IsAs isAs = (Code.IsAs)code;
+            Object object = evaluate(isAs.target);
+            if (object == null) return isAs.cast ? null : Boolean.FALSE;
+            boolean test = isInstanceOf(object, isAs.type, isAs.base);
+            return isAs.cast
+                ? (test ? object : throw_(getCastException(object, isAs.type)))
                 : (test ? Boolean.TRUE : Boolean.FALSE);
-
-        case Or(Code lf, Code rg):
-            Object object = evaluate(lf);
+        }
+        if (code instanceof Code.Or) {
+            Code.Or or = (Code.Or)code;
+            Object object = evaluate(or.lf);
             assert object instanceof scala.Boolean : object.getClass();
             boolean value = ((scala.Boolean)object).value;
             if (value) return new Boolean(value);
-            return evaluate(rg);
-
-        case And(Code lf, Code rg):
-            Object object = evaluate(lf);
+            return evaluate(or.rg);
+        }
+        if (code instanceof Code.And) {
+            Code.And and = (Code.And)code;
+            Object object = evaluate(and.lf);
             assert object instanceof scala.Boolean : object.getClass();
             boolean value = ((scala.Boolean)object).value;
             if (!value) return new Boolean(value);
-            return evaluate(rg);
-
-        case Null:
-            return null;
-
-        case Self:
-            return stack.self;
-
-        default:
-            throw Debug.abort("illegal code", code);
+            return evaluate(and.rg);
         }
+        if (code == Code.Null) {
+            return null;
+        }
+        if (code == Code.Self) {
+            return stack.self;
+        }
+        throw Debug.abort("illegal code", code);
     }
 
     //########################################################################
     // Private Methods - invoke
 
     private Object invoke(Object object, Function function, Object[] args) {
-        switch (function) {
-
-        case Global(CodePromise code):
-            return evaluate(code, object, args);
-
-        case Member(Symbol symbol):
-            return getScalaObject(object).invoke(object, symbol, args);
-
-        case Label(Symbol symbol):
-            throw new LabelException(symbol, args);
-
-        case JavaConstructor(Constructor constructor):
-            return invoke(object, constructor, args);
-
-        case JavaMethod(Method method):
-            return invoke(object, method, args);
-
-        case Pos:
+        if (function instanceof Function.Global) {
+            return evaluate(((Function.Global)function).code, object, args);
+        }
+        if (function instanceof Function.Member) {
+            return getScalaObject(object).invoke(object, ((Function.Member)function).symbol, args);
+        }
+        if (function instanceof Function.Label) {
+            throw new LabelException(((Function.Label)function).symbol, args);
+        }
+        if (function instanceof Function.JavaConstructor) {
+            return invoke(object, ((Function.JavaConstructor)function).constructor, args);
+        }
+        if (function instanceof Function.JavaMethod) {
+            return invoke(object, ((Function.JavaMethod)function).method, args);
+        }
+        if (function == Function.Pos) {
             if (object instanceof scala.Int) {
                 int value = ((scala.Int)object).value;
                 return new Integer(value);
@@ -285,8 +292,8 @@ public class Evaluator {
                 double value = ((scala.Double)object).value;
                 return new Double(value);
             }
-
-        case Neg:
+        }
+        if (function == Function.Neg) {
             if (object instanceof scala.Int) {
                 int value = ((scala.Int)object).value;
                 return new Integer(-value);
@@ -300,40 +307,38 @@ public class Evaluator {
                 double value = ((scala.Double)object).value;
                 return new Double(-value);
             }
-
-        case Throw:
+        }
+        if (function == Function.Throw) {
             assert args.length == 0 : Debug.show(args);
             assert object instanceof Throwable : object.getClass();
             return throw_((Throwable)object);
-
-        case StringPlus:
+        }
+        if (function == Function.StringPlus) {
             assert args.length == 1 : Debug.show(args);
             //assert object instanceof String : object.getClass().getName();
             return (String.valueOf(object)).concat(String.valueOf(args[0]));
-
-        case Eq:
+        }
+        if (function == Function.Eq) {
             assert args.length == 1 : Debug.show(args);
             return object == args[0] ? Boolean.TRUE : Boolean.FALSE;
-
-        case EqEq:
+        }
+        if (function == Function.EqEq) {
             assert args.length == 1 : Debug.show(args);
             return object == null ? new Boolean(args[0] == null) : new Boolean(object.equals(args[0])); // !!!
-
-        case BangEq:
+        }
+        if (function == Function.BangEq) {
             assert args.length == 1 : Debug.show(args);
             return object == null ? new Boolean(args[0] != null) : new Boolean(!object.equals(args[0])); // !!!
-
-        case HashCode:
+        }
+        if (function == Function.HashCode) {
             assert args.length == 0 : Debug.show(args);
             return new Integer(getScalaObject(object).hashCode());
-
-        case ToString:
+        }
+        if (function == Function.ToString) {
             assert args.length == 0 : Debug.show(args);
             return getScalaObject(object).toString();
-
-        default:
-            throw Debug.abort("illegal function", function);
         }
+        throw Debug.abort("illegal function", function);
     }
 
     private Object invoke(Object object, Constructor constructor,Object[]args){
@@ -391,29 +396,28 @@ public class Evaluator {
     // Private Methods - store
 
     private Object store(Object object, Variable variable, Object value) {
-        switch (variable) {
-
-        case Global(_):
+        if (variable instanceof Variable.Global) {
             return ((Variable.Global)variable).value = value;
-
-        case Module(_, _):
-            return ((Variable.Module)variable).value = value;
-
-        case Member(int index):
-            return getScalaObject(object).variables[index] = value;
-
-        case Argument(int index):
-            return stack.args[index] = value;
-
-        case Local(int index):
-            return stack.vars[index] = value;
-
-        case JavaField(Field field):
-            return store(object, field, value);
-
-        default:
-            throw Debug.abort("illegal variable", variable);
         }
+        if (variable instanceof Variable.Module) {
+            return ((Variable.Module)variable).value = value;
+        }
+        if (variable instanceof Variable.Member) {
+            int index = ((Variable.Member)variable).index;
+            return getScalaObject(object).variables[index] = value;
+        }
+        if (variable instanceof Variable.Argument) {
+            int index = ((Variable.Argument)variable).index;
+            return stack.args[index] = value;
+        }
+        if (variable instanceof Variable.Local) {
+            int index = ((Variable.Local)variable).index;
+            return stack.vars[index] = value;
+        }
+        if (variable instanceof Variable.JavaField) {
+            return store(object, ((Variable.JavaField)variable).field, value);
+        }
+        throw Debug.abort("illegal variable", variable);
     }
 
     private Object store(Object object, Field field, Object value) {
@@ -441,38 +445,39 @@ public class Evaluator {
     // Private Methods - load
 
     private Object load(Object object, Variable variable) {
-        switch (variable) {
-
-        case Global(Object value):
-            return value;
-
-        case Module(ScalaTemplate template, Object value):
-            if (value != null) return value;
-            value = evaluate(Code.Create(template));
-            ((Variable.Module)variable).template = null;
-            ((Variable.Module)variable).value = value;
+        if (variable instanceof Variable.Global) {
+            return ((Variable.Global)variable).value;
+        }
+        if (variable instanceof Variable.Module) {
+            Variable.Module module = (Variable.Module)variable;
+            if (module.value != null) return module.value;
+            ScalaTemplate template = module.template;
+            Object value = evaluate(Code.Create(template));
+            module.template = null;
+            module.value = value;
             Symbol clasz = template.getSymbol();
             Symbol initializer = clasz.lookup(Names.INITIALIZER);
             CodePromise promise = template.getMethod(initializer);
             assert promise != null: Debug.show(clasz, " - ", initializer);
             evaluate(promise, value, new Object[0]);
             return value;
-
-        case Member(int index):
-            return getScalaObject(object).variables[index];
-
-        case Argument(int index):
-            return stack.args[index];
-
-        case Local(int index):
-            return stack.vars[index];
-
-        case JavaField(Field field):
-            return load(object, field);
-
-        default:
-            throw Debug.abort("illegal variable", variable);
         }
+        if (variable instanceof Variable.Member) {
+            int index = ((Variable.Member)variable).index;
+            return getScalaObject(object).variables[index];
+        }
+        if (variable instanceof Variable.Argument) {
+            int index = ((Variable.Argument)variable).index;
+            return stack.args[index];
+        }
+        if (variable instanceof Variable.Local) {
+            int index = ((Variable.Local)variable).index;
+            return stack.vars[index];
+        }
+        if (variable instanceof Variable.JavaField) {
+            return load(object, ((Variable.JavaField)variable).field);
+        }
+        throw Debug.abort("illegal variable", variable);
     }
 
     private Object load(Object object, Field field) {
@@ -532,16 +537,16 @@ public class Evaluator {
 
     private boolean isInstanceOf(Object object, Type type, Class base) {
         Class clasz = object.getClass();
-        switch (type) {
-        case TypeRef(_, Symbol symbol, _):
+        if (type instanceof Type.TypeRef) {
+            Symbol symbol = ((Type.TypeRef)type).sym;
             Symbol scala = getScalaSymbol(object);
             if (scala != null) return scala.isSubClass(symbol);
             return base.isAssignableFrom(clasz);
-        case UnboxedArrayType(Type element):
-            return base.isAssignableFrom(clasz);
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        if (type instanceof Type.UnboxedArrayType) {
+            return base.isAssignableFrom(clasz);
+        }
+        throw Debug.abort("illegal case", type);
     }
 
     private String getClassNameOf(Object object) {
@@ -576,16 +581,16 @@ public class Evaluator {
     }
 
     private String getClassName(Type type) {
-        switch (type) {
-        case TypeRef(_, Symbol symbol, _):
-            return getClassName(symbol);
-        case UnboxedArrayType(Type element):
-            return getClassName(element) + "[]";
-        case UnboxedType(_):
-            return type.toString();
-        default:
-            throw Debug.abort("illegal case");
+        if (type instanceof Type.TypeRef) {
+            return getClassName(((Type.TypeRef)type).sym);
         }
+        if (type instanceof Type.UnboxedArrayType) {
+            return getClassName(((Type.UnboxedArrayType)type).elemtp) + "[]";
+        }
+        if (type instanceof Type.UnboxedType) {
+            return type.toString();
+        }
+        throw Debug.abort("illegal case");
     }
 
     private ClassCastException getCastException(Object object, Type type) {

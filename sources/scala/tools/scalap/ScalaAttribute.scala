@@ -81,7 +81,8 @@ class ScalaAttribute(in: ByteArrayReader) {
                 AliasSym(readSymInfo, in.nextNat)
             case CLASS_SYM =>
               val info = readSymInfo;
-              if (Flags.is(info.flags, Flags.OBJECT)) in.nextNat;
+              if (Flags.is(info.flags, Flags.OBJECT) && remainingRefs(end) > 2)
+                in.nextNat;
               ClassSym(info, in.nextNat, in.nextNat)
             case VAL_SYM =>
                 ValSym(readSymInfo, if (in.bp < end) in.nextNat else -1)
@@ -132,6 +133,17 @@ class ScalaAttribute(in: ByteArrayReader) {
 
     def readSymInfo: SymbolInfo =
         SymbolInfo(in.nextNat, in.nextNat, in.nextNat, in.nextNat);
+
+    def remainingRefs(end: Int): Int = {
+        val saved = in.bp;
+        var n = 0;
+        while (in.bp < end) {
+            in.nextNat;
+            n = n + 1;
+        }
+        in.bp = saved;
+        n
+    }
 
     def readRefs(end: Int): List[Int] = {
         var res = new ListBuffer[Int];

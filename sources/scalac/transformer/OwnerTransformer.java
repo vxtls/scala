@@ -14,7 +14,7 @@ import scalac.*;
 import scalac.util.*;
 import scalac.ast.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 
 /** A default transformer class which also maintains owner information
@@ -88,14 +88,21 @@ public class OwnerTransformer extends Transformer {
     }
 
     public Tree transform(Tree tree) {
-	switch(tree) {
-	case PackageDef(Tree packaged, Template impl):
+	if (tree instanceof PackageDef) {
+            PackageDef packageDef = (PackageDef)tree;
+            Tree packaged = packageDef.packaged;
+            Template impl = packageDef.impl;
 	    return copy.PackageDef(
 		tree,
                 transform(packaged),
                 transform(impl, packaged.symbol()));
-
-	case ClassDef(_, _, AbsTypeDef[] tparams, ValDef[][] vparams, Tree tpe, Template impl):
+        }
+	if (tree instanceof ClassDef) {
+            ClassDef classDef = (ClassDef)tree;
+            AbsTypeDef[] tparams = classDef.tparams;
+            ValDef[][] vparams = classDef.vparams;
+            Tree tpe = classDef.tpe;
+            Template impl = classDef.impl;
             Symbol symbol = tree.symbol();
 	    return copy.ClassDef(
 		tree, symbol,
@@ -103,15 +110,23 @@ public class OwnerTransformer extends Transformer {
 		transform(vparams, symbol.primaryConstructor()),
 		transform(tpe, symbol),
 		transform(impl, symbol));
-
-	case ModuleDef(_, _, Tree tpe, Template impl):
+        }
+	if (tree instanceof ModuleDef) {
+            ModuleDef moduleDef = (ModuleDef)tree;
+            Tree tpe = moduleDef.tpe;
+            Template impl = moduleDef.impl;
             Symbol symbol = tree.symbol();
 	    return copy.ModuleDef(
 		tree, symbol,
                 transform(tpe, symbol),
 		transform(impl, symbol.moduleClass()));
-
-	case DefDef(_, _, AbsTypeDef[] tparams, ValDef[][] vparams, Tree tpe, Tree rhs):
+        }
+	if (tree instanceof DefDef) {
+            DefDef defDef = (DefDef)tree;
+            AbsTypeDef[] tparams = defDef.tparams;
+            ValDef[][] vparams = defDef.vparams;
+            Tree tpe = defDef.tpe;
+            Tree rhs = defDef.rhs;
             Symbol symbol = tree.symbol();
 	    return copy.DefDef(
 		tree, symbol,
@@ -119,30 +134,37 @@ public class OwnerTransformer extends Transformer {
 		transform(vparams, symbol),
 		transform(tpe, symbol),
 		transform(rhs, symbol));
-
-	case ValDef(_, _, Tree tpe, Tree rhs):
+        }
+	if (tree instanceof ValDef) {
+            ValDef valDef = (ValDef)tree;
+            Tree tpe = valDef.tpe;
+            Tree rhs = valDef.rhs;
             Symbol symbol = tree.symbol();
 	    return copy.ValDef(
 		tree, symbol,
                 transform(tpe),
 		transform(rhs, symbol));
-
-	case AbsTypeDef(int mods, Name name, Tree rhs, Tree lobound):
+        }
+	if (tree instanceof AbsTypeDef) {
+            AbsTypeDef absTypeDef = (AbsTypeDef)tree;
+            Tree rhs = absTypeDef.rhs;
+            Tree lobound = absTypeDef.lobound;
 	    Symbol symbol = tree.symbol();
 	    return copy.AbsTypeDef(
 		tree, symbol,
 		transform(rhs, symbol),
 		transform(lobound, symbol));
-
-	case AliasTypeDef(int mods, Name name, AbsTypeDef[] tparams, Tree rhs):
+        }
+	if (tree instanceof AliasTypeDef) {
+            AliasTypeDef aliasTypeDef = (AliasTypeDef)tree;
+            AbsTypeDef[] tparams = aliasTypeDef.tparams;
+            Tree rhs = aliasTypeDef.rhs;
 	    Symbol symbol = tree.symbol();
 	    return copy.AliasTypeDef(
 		tree, symbol,
 		transform(tparams, symbol),
 		transform(rhs, symbol));
-
-	default:
-	    return super.transform(tree);
 	}
+	return super.transform(tree);
     }
 }

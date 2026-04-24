@@ -27,7 +27,7 @@ import scalac.util.NameTransformer;
 /**
  * This class provides methods to print symbols and types.
  */
-public abstract class MySymbolTablePrinter extends SymbolTablePrinter {
+abstract class MySymbolTablePrinter extends SymbolTablePrinter {
 
     //########################################################################
     // Private Fields

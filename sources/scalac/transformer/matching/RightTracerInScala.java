@@ -7,12 +7,12 @@ package scalac.transformer.matching ;
 import scalac.*;
 import scalac.ast.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 import scalac.transformer.TransMatch.Matcher ;
 
 import java.util.* ;
-import Scope.SymbolIterator;
+import scalac.symtab.Scope.SymbolIterator;
 
 import scalac.util.Name ;
 import scalac.util.Names ;
@@ -219,8 +219,8 @@ public class RightTracerInScala extends TracerInScala  {
     }
 
     Tree currentMatches( Label label ) {
-        switch( label ) {
-        case Pair( Integer target, Label theLab ):
+        if (label instanceof Label.Pair) {
+            Integer target = ((Label.Pair)label).state;
             return cf.Equals( gen.mkIntLit( cf.pos, target.intValue() ),
                               current() );
         }
@@ -377,17 +377,15 @@ System.out.println("RightTracerInScala - the seqVars"+seqVars);
 
         //System.out.println("delta("+i+","+label+")" );
         Label theLab = null;
-        switch(label) {
-        case Label.Pair( Integer state, Label lab2 ):
+        if (label instanceof Label.Pair) {
+            Label lab2 = ((Label.Pair)label).lab;
             //assert ntarget == state;
             theLab = lab2;
-            switch( lab2 ) {
-            case TreeLabel( Tree pat ):
+            if (lab2 instanceof Label.TreeLabel) {
+                Tree pat = ((Label.TreeLabel)lab2).pat;
                 algMatchTree = _cur_match( pat );
-                break;
             }
-            break;
-        case DefaultLabel:
+        } else if (label == Label.DefaultLabel) {
             throw new ApplicationError(); // should not happen
         }
         assert dfa.qbinders != null : "qbinders ?";

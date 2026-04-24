@@ -100,11 +100,14 @@ public class ExpandMixinsPhase extends Phase {
 
     /** Applies this phase to the given type for the given symbol. */
     public Type transformInfo(Symbol symbol, Type type) {
+        Symbol s = symbol;
         while (true) {
             if (symbol.isJava()) return type;
+            if (symbol.isPackage()) return type;
             if (symbol.isInterface()) return type;
             if (symbol.isCompoundSym()) return type; // !!! check
             if (symbol.isClass()) {
+                // !!! System.out.println(Debug.show("!!! ", s, " -> ", symbol, " - ", getTypeExpander(symbol).clasz, " : " + type));
                 return getTypeExpander(symbol).apply(type);
             }
             symbol = symbol.isConstructor()
@@ -122,14 +125,15 @@ public class ExpandMixinsPhase extends Phase {
     /** A tree traverser that collects class definitions. */
     private class TreeCollector extends Traverser {
         public void traverse(Tree tree) {
-            switch(tree) {
-            case ClassDef(_, _, _, _, _, Template(_, Tree[] body)):
+            if (tree instanceof Tree.ClassDef) {
+                Tree[] body = ((Tree.ClassDef)tree).impl.body;
                 Symbol clasz = tree.symbol();
                 if (!clasz.isInterface()) bodies.put(clasz, body);
                 traverse(body);
                 return;
-            case PackageDef(_, Template(_, Tree[] body)):
-                traverse(body);
+            }
+            if (tree instanceof Tree.PackageDef) {
+                traverse(((Tree.PackageDef)tree).impl.body);
                 return;
             }
         }
@@ -155,14 +159,12 @@ public class ExpandMixinsPhase extends Phase {
             }
         }
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case ClassDef(_, _, _, _, _, _):
+            if (tree instanceof Tree.ClassDef) {
                 Symbol clasz = tree.symbol();
                 if (clasz.isInterface()) return super.transform(tree);
                 return gen.ClassDef(clasz, getExpandedBody(clasz));
-            default:
-                return super.transform(tree);
             }
+            return super.transform(tree);
         }
     }
 
@@ -192,8 +194,8 @@ public class ExpandMixinsPhase extends Phase {
             this.supertype = clasz.nextInfo().parents()[0];
         }
         public Symbol getSymbolFor(Tree tree) {
-            switch (tree) {
-            case Select(Super(_, _), _):
+            if (tree instanceof Tree.Select
+                && ((Tree.Select)tree).qualifier instanceof Tree.Super) {
                 if (tree.symbol().isInitializer()) return tree.symbol(); // !!!
                 assert supertype.symbol().isSubClass(tree.symbol().owner()):
                     tree + " -- " + Debug.show(clasz);
@@ -202,24 +204,27 @@ public class ExpandMixinsPhase extends Phase {
                 global.prevPhase();
                 assert !symbol.isNone(): tree + " -- " + Debug.show(clasz);
                 return symbol;
-            case Super(_, _):
-            case This(_):
-                return clasz;
-            default:
-                return super.getSymbolFor(tree);
             }
+            if (tree instanceof Tree.Super || tree instanceof Tree.This) {
+                return clasz;
+            }
+            return super.getSymbolFor(tree);
         }
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case DefDef(_, _, _, _, _, _):
+            if (tree instanceof Tree.DefDef) {
                 if (getSymbolFor(tree).isInitializer()) initializer = true;
                 tree = super.transform(tree);
                 initializer = false;
                 return tree;
-            case Apply(Select(Super(_, _), _), _):
-                if (TreeInfo.methSymbol(tree).isInitializer() && !initializer)
+            }
+            if (tree instanceof Tree.Apply) {
+                Tree.Apply apply = (Tree.Apply)tree;
+                if (apply.fun instanceof Tree.Select
+                    && ((Tree.Select)apply.fun).qualifier instanceof Tree.Super
+                    && TreeInfo.methSymbol(tree).isInitializer()
+                    && !initializer) {
                     return Tree.Empty;
-                break;
+                }
             }
             if (tree.hasSymbol() && tree.symbol().isParameter()) {
                 Symbol symbol = getSymbolFor(tree);
@@ -283,16 +288,15 @@ public class ExpandMixinsPhase extends Phase {
             throw Debug.abort(Debug.show(member, " -- ", clasz));
         }
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case Select(Super(_, _), _):
+            if (tree instanceof Tree.Select
+                && ((Tree.Select)tree).qualifier instanceof Tree.Super) {
                 Symbol symbol = getSuperMember(tree.symbol());
                 Tree qualifier = symbol.owner() == clasz
                     ? gen.This(tree.pos, clasz)
                     : gen.Super(tree.pos, clasz);
                 return gen.Select(tree.pos, qualifier, symbol);
-            default:
-                return super.transform(tree);
             }
+            return super.transform(tree);
         }
     }
 
@@ -368,8 +372,10 @@ public class ExpandMixinsPhase extends Phase {
             if (parents.length > 0) parents[0].symbol().nextInfo(); // force
             assert Debug.log("expanding type ", clasz);
             for (int i = parents.length - 1; 0 < i; i--) {
-                switch (parents[i]) {
-                case TypeRef(Type prefix, Symbol mixin, Type[] args):
+                if (parents[i] instanceof Type.TypeRef) {
+                    Type.TypeRef typeRef = (Type.TypeRef)parents[i];
+                    Symbol mixin = typeRef.sym;
+                    Type[] args = typeRef.args;
                     if (mixin.isInterface()) continue;
                     mixin.nextInfo(); // force
                     assert Debug.log("expanding type ", clasz, ": inlining ", mixin);
@@ -412,18 +418,30 @@ public class ExpandMixinsPhase extends Phase {
 
 
         public Type apply(Type type) {
-            switch (type) {
-            case TypeRef(Type prefix, Symbol symbol, Type[] args):
+            if (type instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)type;
+                Symbol symbol = typeRef.sym;
                 Type inline = (Type)inlines.get(symbol);
                 if (inline != null) return inline;
                 return map(type);
-            case SingleType(Type prefix, Symbol symbol):
+            }
+            if (type instanceof Type.SingleType) {
+                Type.SingleType singleType = (Type.SingleType)type;
+                Type prefix = singleType.pre;
+                Symbol symbol = singleType.sym;
                 Symbol clone = (Symbol)cloner.clones.get(symbol);
                 prefix = apply(prefix);
                 return Type.singleType(prefix, clone != null ? clone : symbol);
-            case ThisType(_):
+            }
+            if (type instanceof Type.ThisType) {
+                Symbol symbol = ((Type.ThisType)type).sym;
+                if (symbol.isNone()) return type;
                 return clasz.thisType();
-            case CompoundType(Type[] parents, Scope members):
+            }
+            if (type instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)type;
+                Type[] parents = compoundType.parts;
+                Scope members = compoundType.members;
                 if (type.symbol() != clasz) return map(type);
                 if (parents.length <= 1) return type;
                 Symbol iface = (Symbol)interfaces.get(clasz);
@@ -450,9 +468,8 @@ public class ExpandMixinsPhase extends Phase {
                 }
                 parents = new Type[] {parents[0], parents[parents.length - 1]};
                 return Type.compoundType(parents, members, clasz);
-            default:
-                return map(type);
             }
+            return map(type);
         }
 
     }
