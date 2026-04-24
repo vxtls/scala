@@ -730,7 +730,7 @@ class Infer(global: scalac_Global, gen: TreeGen, make: TreeFactory) extends scal
       case Type$PolyType(tparams, restype) if tparams.length == 0 =>
 	restype.isSubType(pt)
       case _ =>
-	false
+	tp.isSubType(pt)
     }
     val tp1 = normalize(tp);
     if (tp1.isSubType(pt)) true
@@ -743,10 +743,27 @@ class Infer(global: scalac_Global, gen: TreeGen, make: TreeFactory) extends scal
       if (!viewMeths.isEmpty) true
       // todo: remove
       else {
-	val coerceMeth: Symbol = tp1.lookup(Names.coerce);
+	val coerceMeth: Symbol = coerceMethod(tp1, pt);
         coerceMeth.kind != NONE && canView(tp1.memberType(coerceMeth));
       }
     } else false;
+  }
+
+  def coerceMethod(from: Type, to: Type): Symbol = {
+    val name = coerceName(to);
+    val coerceMeth = from.lookup(name);
+    if (coerceMeth != Symbol.NONE || name == Names.coerce) coerceMeth
+    else from.lookup(Names.coerce)
+  }
+
+  private def coerceName(to: Type): Name = {
+    val toSym = to.deconst().symbol();
+    if (toSym == definitions.DOUBLE_CLASS) Names.coerceToDouble
+    else if (toSym == definitions.FLOAT_CLASS) Names.coerceToFloat
+    else if (toSym == definitions.LONG_CLASS) Names.coerceToLong
+    else if (toSym == definitions.INT_CLASS) Names.coerceToInt
+    else if (toSym == definitions.SHORT_CLASS) Names.coerceToShort
+    else Names.coerce
   }
 
   def isCompatible(tps: Array[Type], pts: Array[Type]): boolean =
@@ -1322,4 +1339,3 @@ class Infer(global: scalac_Global, gen: TreeGen, make: TreeFactory) extends scal
   }
 }
 }
-

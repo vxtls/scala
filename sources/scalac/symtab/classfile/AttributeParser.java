@@ -116,15 +116,17 @@ public class AttributeParser implements ClassfileConstants {
                 //System.out.println(sym + " has " + n + " innerclass entries");
                 for (int i = 0; i < n; i++) {
                     int inner = in.nextChar();
-                    if (inner == 0) { in.skip(6); return; }
                     int outer = in.nextChar();
-                    if (outer == 0) { in.skip(4); return; }
                     int name = in.nextChar();
-                    if (name == 0) { in.skip(2); return; }
                     int flags = in.nextChar();
-                    if ((flags & JAVA_ACC_STATIC) == 0) return;
-                    if ((flags & (JAVA_ACC_PUBLIC | JAVA_ACC_PROTECTED)) == 0) return;
-                    if (pool.getClass(outer) != sym) return;
+                    if (inner == 0 || outer == 0 || name == 0)
+                        continue;
+                    if ((flags & JAVA_ACC_STATIC) == 0)
+                        continue;
+                    if ((flags & (JAVA_ACC_PUBLIC | JAVA_ACC_PROTECTED)) == 0)
+                        continue;
+                    if (pool.getClass(outer) != sym)
+                        continue;
                     Symbol alias = sym.linkedModule().moduleClass().newTypeAlias(
                         Position.NOPOS,
                         0,
@@ -164,12 +166,13 @@ public class AttributeParser implements ClassfileConstants {
                 return;
             case CONSTANT_VALUE_ATTR:
             	AConstant constant = pool.getConstantValue(in.nextChar());
-                switch (constant) {
-                case INT(int value):
+                if (constant instanceof AConstant.INT) {
+                    int value = ((AConstant.INT)constant).value;
                     Definitions definitions = parser.global.definitions;
                     Symbol base = sym.getType().symbol();
-                    if (base == definitions.INT_CLASS) break;
-                    if (base == definitions.CHAR_CLASS)
+                    if (base == definitions.INT_CLASS) {
+                        // keep the constant unchanged
+                    } else if (base == definitions.CHAR_CLASS)
                         constant = AConstant.CHAR((char)value);
                     else if (base == definitions.SHORT_CLASS)
                         constant = AConstant.SHORT((short)value);
@@ -310,14 +313,14 @@ public class AttributeParser implements ClassfileConstants {
                     Type clazztype = Type.appliedType(
                         parser.ctype, Symbol.type(smbls));
                     Symbol constr = parser.c.primaryConstructor();
-                    switch (constr.rawInfo()) {
-                    case MethodType(Symbol[] vparams, _):
+                    Type rawInfo = constr.rawInfo();
+                    if (rawInfo instanceof Type.MethodType) {
+                        Symbol[] vparams = ((Type.MethodType)rawInfo).vparams;
                         constr.setInfo(
                             Type.PolyType(
                                 smbls, Type.MethodType(vparams, clazztype)));
-                        break;
-                    default:
-                        throw new ApplicationError(constr.rawInfo());
+                    } else {
+                        throw new ApplicationError(rawInfo);
                     }
                 } catch (NoSuchElementException e) {
                 }
@@ -329,8 +332,8 @@ public class AttributeParser implements ClassfileConstants {
                     nextToken();
                     basetpes.add(parseType());
                 } while (token.equals("with"));
-                switch (defaultType) {
-                    case CompoundType(_, Scope scope):
+                if (defaultType instanceof Type.CompoundType) {
+                    Scope scope = ((Type.CompoundType)defaultType).members;
                         res = Type.compoundType(
                             (Type[])basetpes.toArray(new Type[basetpes.size()]),
                             scope,

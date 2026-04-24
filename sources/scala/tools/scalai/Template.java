@@ -11,29 +11,49 @@ package scala.tools.scalai;
 
 import scalac.util.Debug;
 
-public class Template {
+public abstract class Template {
 
     //########################################################################
     // Public Cases
 
-    public case Global(ScalaTemplate template);
-    public case JavaClass(Class clasz);
+    public static final class Global extends Template {
+        public final ScalaTemplate template;
+
+        private Global(ScalaTemplate template) {
+            this.template = template;
+        }
+    }
+
+    public static final class JavaClass extends Template {
+        public final Class clasz;
+
+        private JavaClass(Class clasz) {
+            this.clasz = clasz;
+        }
+    }
+
+    //########################################################################
+    // Public Factory Methods
+
+    public static Global Global(ScalaTemplate template) {
+        return new Global(template);
+    }
+
+    public static JavaClass JavaClass(Class clasz) {
+        return new JavaClass(clasz);
+    }
 
     //########################################################################
     // Public Methods
 
     public String toString() {
-        switch (this) {
-
-        case Global(ScalaTemplate template):
-            return "Global(" + template + ")";
-
-        case JavaClass(Class clasz):
-            return "JavaClass(" + clasz + ")";
-
-        default:
-            throw Debug.abort("unknown case", this);
+        if (this instanceof Global) {
+            return "Global(" + ((Global)this).template + ")";
         }
+        if (this instanceof JavaClass) {
+            return "JavaClass(" + ((JavaClass)this).clasz + ")";
+        }
+        throw Debug.abort("unknown case", this);
     }
 
     //########################################################################

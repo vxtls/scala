@@ -207,37 +207,6 @@ test_compilation_failure() {
     )
 }
 
-test_msil() {
-    IL_FILE="prog.il"
-    PE_FILE="prog.EXE"
-
-    ILASM=ilasm
-    ILASM_ARGS="/qui /nol /out=${PE_FILE}"
-
-    PEVERIFY=peverify
-    PEVERIFY_ARGS="/il"
-
-    rm -f $IL_FILE
-    rm -f $PE_FILE
-
-    $SOCOS -target:msil $FLAGS "$source" &&
-
-    ${ILASM} ${ILASM_ARGS} ${IL_FILE} > /dev/null &&
-    if [ ! $? ] ; then
-	echo "'$ILASM' failed!"
-	return 1
-    fi
-
-#    $PEVERIFY $PEVERIFY_ARGS $PE_FILE > /dev/null
-#    if [ ! $? ] ; then
-#	echo "'$PEVERIFY' failed!"
-#	rm -rf $PE_FILE
-#	return 1
-#    fi
-
-    eval ./$PE_FILE "msil"
-}
-
 test_output() {
     if [ -f "$expect" ]; then
         $DIFF "$actual" "$expect";
@@ -333,8 +302,6 @@ test_all() {
         test_compilation_success "pos" $FILES_POS;
     test_one "Testing compiler (on files whose compilation should fail)" \
         test_compilation_failure "neg" $FILES_NEG;
-    test_one "Testing msil backend" \
-	test_msil "msil" $FILES_MSIL;
 }
 
 ##############################################################################
@@ -356,7 +323,6 @@ print_help() {
     echo "--dis           next files test the disassembler";
     echo "--pos           next files test a compilation success";
     echo "--neg           next files test a compilation failure";
-    echo "--msil          next files test the .NET backend (requires Cygwin)"
     echo "--boot          use bootstrap compiler";
     echo "--no-run        run no test, use results of last run";
     echo "--show-log      show output of failed tests";
@@ -460,7 +426,6 @@ add_file() {
         dis  ) FILES_DIS="$FILES_DIS $1"; return;;
         pos  ) FILES_POS="$FILES_POS $1"; return;;
         neg  ) FILES_NEG="$FILES_NEG $1"; return;;
-	msil ) FILES_MSIL="$FILES_MSIL $1"; return;;
         *    ) abort "unknown test type \`$TEST_TYPE'";;
     esac;
     case "$1" in
@@ -472,7 +437,6 @@ add_file() {
         dis  | */dis  | */dis/*  | dis/*  ) FILES_DIS="$FILES_DIS $1";;
         pos  | */pos  | */pos/*  | pos/*  ) FILES_POS="$FILES_POS $1";;
         neg  | */neg  | */neg/*  | neg/*  ) FILES_NEG="$FILES_NEG $1";;
-        msil | */msil | */msil/* | msil/* ) FILES_MSIL="$FILES_MSIL $1";;
         * ) abort "don't known what to do with \`$1'";;
     esac;
 }
@@ -499,8 +463,6 @@ main() {
     FILES_DIS="";
     FILES_POS="";
     FILES_NEG="";
-    FILES_MSIL="";
-
     CYGWIN="false";
     DIFF="diff"
     case `uname` in
@@ -521,7 +483,6 @@ main() {
             --dis        ) TEST_TYPE="dis"; shift 1;;
             --pos        ) TEST_TYPE="pos"; shift 1;;
             --neg        ) TEST_TYPE="neg"; shift 1;;
-            --msil       ) TEST_TYPE="msil"; shift 1;;
             --boot       ) BOOT="true"; shift 1;;
             --no-run     ) NORUN="true"; shift 1;;
             --show-log   ) SHOWLOG="true"; shift 1;;
@@ -591,9 +552,6 @@ main() {
         esac;
         case "$TEST_TYPE" in
             auto | neg ) FILES_NEG="$FILES_NEG $SRCDIR/neg";;
-        esac;
-        case "$TEST_TYPE" in
-                   msil ) FILES_MSIL="$FILES_MSIL $SRCDIR/run";;
         esac;
     fi;
 

@@ -13,7 +13,6 @@ package scala;
 public abstract class Double  extends AnyVal {
 
     public final double  value;
-
     public Double (double  value) {
         this.value = value;
     }

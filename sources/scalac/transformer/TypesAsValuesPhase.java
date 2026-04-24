@@ -166,9 +166,13 @@ public class TypesAsValuesPhase extends Phase {
         } else if (type.typeParams().length > 0 && !isPrimitive(symbol)) {
             // Polymorphic method/constructor:
             // - add a value parameter for every type parameter.
-            switch (type) {
-            case PolyType(Symbol[] tparams, // :
-                          Type.MethodType(Symbol[] vparams, Type result)):
+            if (type instanceof Type.PolyType) {
+                Type.PolyType polyType = (Type.PolyType)type;
+                if (polyType.result instanceof Type.MethodType) {
+                    Symbol[] tparams = polyType.tparams;
+                    Type.MethodType methodType = (Type.MethodType)polyType.result;
+                    Symbol[] vparams = methodType.vparams;
+                    Type result = methodType.result;
                 HashMap newVParams = typeParams(symbol);
                 Symbol[] allVParams =
                     new Symbol[newVParams.size() + vparams.length];
@@ -182,10 +186,9 @@ public class TypesAsValuesPhase extends Phase {
                 return new Type.PolyType(tparams,
                                          new Type.MethodType(allVParams,
                                                              result));
-
-            default:
-                throw Debug.abort("unexpected type: ", type);
+                }
             }
+            throw Debug.abort("unexpected type: ", type);
         } else
             return type;
     }
@@ -206,13 +209,9 @@ public class TypesAsValuesPhase extends Phase {
         }
 
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case ClassDef(int mods, //:
-                          Name name,
-                          Tree.AbsTypeDef[] tparams,
-                          Tree.ValDef[][] vparams,
-                          Tree tpe,
-                          Tree.Template impl):
+            if (tree instanceof Tree.ClassDef) {
+                Tree.ClassDef classDef = (Tree.ClassDef)tree;
+                Tree.Template impl = classDef.impl;
                 Symbol sym = tree.symbol();
                 Tree[] newBody = transform(impl.body, impl.symbol());
 
@@ -242,46 +241,61 @@ public class TypesAsValuesPhase extends Phase {
                                     transform(impl.parents),
                                     impl.symbol(),
                                     finalBody);
-
-            case DefDef(_, _, _, _, _, Tree rhs):
+            } else if (tree instanceof Tree.DefDef) {
+                Tree.DefDef defDef = (Tree.DefDef)tree;
                 Symbol symbol = getSymbolFor(tree);
-                return gen.DefDef(symbol, transform(rhs, symbol));
-
-            case ValDef(_, _, Tree tpe, Literal(AConstant.ZERO)):
+                return gen.DefDef(symbol, transform(defDef.rhs, symbol));
+            } else if (tree instanceof Tree.ValDef) {
+                Tree.ValDef valDef = (Tree.ValDef)tree;
+                Symbol symbol = getSymbolFor(tree);
+                if (valDef.rhs instanceof Tree.Literal
+                    && ((Tree.Literal)valDef.rhs).value == AConstant.ZERO) {
                 // transform default values:
                 //   val x: T = _
                 // becomes
                 //   val x: T = asValue(T).defaultValue()
-                Symbol symbol = getSymbolFor(tree);
                 Tree defaultValue =
                     gen.mkRef(tree.pos,
-                              typeAsValue(tree.pos, tpe.type, currentOwner),
+                              typeAsValue(tree.pos, valDef.tpe.type, currentOwner),
                               defs.TYPE_DEFAULTVALUE());
                 Tree rhs = gen.mkApply__(tree.pos, defaultValue);
                 return gen.ValDef(symbol, rhs);
-
-            case ValDef(_, _, _, Tree rhs):
-                Symbol symbol = getSymbolFor(tree);
-                return gen.ValDef(symbol, transform(rhs, symbol));
-
-            case New(Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs)):
-                if (fun.symbol() == ARRAY_CONSTRUCTOR) {
-                    // Transform array creations:
-                    //   new Array[T](size)
-                    // becomes
-                    //   asValue(T).newArray[T](size)
-                    assert targs.length == 1;
-                    assert vargs.length == 1;
-                    Tree newArrayfun = gen.mkRef(tree.pos,
-                                                 typeAsValue(targs[0].pos,
-                                                             targs[0].type,
-                                                             currentOwner),
-                                                 defs.TYPE_NEWARRAY());
-                    return gen.mkApplyTV(newArrayfun, targs, vargs);
-                } else
-                    return super.transform(tree);
-
-            case Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs):
+                }
+                return gen.ValDef(symbol, transform(valDef.rhs, symbol));
+            } else if (tree instanceof Tree.New) {
+                Tree init = ((Tree.New)tree).init;
+                if (init instanceof Tree.Apply) {
+                    Tree.Apply initApply = (Tree.Apply)init;
+                    if (initApply.fun instanceof Tree.TypeApply) {
+                        Tree.TypeApply initTypeApply = (Tree.TypeApply)initApply.fun;
+                        Tree fun = initTypeApply.fun;
+                        Tree[] targs = initTypeApply.args;
+                        Tree[] vargs = initApply.args;
+                    if (fun.symbol() == ARRAY_CONSTRUCTOR) {
+                        // Transform array creations:
+                        //   new Array[T](size)
+                        // becomes
+                        //   asValue(T).newArray[T](size)
+                        assert targs.length == 1;
+                        assert vargs.length == 1;
+                        Tree newArrayfun = gen.mkRef(tree.pos,
+                                                     typeAsValue(targs[0].pos,
+                                                                 targs[0].type,
+                                                                 currentOwner),
+                                                     defs.TYPE_NEWARRAY());
+                        return gen.mkApplyTV(newArrayfun, targs, vargs);
+                    } else
+                        return super.transform(tree);
+                    }
+                }
+                return super.transform(tree);
+            } else if (tree instanceof Tree.Apply
+                       && ((Tree.Apply)tree).fun instanceof Tree.TypeApply) {
+                Tree.Apply apply = (Tree.Apply)tree;
+                Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+                Tree fun = typeApply.fun;
+                Tree[] targs = typeApply.args;
+                Tree[] vargs = apply.args;
                 Symbol funSym = fun.symbol();
 
                 if (funSym == defs.ANY_IS) {
@@ -336,10 +350,8 @@ public class TypesAsValuesPhase extends Phase {
                                          targs,
                                          finalVArgs);
                 }
-
-            default:
-                return super.transform(tree);
             }
+            return super.transform(tree);
         }
 
         private Tree transform(Tree tree, Symbol currentOwner) {
@@ -364,29 +376,30 @@ public class TypesAsValuesPhase extends Phase {
          * information.
          */
         private boolean isTrivialType(Type tp) {
-            switch (tp) {
-            case ConstantType(Type base, _):
-                return isTrivialType(base);
-            case TypeRef(_, Symbol sym, Type[] args):
-                return sym.isStatic() && args.length == 0;
-            case SingleType(_, _):
-            case ThisType(_):   // TODO check
-            case CompoundType(_, _): // TODO check
+            if (tp instanceof Type.ConstantType) {
+                return isTrivialType(((Type.ConstantType)tp).base);
+            } else if (tp instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tp;
+                return typeRef.sym.isStatic() && typeRef.args.length == 0;
+            } else if (tp instanceof Type.SingleType
+                       || tp instanceof Type.ThisType
+                       || tp instanceof Type.CompoundType) {
                 return false;
-            default:
-                throw Debug.abort("unexpected type", tp);
             }
+            throw Debug.abort("unexpected type", tp);
         }
 
         /**
          * Transform a type into a tree representing it.
          */
         private Tree typeAsValue(int pos, Type tp, Symbol owner) {
-            switch (tp) {
-            case ConstantType(Type base, _):
-                return typeAsValue(pos, base, owner);
-
-            case TypeRef(Type pre, Symbol sym, Type[] args): {
+            if (tp instanceof Type.ConstantType) {
+                return typeAsValue(pos, ((Type.ConstantType)tp).base, owner);
+            } else if (tp instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tp;
+                Type pre = typeRef.pre;
+                Symbol sym = typeRef.sym;
+                Type[] args = typeRef.args;
                 Symbol symOwner = sym.owner();
 
                 if (basicTypes.containsKey(sym)) {
@@ -417,48 +430,47 @@ public class TypesAsValuesPhase extends Phase {
                                                                  typeConstr),
                                                  ctorArgs));
                 }
-            }
-
-            case SingleType(Type pre, Symbol sym): {
+            } else if (tp instanceof Type.SingleType) {
+                Type.SingleType singleType = (Type.SingleType)tp;
+                Type pre = singleType.pre;
+                Symbol sym = singleType.sym;
                 Tree constr =
                     gen.mkPrimaryConstructorGlobalRef(pos, singleTypeClass);
                 Tree[] args = new Tree[] { gen.mkRef(pos, pre, sym) };
                 return gen.New(pos, gen.mkApply_V(constr, args));
             }
-
-            default:
-                throw global.fail("unexpected type: ", tp);
-            }
+            throw global.fail("unexpected type: ", tp);
         }
 
         /**
          * Extract qualifier from a tree, which must be a Select node.
          */
         private Tree extractQualifier(Tree tree) {
-            switch (tree) {
-            case Select(Tree qualifier, _): return qualifier;
-            default: throw Debug.abort("cannot extract qualifier from ", tree);
-            }
+            if (tree instanceof Tree.Select)
+                return ((Tree.Select)tree).qualifier;
+            throw Debug.abort("cannot extract qualifier from ", tree);
         }
 
         /**
          * Transform a prefix into a tree representing it.
          */
         private Tree prefixAsValue(int pos, Type pre) {
-            switch (pre) {
-            case ThisType(Symbol clazz):
+            if (pre instanceof Type.ThisType) {
+                Symbol clazz = ((Type.ThisType)pre).sym;
                 if (clazz.isPackage() || clazz.isNone())
                     return gen.mkNullLit(pos);
                 else
                     return gen.This(pos, clazz);
-            case SingleType(Type prefix, Symbol member):
+            } else if (pre instanceof Type.SingleType) {
+                Type.SingleType singleType = (Type.SingleType)pre;
+                Type prefix = singleType.pre;
+                Symbol member = singleType.sym;
                 return gen.mkApply__(pos,
                                      gen.mkRef(pos,
                                                prefixAsValue(pos, prefix),
                                                member));
-            default:
-                throw Debug.abort("unexpected prefix", pre);
             }
+            throw Debug.abort("unexpected prefix", pre);
         }
     }
 }

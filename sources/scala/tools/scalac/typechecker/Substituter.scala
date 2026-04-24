@@ -38,8 +38,10 @@ class Substituter(global: scalac_Global, gen: TreeGen) extends Transformer(globa
       t match {
 	case Type$PolyType(tparams1: Array[Symbol], restp: Type) =>
 	  if (tparams1.length == tparams.length && tparams1(0) == tparams(0)) {
-	    for (val i <- Iterator.range(1, tparams.length))
+	    { var i = 1; while (i < tparams.length) {
 	      assert(tparams1(i) == tparams(i));
+	      i = i + 1
+	    }}
 	    return apply(restp);
 	  }
 	case _ =>
@@ -77,9 +79,11 @@ class Substituter(global: scalac_Global, gen: TreeGen) extends Transformer(globa
 	  case Type$PolyType(tparams1, _) =>
 	    if (tparams1.length == tparams.length && tparams1(0) == tparams(0) && targs.length == tparams.length) {
 	      proceed = false;
-	      for (val i <- Iterator.range(0, tparams.length))
+	      { var i = 0; while (i < tparams.length) {
 		if (!typeSubstituter.matches(targs(i).getType().symbol(), tparams(i)))
 		  proceed = true;
+		i = i + 1
+	      }}
 	    }
 	  case _ =>
 	}

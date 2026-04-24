@@ -120,52 +120,52 @@ public abstract class RunTime {
 
     /** @meta method (scala.Array[scala.Boolean]) scala.Array[scala.Boolean];*/
     public static Array   box_zarray(boolean[] xs) {
-	return new ZArray(xs);
+	return xs == null ? null : new ZArray(xs);
     }
 
     /** @meta method (scala.Array[scala.Byte]) scala.Array[scala.Byte]; */
     public static Array   box_barray(byte   [] xs) {
-	return new BArray(xs);
+	return xs == null ? null : new BArray(xs);
     }
 
     /** @meta method (scala.Array[scala.Short]) scala.Array[scala.Short]; */
     public static Array   box_sarray(short  [] xs) {
-	return new SArray(xs);
+	return xs == null ? null : new SArray(xs);
     }
 
     /** @meta method (scala.Array[scala.Char]) scala.Array[scala.Char]; */
     public static Array   box_carray(char   [] xs) {
-	return new CArray(xs);
+	return xs == null ? null : new CArray(xs);
     }
 
     /** @meta method (scala.Array[scala.Int]) scala.Array[scala.Int]; */
     public static Array   box_iarray(int    [] xs) {
-	return new IArray(xs);
+	return xs == null ? null : new IArray(xs);
     }
 
     /** @meta method (scala.Array[scala.Long]) scala.Array[scala.Long]; */
     public static Array   box_larray(long   [] xs) {
-	return new LArray(xs);
+	return xs == null ? null : new LArray(xs);
     }
 
     /** @meta method (scala.Array[scala.Float]) scala.Array[scala.Float]; */
     public static Array   box_farray(float  [] xs) {
-	return new FArray(xs);
+	return xs == null ? null : new FArray(xs);
     }
 
     /** @meta method (scala.Array[scala.Double]) scala.Array[scala.Double]; */
     public static Array   box_darray(double [] xs) {
-	return new DArray(xs);
+	return xs == null ? null : new DArray(xs);
     }
 
     /** @meta method [?T < scala.AnyRef](scala.Array[?T]) scala.Array[?T]; */
     public static Array   box_oarray(Object [] xs) {
-	return new OArray(xs);
+	return xs == null ? null : new OArray(xs);
     }
 
     /** @meta method [?T](scala.Array[?T]) scala.Array[?T]; */
     public static Array   box__array(Object    xs) {
-        if (xs == null             ) return box_oarray((Object [])xs);
+        if (xs == null             ) return null;
         if (xs instanceof boolean[]) return box_zarray((boolean[])xs);
         if (xs instanceof byte   []) return box_barray((byte   [])xs);
         if (xs instanceof short  []) return box_sarray((short  [])xs);
@@ -181,15 +181,15 @@ public abstract class RunTime {
     //########################################################################
     // Public Functions - Unboxing primitives
 
-    public static void      unbox_uvalue(Unit    x) {        x.value(); }
-    public static boolean   unbox_zvalue(Boolean x) { return x.value  ; }
-    public static byte      unbox_bvalue(Byte    x) { return x.value  ; }
-    public static short     unbox_svalue(Short   x) { return x.value  ; }
-    public static char      unbox_cvalue(Char    x) { return x.value  ; }
-    public static int       unbox_ivalue(Int     x) { return x.value  ; }
-    public static long      unbox_lvalue(Long    x) { return x.value  ; }
-    public static float     unbox_fvalue(Float   x) { return x.value  ; }
-    public static double    unbox_dvalue(Double  x) { return x.value  ; }
+    public static void      unbox_uvalue(Unit    x) { if (x != null) x.value(); }
+    public static boolean   unbox_zvalue(Boolean x) { return x == null ? false : x.value; }
+    public static byte      unbox_bvalue(Byte    x) { return x == null ? 0     : x.value; }
+    public static short     unbox_svalue(Short   x) { return x == null ? 0     : x.value; }
+    public static char      unbox_cvalue(Char    x) { return x == null ? 0     : x.value; }
+    public static int       unbox_ivalue(Int     x) { return x == null ? 0     : x.value; }
+    public static long      unbox_lvalue(Long    x) { return x == null ? 0L    : x.value; }
+    public static float     unbox_fvalue(Float   x) { return x == null ? 0.0f  : x.value; }
+    public static double    unbox_dvalue(Double  x) { return x == null ? 0.0d  : x.value; }
 
     /** @meta method (scala.Array[scala.Boolean]) scala.Array[scala.Boolean];*/
     public static boolean[] unbox_zarray(Array xs) {
@@ -338,9 +338,8 @@ public abstract class RunTime {
     //########################################################################
 }
 
-// These classes may not be defined in class RunTime because inner
-// classes confuse pico which then attributes the metadata to the
-// wrong members.
+// These classes must stay top-level so metadata is attached to the
+// wrapper classes themselves instead of to enclosing RunTime members.
 
 class UValue extends Unit    { public UValue(         ) { super( ); } }
 class ZValue extends Boolean { public ZValue(boolean x) { super(x); } }
@@ -354,7 +353,7 @@ class DValue extends Double  { public DValue(double  x) { super(x); } }
 
 class ZArray extends Array {
     private final boolean[] xs;
-    public ZArray(boolean[] xs) { this.xs = xs; }
+    public ZArray(boolean[] xs) { super(xs.length); this.xs = xs; }
     public boolean[] asBooleanArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return RunTime.box_zvalue(xs[i]); }
@@ -365,7 +364,7 @@ class ZArray extends Array {
 
 class BArray extends Array {
     private final byte[] xs;
-    public BArray(byte[] xs) { this.xs = xs; }
+    public BArray(byte[] xs) { super(xs.length); this.xs = xs; }
     public byte[] asByteArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return RunTime.box_bvalue(xs[i]); }
@@ -376,7 +375,7 @@ class BArray extends Array {
 
 class SArray extends Array {
     private final short[] xs;
-    public SArray(short[] xs) { this.xs = xs; }
+    public SArray(short[] xs) { super(xs.length); this.xs = xs; }
     public short[] asShortArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return RunTime.box_svalue(xs[i]); }
@@ -387,7 +386,7 @@ class SArray extends Array {
 
 class CArray extends Array {
     private final char[] xs;
-    public CArray(char[] xs) { this.xs = xs; }
+    public CArray(char[] xs) { super(xs.length); this.xs = xs; }
     public char[] asCharArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return RunTime.box_cvalue(xs[i]); }
@@ -398,7 +397,7 @@ class CArray extends Array {
 
 class IArray extends Array {
     private final int[] xs;
-    public IArray(int[] xs) { this.xs = xs; }
+    public IArray(int[] xs) { super(xs.length); this.xs = xs; }
     public int[] asIntArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return RunTime.box_ivalue(xs[i]); }
@@ -409,7 +408,7 @@ class IArray extends Array {
 
 class LArray extends Array {
     private final long[] xs;
-    public LArray(long[] xs) { this.xs = xs; }
+    public LArray(long[] xs) { super(xs.length); this.xs = xs; }
     public long[] asLongArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return RunTime.box_lvalue(xs[i]); }
@@ -420,7 +419,7 @@ class LArray extends Array {
 
 class FArray extends Array {
     private final float[] xs;
-    public FArray(float[] xs) { this.xs = xs; }
+    public FArray(float[] xs) { super(xs.length); this.xs = xs; }
     public float[] asFloatArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return RunTime.box_fvalue(xs[i]); }
@@ -431,7 +430,7 @@ class FArray extends Array {
 
 class DArray extends Array {
     private final double[] xs;
-    public DArray(double[] xs) { this.xs = xs; }
+    public DArray(double[] xs) { super(xs.length); this.xs = xs; }
     public double[] asDoubleArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return RunTime.box_dvalue(xs[i]); }
@@ -442,7 +441,7 @@ class DArray extends Array {
 
 class OArray extends Array {
     private final Object[] xs;
-    public OArray(Object[] xs) { this.xs = xs; }
+    public OArray(Object[] xs) { super(xs.length); this.xs = xs; }
     public Object[] asObjectArray() { return xs; }
     public Object asArray() { return xs; }
     public Object apply(int i) { return xs[i]; }

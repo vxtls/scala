@@ -22,11 +22,10 @@ public class TestRegTraverser extends Traverser {
 
     public void traverse(Tree tree) {
     	if (!result)
-	    switch (tree) {
-	    case Alternative(_):
+	    if (tree instanceof Tree.Alternative) {
 		result = true;
-		break;
-	    case Bind(_, Tree pat):
+	    } else if (tree instanceof Tree.Bind) {
+                Tree pat = ((Tree.Bind)tree).rhs;
 		if( TreeInfo.isEmptySequence( pat ) ) {
 		    // annoying special case: b@() [or b@(()|()) after normalization]
 		    //System.err.println("bindin empty "+tree.symbol());
@@ -36,24 +35,20 @@ public class TestRegTraverser extends Traverser {
 		    variables.add(tree.symbol());
 		}
 		traverse(pat);
-		break;
-	    case Ident(_):
+	    } else if (tree instanceof Tree.Ident) {
 		Symbol symbol = tree.symbol();
 		if ((symbol != Global.instance.definitions.PATTERN_WILDCARD) &&
 		    variables.contains(symbol))
 		    result = true;
-		break;
-	    case CaseDef(Tree pat, _, _):
+	    } else if (tree instanceof Tree.CaseDef) {
+                Tree pat = ((Tree.CaseDef)tree).pat;
 		traverse(pat);
-		break;
-
-	    case Sequence( Tree[] trees):
+	    } else if (tree instanceof Tree.Sequence) {
+                Tree[] trees = ((Tree.Sequence)tree).trees;
 		//result = true;
 		traverse( trees );
 		//result = true;
-		break;
-
-	    default:
+	    } else {
 		super.traverse( tree );
 	    }
     }

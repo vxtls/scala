@@ -16,9 +16,16 @@ public abstract class Array
     extends java.lang.Object
     implements ScalaObject, Function1, Cloneable, java.io.Serializable {
 
+    public final int length;
+
     /** @meta constr (scala.Int);
      */
     public Array() {
+        this(0);
+    }
+
+    protected Array(int length) {
+        this.length = length;
     }
 
     /** @meta method []scala.Int;

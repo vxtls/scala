@@ -10,31 +10,22 @@
 
 package scala.runtime;
 
-/** @meta class [?A] extends java.lang.Object;
- */
-public class ResultOrException {
+public class ResultOrException<A> {
 
-    /** @meta field ?A;
-     */
-    public Object result;
+    public A result;
 
     public Throwable exc;
 
-    /** @meta constr(?A, java.lang.Throwable);
-     */
-    ResultOrException(Object result, Throwable exc) {
+    ResultOrException(A result, Throwable exc) {
 	this.result = result;
 	this.exc = exc;
     }
 
-    /** @meta method [?A] (def ?A) scala.runtime.ResultOrException[?A];
-     */
-    public static ResultOrException tryBlock(scala.Function0 block) {
+    public static <A> ResultOrException<A> tryBlock(scala.Function0<A> block) {
 	try {
-	    return new ResultOrException(block.apply(), null);
+	    return new ResultOrException<A>(block.apply(), null);
 	} catch (Throwable ex) {
-	    return new ResultOrException(null, ex);
+	    return new ResultOrException<A>(null, ex);
 	}
     }
 }
-

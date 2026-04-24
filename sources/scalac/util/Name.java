@@ -40,12 +40,12 @@ public abstract class Name {
     // Public Factories
 
     /** Returns the term name with given ASCII representation. */
-    public static TermName fromAscii(byte[] bytes, int start, int count) {
+    public static Name fromAscii(byte[] bytes, int start, int count) {
         return TermName.fromAscii(bytes, start, count);
     }
 
     /** Returns the term name with given string representation. */
-    public static TermName fromString(String string) {
+    public static Name fromString(String string) {
         return TermName.fromString(string);
     }
 
