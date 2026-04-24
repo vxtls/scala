@@ -140,9 +140,6 @@ LIBRARY_ROOT		 = $(PROJECT_SOURCEDIR)/scala
 LIBRARY_LIST		+= $(call READLIST,$(PROJECT_LISTDIR)/library.lst)
 LIBRARY_SOURCES		+= $(LIBRARY_LIST:%=$(LIBRARY_ROOT)/%)
 LIBRARY_JC_FILES	+= $(filter %.java,$(LIBRARY_SOURCES))
-LIBRARY_ALIAS_JC_FILES	+= $(LIBRARY_ROOT)/Iterator$$$$anon$$0.java
-LIBRARY_ALIAS_JC_FILES	+= $(LIBRARY_ROOT)/Iterator$$$$anon$$1.java
-LIBRARY_ALIAS_JC_FILES	+= $(LIBRARY_ROOT)/Iterator$$$$anon$$2.java
 LIBRARY_JC_FLAGS	+= $(JC_FLAGS)
 LIBRARY_SC_FILES	+= $(filter %.scala,$(LIBRARY_SOURCES))
 LIBRARY_SC_BOOTCLASSPATH = $(PROJECT_OUTPUTDIR):$(PROJECT_SOURCEDIR):$(JRE_JARFILE)
@@ -447,7 +444,6 @@ cvs-fix-perms		:
 
 .latest%library-sc	: .latest%library-jc $(LIBRARY_SC_FILES)
 	@$(make) sc target=LIBRARY LIBRARY_SC_FILES='$(subst $$,$$$$,$(filter %.scala,$?))'
-	@$(make) jc target=LIBRARY LIBRARY_JC_FILES='$(subst $$,$$$$,$(LIBRARY_ALIAS_JC_FILES))'
 	touch $@
 
 .latest-$(boot)library-sc-msil	: $(LIBRARY_SC_FILES)
