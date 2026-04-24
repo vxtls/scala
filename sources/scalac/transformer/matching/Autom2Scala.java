@@ -9,7 +9,7 @@ import scalac.ast.Tree;
 import scalac.ast.TreeGen;
 import scalac.util.Name;
 import scalac.util.Names;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 import scalac.transformer.TransMatch.Matcher ;
 import java.util.* ;
@@ -57,8 +57,8 @@ public class Autom2Scala  {
     public int pos;
 
     Type funRetType() {
-        switch( funSym.type() ) {
-        case MethodType( _, Type retType ):
+        if (funSym.type() instanceof Type.MethodType) {
+            Type retType = ((Type.MethodType)funSym.type()).result;
             return retType;
         }
         throw new RuntimeException();
@@ -68,6 +68,7 @@ public class Autom2Scala  {
     Tree callFun( Tree[] args ) {
         return gen.mkApply_V(gen.Ident(pos, funSym), args);
     }
+
 
     public Autom2Scala( DetWordAutom dfa,
                         Type elementType,
@@ -85,14 +86,15 @@ public class Autom2Scala  {
 
     // overridden in RightTracerInScala
     Tree loadCurrentElem( Tree body ) {
-        return gen.mkBlock( new Tree[] {
+        return gen.mkBlock(
+            new Tree[] {
             cf.gen.ValDef( this.hasnSym,
                            cf._hasNext( _iter() ) ),
             cf.gen.ValDef( this.curSym,
                            gen.If( gen.Ident( pos, hasnSym ),
                                    cf._next( _iter() ),
-                                   gen.mkDefaultValue(cf.pos,curSym.type())))},
-
+                                   gen.mkDefaultValue(cf.pos,curSym.type())))
+            },
             body );
     }
 
@@ -100,10 +102,12 @@ public class Autom2Scala  {
     Tree currentElem() { return gen.Ident( cf.pos, curSym ).setType( curSym.type() ); }
 
     Tree currentMatches( Label label ) {
-        switch( label ) {
-        case TreeLabel( Tree pat ):
+        if (label instanceof Label.TreeLabel) {
+            Tree pat = ((Label.TreeLabel)label).pat;
             return _cur_match( pat );
-        case SimpleLabel( Tree.Literal lit ):
+        }
+        if (label instanceof Label.SimpleLabel) {
+            Tree.Literal lit = ((Label.SimpleLabel)label).lit;
             return cf.Equals( currentElem(), lit );
         }
         throw new ApplicationError("expected either algebraic or simple label:"+label);

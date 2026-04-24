@@ -42,6 +42,7 @@ public class JavaMirror {
     //########################################################################
     // Private Fields
 
+    private final Definitions definitions;
     private final ClassLoader loader;
 
     private final Map/*<Class ,Class      >*/ arrays;
@@ -54,6 +55,7 @@ public class JavaMirror {
     // Public Constructors
 
     public JavaMirror(Definitions definitions, ClassLoader loader) {
+        this.definitions = definitions;
         this.loader = loader;
         this.arrays = new HashMap();
         this.classes = new HashMap();
@@ -105,20 +107,18 @@ public class JavaMirror {
     // Public Methods - classes
 
     public Class getClass(Type type) {
-        switch (type) {
-
-        case UnboxedType(int kind):
-            return getClass(kind);
-
-        case UnboxedArrayType(Type component):
-            return getArray(getClass(component));
-
-        case TypeRef(_, Symbol symbol, _):
-            return getClass(symbol);
-
-        default:
-            throw Debug.abort("illegal type", type);
+        Type unboxed = type.unbox();
+        if (unboxed != type) return getClass(unboxed);
+        if (type instanceof Type.UnboxedType) {
+            return getClass(((Type.UnboxedType)type).tag);
         }
+        if (type instanceof Type.UnboxedArrayType) {
+            return getArray(getClass(((Type.UnboxedArrayType)type).elemtp));
+        }
+        if (type instanceof Type.TypeRef) {
+            return getClass(((Type.TypeRef)type).sym);
+        }
+        throw Debug.abort("illegal type", type);
     }
 
     public Class getClass(int kind) {
@@ -218,8 +218,31 @@ public class JavaMirror {
         try {
             return owner.getMethod(symbol.name.toString(), params);
         } catch (NoSuchMethodException exception) {
+            Method fallback = getMethodByEquivalentParams(owner, symbol);
+            if (fallback != null) return fallback;
             throw Debug.abort("no such method", symbol);
         }
+    }
+
+    private Method getMethodByEquivalentParams(Class owner, Symbol symbol) {
+        Type[] params = getValueParamTypes(symbol.type());
+        Method result = null;
+        Method[] methods = owner.getMethods();
+        for (int i = 0; i < methods.length; i++) {
+            Method method = methods[i];
+            if (!method.getName().equals(symbol.name.toString())) continue;
+            Class[] javaParams = method.getParameterTypes();
+            if (javaParams.length != params.length) continue;
+            int j = 0;
+            while (j < javaParams.length
+                && isEquivalentRuntimeClass(params[j], javaParams[j])) {
+                j++;
+            }
+            if (j != javaParams.length) continue;
+            if (result != null) throw Debug.abort("ambiguous method", symbol);
+            result = method;
+        }
+        return result;
     }
 
     //########################################################################
@@ -252,14 +275,11 @@ public class JavaMirror {
     }
 
     public Class[] getVParamsOf(Type type) {
-        switch (type) {
-
-        case MethodType(Symbol[] vparams, _):
-            return getVParams(vparams);
-
-        default:
-            throw Debug.abort("illegal type", type);
+        type = type.fullErasure();
+        if (type instanceof Type.MethodType) {
+            return getVParams(((Type.MethodType)type).vparams);
         }
+        throw Debug.abort("illegal type", type);
     }
 
     public Class[] getVParams(Symbol[] symbols) {
@@ -268,6 +288,85 @@ public class JavaMirror {
             vparams[i] = getClass(symbols[i].type());
         }
         return vparams;
+    }
+
+    private Type[] getValueParamTypes(Type type) {
+        if (type instanceof Type.PolyType) {
+            return getValueParamTypes(((Type.PolyType)type).result);
+        }
+        if (type instanceof Type.MethodType) {
+            return Symbol.type(((Type.MethodType)type).vparams);
+        }
+        throw Debug.abort("illegal method type", type);
+    }
+
+    private boolean isEquivalentRuntimeClass(Type type, Class clazz) {
+        if (type instanceof Type.PolyType) {
+            return isEquivalentRuntimeClass(((Type.PolyType)type).result, clazz);
+        }
+        if (type instanceof Type.UnboxedType) {
+            return clazz == getClass(((Type.UnboxedType)type).tag)
+                || clazz == getBoxedValueClass(((Type.UnboxedType)type).tag);
+        }
+        if (type instanceof Type.UnboxedArrayType) {
+            return clazz.isArray()
+                && isEquivalentRuntimeClass(
+                    ((Type.UnboxedArrayType)type).elemtp,
+                    clazz.getComponentType());
+        }
+        if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            if (typeRef.sym == definitions.ARRAY_CLASS && typeRef.args.length == 1) {
+                return clazz.isArray()
+                    && isEquivalentRuntimeClass(typeRef.args[0], clazz.getComponentType());
+            }
+            if (isScalaValueClass(typeRef.sym)) {
+                return clazz == getClass(typeRef.sym)
+                    || clazz == getPrimitiveValueClass(typeRef.sym);
+            }
+            return clazz == getClass(typeRef.sym);
+        }
+        return false;
+    }
+
+    private boolean isScalaValueClass(Symbol symbol) {
+        return symbol == definitions.UNIT_CLASS
+            || symbol == definitions.BOOLEAN_CLASS
+            || symbol == definitions.BYTE_CLASS
+            || symbol == definitions.SHORT_CLASS
+            || symbol == definitions.CHAR_CLASS
+            || symbol == definitions.INT_CLASS
+            || symbol == definitions.LONG_CLASS
+            || symbol == definitions.FLOAT_CLASS
+            || symbol == definitions.DOUBLE_CLASS;
+    }
+
+    private Class getPrimitiveValueClass(Symbol symbol) {
+        if (symbol == definitions.UNIT_CLASS) return void_class;
+        if (symbol == definitions.BOOLEAN_CLASS) return boolean_class;
+        if (symbol == definitions.BYTE_CLASS) return byte_class;
+        if (symbol == definitions.SHORT_CLASS) return short_class;
+        if (symbol == definitions.CHAR_CLASS) return char_class;
+        if (symbol == definitions.INT_CLASS) return int_class;
+        if (symbol == definitions.LONG_CLASS) return long_class;
+        if (symbol == definitions.FLOAT_CLASS) return float_class;
+        if (symbol == definitions.DOUBLE_CLASS) return double_class;
+        throw Debug.abort("illegal value class", symbol);
+    }
+
+    private Class getBoxedValueClass(int kind) {
+        switch (kind) {
+        case TypeTags.BYTE: return getClass(definitions.BYTE_CLASS);
+        case TypeTags.SHORT: return getClass(definitions.SHORT_CLASS);
+        case TypeTags.CHAR: return getClass(definitions.CHAR_CLASS);
+        case TypeTags.INT: return getClass(definitions.INT_CLASS);
+        case TypeTags.LONG: return getClass(definitions.LONG_CLASS);
+        case TypeTags.FLOAT: return getClass(definitions.FLOAT_CLASS);
+        case TypeTags.DOUBLE: return getClass(definitions.DOUBLE_CLASS);
+        case TypeTags.BOOLEAN: return getClass(definitions.BOOLEAN_CLASS);
+        case TypeTags.UNIT: return getClass(definitions.UNIT_CLASS);
+        default: throw Debug.abort("illegal value class kind", new Integer(kind));
+        }
     }
 
     //########################################################################

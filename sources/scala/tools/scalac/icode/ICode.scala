@@ -13,6 +13,7 @@ import scala.collection.mutable.HashSet;
 
 import scalac.symtab._;
 import scalac.atree._;
+import scalac.ApplicationError;
 import scalac.util.Debug;
 
 package scala.tools.scalac.icode {
@@ -152,115 +153,122 @@ class ICode(label: String, global: scalac_Global) {
 	ctx;
       }
 
-      case ACode$This(clasz) =>
-	ctx.emit(THIS(clasz));
+      case code: ACode$This =>
+	ctx.emit(THIS(code.clasz));
 
-      case ACode$Constant(c) =>
-	ctx.emit(CONSTANT(c));
+      case code: ACode$Constant =>
+	ctx.emit(CONSTANT(code.constant));
 
-      case ACode$Load(ALocation$Module(_)) => {
-	global.log ("ICodeGenerator::emit: Load(Module) node found");
-	ctx;
-      }
+      case code: ACode$Load =>
+	code.location match {
+	  case _: ALocation$Module => {
+	    global.log ("ICodeGenerator::emit: Load(Module) node found");
+	    ctx;
+	  }
 
-      case ACode$Load(ALocation$Field(obj, field ,isStatic)) => {
-	var ctx1 = gen(obj, ctx);
-	ctx.emit(LOAD_FIELD(field, isStatic));
-      }
+	  case loc: ALocation$Field => {
+	    var ctx1 = gen(loc.`object`, ctx);
+	    ctx.emit(LOAD_FIELD(loc.field, loc.isStatic));
+	  }
 
-      case ACode$Load(ALocation$Local(local,isArgument)) =>
-	ctx.emit(LOAD_LOCAL(local, isArgument));
+	  case loc: ALocation$Local =>
+	    ctx.emit(LOAD_LOCAL(loc.local, loc.isArgument));
 
-      case ACode$Load(ALocation$ArrayItem(array, index)) => {
-	var ctx1 = gen(array, ctx);
-	ctx1 = gen(index, ctx1);
-	ctx1.emit(LOAD_ARRAY_ITEM());
-      }
-
-      case ACode$Store(ALocation$Module(_),_) => {
-	global.log ("ICodeGenerator::emit: Store(Module(_)) node found");
-	ctx;
-      }
-
-      case ACode$Store(ALocation$Field(obj, field, isStatic), value) => {
-	var ctx1 = gen(obj, ctx);
-	ctx1 = gen(value, ctx1);
-	ctx1.emit(STORE_FIELD(field, isStatic));
-      }
-
-      case ACode$Store(ALocation$Local(local, isArgument), value) => {
-	val ctx1 = gen(value, ctx);
-	ctx1.emit(STORE_LOCAL(local, isArgument));
-      }
-
-      case ACode$Store(ALocation$ArrayItem(array, index), value) => {
-	var ctx1 = gen(array, ctx);
-	ctx1 = gen(index, ctx1);
-	ctx1 = gen(value, ctx1);
-	ctx1.emit(STORE_ARRAY_ITEM());
-      }
-
-      case ACode$Apply(AFunction$Method(_,sym,AInvokeStyle.New),_,vargs) => {
-	val vargs_it = new IterableArray(vargs).elements;
-	// !!! Depend the backend in use
-	ctx.emit(NEW(sym.owner()));
-	ctx.emit(DUP(sym.owner().getType()));
-	var ctx1 = ctx;
-	vargs_it.foreach((varg: ACode) => ctx1 = gen(varg, ctx1));
-	ctx1.emit(CALL_METHOD(sym,AInvokeStyle.StaticInstance));
-      }
-
-      case ACode$Apply(AFunction$Method(obj,sym,style),_,vargs) => {
-	val vargs_it = new IterableArray(vargs).elements;
-	var ctx1 = ctx;
-	style match {
-	  case AInvokeStyle.StaticClass =>
-	    ; // NOP
-	  case _ =>
-	    ctx1 = gen(obj, ctx1);
+	  case loc: ALocation$ArrayItem => {
+	    var ctx1 = gen(loc.array, ctx);
+	    ctx1 = gen(loc.index, ctx1);
+	    ctx1.emit(LOAD_ARRAY_ITEM());
+	  }
 	}
-	vargs_it.foreach((varg: ACode) => ctx1 = gen(varg, ctx1));
-	ctx1.emit(CALL_METHOD(sym,style));
+
+      case code: ACode$Store =>
+	code.location match {
+	  case _: ALocation$Module => {
+	    global.log ("ICodeGenerator::emit: Store(Module(_)) node found");
+	    ctx;
+	  }
+
+	  case loc: ALocation$Field => {
+	    var ctx1 = gen(loc.`object`, ctx);
+	    ctx1 = gen(code.value, ctx1);
+	    ctx1.emit(STORE_FIELD(loc.field, loc.isStatic));
+	  }
+
+	  case loc: ALocation$Local => {
+	    val ctx1 = gen(code.value, ctx);
+	    ctx1.emit(STORE_LOCAL(loc.local, loc.isArgument));
+	  }
+
+	  case loc: ALocation$ArrayItem => {
+	    var ctx1 = gen(loc.array, ctx);
+	    ctx1 = gen(loc.index, ctx1);
+	    ctx1 = gen(code.value, ctx1);
+	    ctx1.emit(STORE_ARRAY_ITEM());
+	  }
+	}
+
+      case code: ACode$Apply =>
+	if (code.function.isInstanceOf[AFunction$Method]) {
+	  val fun = code.function.asInstanceOf[AFunction$Method];
+	  if (fun.style == AInvokeStyle.New) {
+	    val vargs_it = new IterableArray(code.vargs).elements;
+	    val sym = fun.method;
+	    // !!! Depend the backend in use
+	    ctx.emit(NEW(sym.owner()));
+	    ctx.emit(DUP(sym.owner().getType()));
+	    var ctx1 = ctx;
+	    vargs_it.foreach((varg: ACode) => ctx1 = gen(varg, ctx1));
+	    ctx1.emit(CALL_METHOD(sym,AInvokeStyle.StaticInstance));
+	  } else {
+	    val vargs_it = new IterableArray(code.vargs).elements;
+	    var ctx1 = ctx;
+	    fun.style match {
+	      case AInvokeStyle.StaticClass =>
+		; // NOP
+	      case _ =>
+		ctx1 = gen(fun.`object`, ctx1);
+	    }
+	    vargs_it.foreach((varg: ACode) => ctx1 = gen(varg, ctx1));
+	    ctx1.emit(CALL_METHOD(fun.method, fun.style));
+	  }
+	} else if (code.function.isInstanceOf[AFunction$Primitive]) {
+	  val fun = code.function.asInstanceOf[AFunction$Primitive];
+	  val vargs_it = new IterableArray(code.vargs).elements;
+	  var ctx1 = ctx;
+
+	  vargs_it.foreach((varg: ACode) => ctx1 = gen(varg, ctx1));
+	  ctx1.emit(CALL_PRIMITIVE(fun.primitive));
+	} else if (code.function.isInstanceOf[AFunction$NewArray]) {
+	  val fun = code.function.asInstanceOf[AFunction$NewArray];
+	  var ctx1 = gen(code.vargs(0), ctx); // The size is given as first argument
+	  ctx1.emit(CREATE_ARRAY(fun.element));
+	} else
+	  throw new ApplicationError("illegal code " + code);
+
+      case code: ACode$IsAs =>
+	if (code.cast) {
+	  var ctx1 = gen(code.value, ctx);
+	  ctx1.emit(CHECK_CAST(code.`type`));
+	} else {
+	  var ctx1 = gen(code.value, ctx);
+	  ctx1.emit(IS_INSTANCE(code.`type`));
+	}
+
+      case code: ACode$If => {
+	genAlt(code.test, code.success, code.failure, ctx, newBlock);
       }
 
-      case ACode$Apply(AFunction$Primitive(p),_,vargs) => {
-	val vargs_it = new IterableArray(vargs).elements;
-	var ctx1 = ctx;
+      case code: ACode$Switch => {
 
-	vargs_it.foreach((varg: ACode) => ctx1 = gen(varg, ctx1));
-	ctx1.emit(CALL_PRIMITIVE(p));
-      }
-
-      case ACode$Apply(AFunction$NewArray(element),_,vargs) => {
-	var ctx1 = gen(vargs(0), ctx); // The size is given as first argument
-	ctx1.emit(CREATE_ARRAY(element));
-      }
-
-      case ACode$IsAs(value,typ,false) => {
-	var ctx1 = gen(value, ctx);
-	ctx1.emit(IS_INSTANCE(typ));
-      }
-
-      case ACode$IsAs(value,typ,true) => {
-	var ctx1 = gen(value, ctx);
-	ctx1.emit(CHECK_CAST(typ));
-      }
-
-      case ACode$If(test, success, failure) => {
-	genAlt(test, success, failure, ctx, newBlock);
-      }
-
-      case ACode$Switch(test,tags,bodies) => {
-
-	val switchBodies = List.fromArray(bodies, 0, bodies.length);
+	val switchBodies = List.fromArray(code.bodies, 0, code.bodies.length);
 	var switchBlocks: List[IBasicBlock] = Nil;
 	for (val i : ACode <- switchBodies) switchBlocks = newBlock::switchBlocks;
 	val switchPairs = switchBodies.zip(switchBlocks);
 
 	val nextBlock = newBlock;
 
-	var ctx1 = gen(test, ctx);
-	ctx1.emit(SWITCH(tags, switchBlocks));
+	var ctx1 = gen(code.test, ctx);
+	ctx1.emit(SWITCH(code.tags, switchBlocks));
 	//ctx1.currentBlock.addSuccessors(switchBlocks);
 
 	switchPairs.foreach((p: Pair[ACode, IBasicBlock]) => {
@@ -274,19 +282,19 @@ class ICode(label: String, global: scalac_Global) {
 	ctx1.changeBlock(nextBlock);
       }
 
-      case ACode$Synchronized(lock, value) => {
-	var ctx1 = gen(lock, ctx);
+      case code: ACode$Synchronized => {
+	var ctx1 = gen(code.lock, ctx);
 	ctx1.emit(MONITOR_ENTER());
-	ctx1 = gen(value,ctx);
-	ctx1 = gen(lock, ctx);
+	ctx1 = gen(code.value,ctx);
+	ctx1 = gen(code.lock, ctx);
 	ctx1.emit(MONITOR_EXIT());
       }
 
-      case ACode$Block(_,statements,value) => {
-	val statements_it = new IterableArray(statements).elements;
+      case code: ACode$Block => {
+	val statements_it = new IterableArray(code.statements).elements;
 	var ctx1 = ctx;
 	statements_it.foreach((st: ACode) => ctx1 = gen(st, ctx1));
-	ctx1 = gen(value, ctx1);
+	ctx1 = gen(code.value, ctx1);
 	ctx1;
       }
 
@@ -304,12 +312,12 @@ class ICode(label: String, global: scalac_Global) {
 	gen(value, ctx1);
       }
 
-      case ACode$Goto(label,vargs) => {
+      case code: ACode$Goto => {
 
-	val vargs_it = new IterableArray(vargs).elements;
+	val vargs_it = new IterableArray(code.vargs).elements;
 	global.log("Current label mapping: "+aTreeLabels.keys.foreach((s: Symbol) => global.log(s.toString())));
-	global.log("Looking for sym: "+label);
-	val gotoBlock = aTreeLabels(label);
+	global.log("Looking for sym: "+code.label);
+	val gotoBlock = aTreeLabels(code.label);
         var ctx1 = ctx;
 
 	// Stack-> :
@@ -327,24 +335,24 @@ class ICode(label: String, global: scalac_Global) {
 	ctx1;
       }
 
-      case ACode$Return(_,value) => {
-	var ctx1 = gen(value, ctx);
+      case code: ACode$Return => {
+	var ctx1 = gen(code.value, ctx);
 	ctx1.emit(RETURN());
       }
-      case ACode$Throw(value) => {
-	var ctx1 = gen(value, ctx);
+      case code: ACode$Throw => {
+	var ctx1 = gen(code.value, ctx);
 	ctx1.emit(THROW());
       }
 
-      case ACode$Drop(value, typ) => {
-	var ctx1 = gen(value, ctx);
+      case code: ACode$Drop => {
+	var ctx1 = gen(code.value, ctx);
 	//global.log("Type de Drop: "+typ+" = unboxed:"+typ.unbox() );
-	if (! typ.isSameAs(global.definitions.UNIT_TYPE()))
-	  typ.unbox() match { // !!! Hack
+	if (! code.`type`.isSameAs(global.definitions.UNIT_TYPE()))
+	  code.`type`.unbox() match { // !!! Hack
 	    case Type$UnboxedType(TypeTags.UNIT) =>
 	      global.log("it matches UNIT !"); // debug ; // NOP
 	    case _ =>
-	      ctx1.emit(DROP(typ));
+	      ctx1.emit(DROP(code.`type`));
 	  }
 	  else
 	  global.log("it matches SCALAC_UNIT :-(");
@@ -360,9 +368,9 @@ class ICode(label: String, global: scalac_Global) {
     val successBlock = success match {
       case ACode.Void => nextBlock;
 
-      case ACode$If(test, innerSuccess, innerFailure) => {
+      case code: ACode$If => {
 	val ctx1 = new GenContext(newBlock, null);
-	val ctx2 = genAlt(test, innerSuccess, innerFailure, ctx1, nextBlock);
+	val ctx2 = genAlt(code.test, code.success, code.failure, ctx1, nextBlock);
 	//ctx2.closeBlock; // or close when CJUMP is emitted
 	ctx1.currentBlock;
       }
@@ -378,9 +386,9 @@ class ICode(label: String, global: scalac_Global) {
     val failureBlock = failure match {
       case ACode.Void => nextBlock;
 
-      case ACode$If(test, innerSuccess, innerFailure) => {
+      case code: ACode$If => {
 	val ctx1 = new GenContext(newBlock, null);
-	val ctx2 = genAlt(test, innerSuccess, innerFailure, ctx1, nextBlock);
+	val ctx2 = genAlt(code.test, code.success, code.failure, ctx1, nextBlock);
 	//ctx2.closeBlock; // or close when CJUMP is emitted
 	ctx1.currentBlock;
       }
@@ -400,28 +408,34 @@ class ICode(label: String, global: scalac_Global) {
   /* This methods generate the test and the jump instruction */
   private def genCond(cond: ACode, successBlock: IBasicBlock, failureBlock: IBasicBlock, ctx: GenContext) : GenContext= {
     var ctx1 = ctx;
+    var handled = false;
     cond match {
-      case ACode$Apply(AFunction$Primitive(APrimitive$Test(op,_,zero)),_, vargs) => {
-	ctx1 = gen(vargs(0),ctx1);
-	if (zero)
-	  ctx1.emit(CZJUMP(successBlock, failureBlock, op));
-	else {
-	  ctx1 = gen(vargs(1), ctx1);
-	  ctx1.emit(CJUMP(successBlock, failureBlock, op));
+      case code: ACode$Apply =>
+	code.function match {
+	  case fun: AFunction$Primitive =>
+	    if (fun.primitive.isInstanceOf[APrimitive$Test]) {
+	      val primitive = fun.primitive.asInstanceOf[APrimitive$Test];
+	      ctx1 = gen(code.vargs(0),ctx1);
+	      if (primitive.zero)
+		ctx1.emit(CZJUMP(successBlock, failureBlock, primitive.op));
+	      else {
+		ctx1 = gen(code.vargs(1), ctx1);
+		ctx1.emit(CJUMP(successBlock, failureBlock, primitive.op));
+	      }
+	      handled = true;
+	    } else if (fun.primitive.isInstanceOf[APrimitive$Negation]) {
+	      ctx1 = genCond(code.vargs(0), failureBlock, successBlock, ctx1);
+	      handled = true;
+	    }
+	  case _ =>
 	}
-	//ctx1.currentBlock.addSuccessors(failureBlock::successBlock::Nil);
-      }
-
-      case ACode$Apply(AFunction$Primitive(APrimitive$Negation(_)),_,vargs) =>
-	ctx1 = genCond(vargs(0), failureBlock, successBlock, ctx1);
-      // ??? Test with TestOp opposite ?
       case _ => {
-	ctx1 = gen(cond, ctx1);
-	//ctx1.emit(CONSTANT(AConstant.INT(1)));
-	// We have a boolean value
-	ctx1.emit(CZJUMP(successBlock, failureBlock, ATestOp.NE));
-	//ctx1.currentBlock.addSuccessors(failureBlock::successBlock::Nil);
       }
+    }
+    if (!handled) {
+      ctx1 = gen(cond, ctx1);
+      ctx1.emit(CONSTANT(AConstant.INT(1)));
+      ctx1.emit(CJUMP(successBlock, failureBlock, ATestOp.EQ));
     }
     ctx1;
   }

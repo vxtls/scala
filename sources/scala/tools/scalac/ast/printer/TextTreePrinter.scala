@@ -195,16 +195,20 @@ class TextTreePrinter(writer: PrintWriter) with TreePrinter {
   def print(global: scalac_Global): unit = {
     val phase: Phase = global.currentPhase;
     beginSection(1, "syntax trees at "+phase+" (after "+phase.prev+")");
-    for (val i <- Iterator.range(0, global.units.length))
+    { var i = 0; while (i < global.units.length) {
       print(global.units(i));
+      i = i + 1
+    }}
   }
 
   def print(unit: Unit): unit = {
     printUnitHeader(unit);
     if (unit.body != null) {
-      for (val i <- Iterator.range(0, unit.body.length)) {
+      var i = 0;
+      while (i < unit.body.length) {
         print(unit.body(i));
         print(TXT_BLOCK_SEP);
+        i = i + 1
       }
     } else {
       print(TXT_NULL);
@@ -402,7 +406,7 @@ class TextTreePrinter(writer: PrintWriter) with TreePrinter {
 	indent();
 	print(TXT_BLOCK_BEGIN);
 
-	for (val i <- Iterator.range(0, tags.length)) {
+	{ var i = 0; while (i < tags.length) {
 	  print(KW_CASE);
 	  print(Space);
 	  print("" + tags(i));
@@ -411,7 +415,8 @@ class TextTreePrinter(writer: PrintWriter) with TreePrinter {
 	  print(Space);
 	  print(bodies(i));
 	  print(Newline);
-	}
+	  i = i + 1
+	}}
 	print("<default> => ");
 	print(defaultBody);
 	undent();
@@ -513,10 +518,11 @@ class TextTreePrinter(writer: PrintWriter) with TreePrinter {
 	print(tpe);
 	indent();
 	print(TXT_LEFT_BRACKET);
-	for (val i <- Iterator.range(0, args.length)) {
+	{ var i = 0; while (i < args.length) {
 	  if (i > 0) print(TXT_COMMA_SP);
 	  print(args(i));
-	}
+	  i = i + 1
+	}}
 	undent();
 	print(TXT_RIGHT_BRACKET);
 
@@ -534,10 +540,11 @@ class TextTreePrinter(writer: PrintWriter) with TreePrinter {
   protected def printArray(trees: Array[Tree], open: Text, close: Text, sep: Text): unit = {
     indent();
     print(open);
-    for (val i <- Iterator.range(0, trees.length)) {
+    { var i = 0; while (i < trees.length) {
       if (i > 0) print(sep);
       print(trees(i));
-    }
+      i = i + 1
+    }}
     undent();
     print(close);
   }
@@ -664,23 +671,27 @@ class TextTreePrinter(writer: PrintWriter) with TreePrinter {
   protected def printParams(tparams: Array[Tree$AbsTypeDef]): unit =
     if (tparams.length > 0) {
       print(TXT_LEFT_BRACKET);
-      for (val i <- Iterator.range(0, tparams.length)) {
+      { var i = 0; while (i < tparams.length) {
         if (i > 0) print(TXT_COMMA_SP);
         printParam(tparams(i));
-      }
+        i = i + 1
+      }}
       print(TXT_RIGHT_BRACKET);
     }
 
   protected def printParams(vparamss: Array[Array[Tree$ValDef]]): unit =
-    for (val i <- Iterator.range(0, vparamss.length))
+    { var i = 0; while (i < vparamss.length) {
       printParams(vparamss(i));
+      i = i + 1
+    }}
 
   protected def printParams(vparams: Array[Tree$ValDef]): unit = {
     print(TXT_LEFT_PAREN);
-    for (val i <- Iterator.range(0, vparams.length)) {
+    { var i = 0; while (i < vparams.length) {
       if (i > 0) print(TXT_COMMA_SP);
       printParam(vparams(i));
-    }
+      i = i + 1
+    }}
     print(TXT_RIGHT_PAREN);
   }
 

@@ -16,8 +16,8 @@ import scalac.ApplicationError;
 import scalac.atree.AConstant;
 import scalac.util.*;
 import scalac.symtab.*;
-import Symbol.*;
-import Type.*;
+import scalac.symtab.Symbol.*;
+import scalac.symtab.Type.*;
 
 public class Pickle implements Kinds, Modifiers, EntryTags {
 
@@ -160,54 +160,49 @@ public class Pickle implements Kinds, Modifiers, EntryTags {
      */
     private void putType(Type tp) {
 	if (putEntry(tp)) {
-	    switch (tp) {
-	    case NoType:
-		break;
-	    case NoPrefix:
+	    if (tp == Type.NoType) {
+		return;
+	    } else if (tp == Type.NoPrefix) {
 		putSymbol(Symbol.NONE);
-                // !!! code above is usefull for compatibility
-                // !!! nothing would be better line
-		break;
-	    case ThisType(Symbol sym):
-		putSymbol(sym);
-		break;
-	    case SingleType(Type pre, Symbol sym):
-		putType(pre);
-		putSymbol(sym);
-		break;
-	    case ConstantType(Type base, AConstant value):
-		putType(base);
-                putConstant(value);
-		break;
-	    case TypeRef(Type pre, Symbol sym, Type[] args):
-		putType(pre);
-		putSymbol(sym);
-		putTypes(args);
-		break;
-	    case CompoundType(Type[] parents, Scope members):
+	    } else if (tp instanceof Type.ThisType) {
+		putSymbol(((Type.ThisType)tp).sym);
+	    } else if (tp instanceof Type.SingleType) {
+                Type.SingleType singleType = (Type.SingleType)tp;
+		putType(singleType.pre);
+		putSymbol(singleType.sym);
+	    } else if (tp instanceof Type.ConstantType) {
+                Type.ConstantType constantType = (Type.ConstantType)tp;
+		putType(constantType.base);
+                putConstant(constantType.value);
+	    } else if (tp instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tp;
+		putType(typeRef.pre);
+		putSymbol(typeRef.sym);
+		putTypes(typeRef.args);
+	    } else if (tp instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)tp;
                 putSymbol(tp.symbol());
-		putTypes(parents);
-		break;
-	    case MethodType(Symbol[] vparams, Type result):
-		putType(result);
-		for (int i = 0; i < vparams.length; i++) {
-		    Type ptype = vparams[i].type();
+		putTypes(compoundType.parts);
+	    } else if (tp instanceof Type.MethodType) {
+                Type.MethodType methodType = (Type.MethodType)tp;
+		putType(methodType.result);
+		for (int i = 0; i < methodType.vparams.length; i++) {
+		    Type ptype = methodType.vparams[i].type();
 		    putType(ptype);
-		    int pflags = vparams[i].flags;
+		    int pflags = methodType.vparams[i].flags;
 		    if ((pflags & (REPEATED | DEF)) != 0)
 			putEntry(new FlagsAndType(encodeFlags(pflags), ptype));
 		}
-		break;
-	    case PolyType(Symbol[] tparams, Type result):
-		putType(result);
-		putSymbols(tparams);
-		break;
-	    case OverloadedType(Symbol[] alts, Type[] alttypes):
-		for (int i = 0; i < alts.length; i++) alts[i].flags |= ALTERNATIVE;
-		putSymbols(alts);
-		putTypes(alttypes);
-		break;
-	    default:
+	    } else if (tp instanceof Type.PolyType) {
+                Type.PolyType polyType = (Type.PolyType)tp;
+		putType(polyType.result);
+		putSymbols(polyType.tparams);
+	    } else if (tp instanceof Type.OverloadedType) {
+                Type.OverloadedType overloadedType = (Type.OverloadedType)tp;
+		for (int i = 0; i < overloadedType.alts.length; i++) overloadedType.alts[i].flags |= ALTERNATIVE;
+		putSymbols(overloadedType.alts);
+		putTypes(overloadedType.alttypes);
+	    } else {
 		throw new ApplicationError();
 	    }
 	}
@@ -220,9 +215,8 @@ public class Pickle implements Kinds, Modifiers, EntryTags {
 
     private void putConstant(AConstant constant) {
         if (putEntry(constant)) {
-            switch (constant) {
-            case STRING(String value):
-                putEntry(Name.fromString(value));
+            if (constant instanceof AConstant.StringValue) {
+                putEntry(Name.fromString(((AConstant.StringValue)constant).value));
                 return;
             }
         }
@@ -379,84 +373,69 @@ public class Pickle implements Kinds, Modifiers, EntryTags {
     /** Write a type entry.
      */
     private void writeType(Type tp) {
-	switch (tp) {
-	case NoType:
+	if (tp == Type.NoType) {
 	    writeByte(NOtpe);
 	    writeByte(0); // space for length
-	    break;
-	case NoPrefix:
+	} else if (tp == Type.NoPrefix) {
 	    writeByte(THIStpe);
 	    writeByte(0); // space for length
 	    writeRef(Symbol.NONE);
-            // !!! code above is usefull for compatibility
-            // !!! following code would be better line:
-	    // !!! writeByte(NOpre);
-	    // !!! writeByte(0); // space for length
-	    break;
-	case ThisType(Symbol sym):
+	} else if (tp instanceof Type.ThisType) {
+            Symbol sym = ((Type.ThisType)tp).sym;
 	    writeByte(THIStpe);
 	    writeByte(0); // space for length
 	    writeRef(sym);
-	    break;
-
-	case SingleType(Type pre, Symbol sym):
+	} else if (tp instanceof Type.SingleType) {
+            Type.SingleType singleType = (Type.SingleType)tp;
 	    writeByte(SINGLEtpe);
 	    writeByte(0); // space for length
-	    writeRef(pre);
-	    writeRef(sym);
-	    break;
-
-	case ConstantType(Type base, AConstant value):
+	    writeRef(singleType.pre);
+	    writeRef(singleType.sym);
+	} else if (tp instanceof Type.ConstantType) {
+            Type.ConstantType constantType = (Type.ConstantType)tp;
 	    writeByte(CONSTANTtpe);
 	    writeByte(0); // space for length
-	    writeRef(base);
-	    writeRef(value);
-	    break;
-
-	case TypeRef(Type pre, Symbol sym, Type[] args):
+	    writeRef(constantType.base);
+	    writeRef(constantType.value);
+	} else if (tp instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)tp;
 	    writeByte(TYPEREFtpe);
 	    writeByte(0); // space for length
-	    writeRef(pre);
-	    writeRef(sym);
-	    writeRefs(args);
-	    break;
-
-	case CompoundType(Type[] parents, Scope members):
+	    writeRef(typeRef.pre);
+	    writeRef(typeRef.sym);
+	    writeRefs(typeRef.args);
+	} else if (tp instanceof Type.CompoundType) {
+            Type.CompoundType compoundType = (Type.CompoundType)tp;
 	    writeByte(COMPOUNDtpe);
 	    writeByte(0); // space for length
             writeRef(tp.symbol());
-	    writeRefs(parents);
-	    break;
-
-	case MethodType(Symbol[] vparams, Type result):
+	    writeRefs(compoundType.parts);
+	} else if (tp instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)tp;
 	    writeByte(METHODtpe);
 	    writeByte(0); // space for length
-	    writeRef(result);
-	    for (int i = 0; i < vparams.length; i++) {
-		Type ptype = vparams[i].type();
-		int pflags = vparams[i].flags;
+	    writeRef(methodType.result);
+	    for (int i = 0; i < methodType.vparams.length; i++) {
+		Type ptype = methodType.vparams[i].type();
+		int pflags = methodType.vparams[i].flags;
 		if ((pflags & (REPEATED | DEF)) != 0)
 		    writeRef(new FlagsAndType(encodeFlags(pflags), ptype));
 		else
 		    writeRef(ptype);
 	    }
-	    break;
-
-	case PolyType(Symbol[] tparams, Type result):
+	} else if (tp instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)tp;
 	    writeByte(POLYtpe);
 	    writeByte(0); // space for length
-	    writeRef(result);
-	    writeRefs(tparams);
-	    break;
-
-	case OverloadedType(Symbol[] alts, Type[] alttypes):
+	    writeRef(polyType.result);
+	    writeRefs(polyType.tparams);
+	} else if (tp instanceof Type.OverloadedType) {
+            Type.OverloadedType overloadedType = (Type.OverloadedType)tp;
 	    writeByte(OVERLOADEDtpe);
 	    writeByte(0); // space for length
-	    writeRefs(alts);
-	    writeRefs(alttypes);
-	    break;
-
-	default:
+	    writeRefs(overloadedType.alts);
+	    writeRefs(overloadedType.alttypes);
+	} else {
 	    throw new ApplicationError();
 	}
     }
@@ -471,67 +450,74 @@ public class Pickle implements Kinds, Modifiers, EntryTags {
     /** Write a constant entry.
      */
     private void writeConstant(AConstant constant) {
-        switch (constant) {
-        case UNIT:
+        if (constant == AConstant.UNIT) {
 	    writeByte(LITERALunit);
 	    writeByte(0); // space for length
             return;
-        case BOOLEAN(boolean value):
+        } else if (constant instanceof AConstant.BooleanValue) {
+            boolean value = ((AConstant.BooleanValue)constant).value;
 	    writeByte(LITERALboolean);
 	    writeByte(0); // space for length
 	    writeByte(value ? 1 : 0);
             return;
-        case BYTE(byte value):
+        } else if (constant instanceof AConstant.ByteValue) {
+            byte value = ((AConstant.ByteValue)constant).value;
 	    writeByte(LITERALbyte);
 	    writeByte(0); // space for length
 	    writeLong(value);
             return;
-        case SHORT(short value):
+        } else if (constant instanceof AConstant.ShortValue) {
+            short value = ((AConstant.ShortValue)constant).value;
 	    writeByte(LITERALshort);
 	    writeByte(0); // space for length
 	    writeLong(value);
             return;
-        case CHAR(char value):
+        } else if (constant instanceof AConstant.CharValue) {
+            char value = ((AConstant.CharValue)constant).value;
 	    writeByte(LITERALchar);
 	    writeByte(0); // space for length
 	    writeLong(value);
             return;
-        case INT(int value):
+        } else if (constant instanceof AConstant.IntValue) {
+            int value = ((AConstant.IntValue)constant).value;
 	    writeByte(LITERALint);
 	    writeByte(0); // space for length
 	    writeLong(value);
             return;
-        case LONG(long value):
+        } else if (constant instanceof AConstant.LongValue) {
+            long value = ((AConstant.LongValue)constant).value;
 	    writeByte(LITERALlong);
 	    writeByte(0); // space for length
 	    writeLong(value);
             return;
-        case FLOAT(float value):
+        } else if (constant instanceof AConstant.FloatValue) {
+            float value = ((AConstant.FloatValue)constant).value;
 	    writeByte(LITERALfloat);
 	    writeByte(0); // space for length
 	    writeLong(Float.floatToIntBits(value));
             return;
-        case DOUBLE(double value):
+        } else if (constant instanceof AConstant.DoubleValue) {
+            double value = ((AConstant.DoubleValue)constant).value;
 	    writeByte(LITERALdouble);
 	    writeByte(0); // space for length
 	    writeLong(Double.doubleToLongBits(value));
             return;
-        case STRING(String value):
+        } else if (constant instanceof AConstant.StringValue) {
+            String value = ((AConstant.StringValue)constant).value;
 	    writeByte(LITERALstring);
 	    writeByte(0); // space for length
 	    writeRef(Name.fromString(value));
             return;
-        case NULL:
+        } else if (constant == AConstant.NULL) {
 	    writeByte(LITERALnull);
 	    writeByte(0); // space for length
             return;
-        case ZERO:
+        } else if (constant == AConstant.ZERO) {
 	    writeByte(LITERALzero);
 	    writeByte(0); // space for length
             return;
-        default:
-            throw Debug.abort("unknown case", constant);
         }
+        throw Debug.abort("unknown case", constant);
     }
 
     private void writeEntry(Object e) {
@@ -589,4 +575,3 @@ public class Pickle implements Kinds, Modifiers, EntryTags {
 	}
     }
 }
-

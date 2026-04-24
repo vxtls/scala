@@ -49,13 +49,7 @@ public class Tree {
 
     /** Returns true if this tree is empty or error. */
     public boolean isMissing() {
-	switch (this) {
-        case Bad():
-	case Empty:
-	    return true;
-	default:
-	    return false;
-	}
+        return this instanceof Bad || this == Tree.Empty;
     }
 
     //########################################################################

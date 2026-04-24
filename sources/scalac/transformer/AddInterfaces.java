@@ -260,7 +260,7 @@ public class AddInterfaces extends GenTransformer {
     // needed for super calls to abstract method (possible in mixins).
     private Symbol getClassMember(Symbol member, boolean lazy) {
         Symbol owner = member.owner();
-        assert owner.isClass(): Debug.show(member);
+        if (!owner.isClass()) return member;
         if (!phase.needInterface(owner)) return member;
         Symbol clasz = phase.getClassSymbol(owner);
         Symbol clone = (Symbol)phase.getClassMemberMap(clasz).get(member);

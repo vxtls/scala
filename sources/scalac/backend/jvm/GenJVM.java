@@ -19,6 +19,7 @@ import scala.tools.util.Position;
 
 import scalac.*;
 import scalac.ast.Tree;
+import scalac.ast.TreeInfo;
 import scalac.atree.AConstant;
 import scalac.backend.*;
 import scalac.symtab.*;
@@ -26,7 +27,6 @@ import scalac.symtab.classfile.ClassfileConstants;
 import scalac.symtab.classfile.Pickle;
 import scalac.transformer.*;
 import scalac.util.*;
-
 
 /* Several things which are done here should in fact be done in
  * previous phases, namely:
@@ -62,7 +62,6 @@ class GenJVM {
     protected final static String JAVA_LANG_STRINGBUFFER = "java.lang.StringBuffer";
     protected final static String JAVA_RMI_REMOTE = "java.rmi.Remote";
     protected final static String JAVA_RMI_REMOTEEXCEPTION = "java.rmi.RemoteException";
-
     protected final static String SCALA_RUNTIME_RUNTIME = "scala.runtime.RunTime";
     protected final static String SCALA_UNIT = "scala.Unit";
     protected final static String SCALA_UNIT_VALUE = "UNIT_VAL";
@@ -139,14 +138,10 @@ class GenJVM {
 
         Symbol sym = tree.symbol();
 
-        switch (tree) {
-        case PackageDef(_, Tree.Template impl):
-            gen(ctx, impl);
-            break;
-
-        case ClassDef(_, _, _, _, _, Tree.Template impl) : {
+        if (tree instanceof Tree.PackageDef) {
+            gen(ctx, ((Tree.PackageDef)tree).impl);
+        } else if (tree instanceof Tree.ClassDef) {
             Tree.ClassDef classDef = (Tree.ClassDef)tree;
-
             Context ctx1 = enterClass(ctx, sym);
 
             addValueClassMembers(ctx1, classDef);
@@ -158,29 +153,23 @@ class GenJVM {
             if (clinit != null)
                 clinit.getCode().emitRETURN();
 
-            gen(ctx1, impl);
+            gen(ctx1, classDef.impl);
             leaveClass(ctx1, sym);
-        } break;
+        } else if (tree instanceof Tree.Template) {
+            gen(ctx, ((Tree.Template)tree).body);
+        } else if (tree instanceof Tree.ValDef) {
+            Tree.ValDef valDef = (Tree.ValDef)tree;
+            if (ctx.method != null) {
+                JType valType = typeStoJ(sym.info());
+                JLocalVariable var =
+                    ctx.method.addNewLocalVariable(valType, valDef.name.toString());
+                ctx.locals.put(sym, new Integer(var.getIndex()));
 
-        case Template(_, Tree[] body):
-            gen(ctx, body);
-            break;
-
-        case ValDef(_, Name name, _, Tree rhs): {
-            if (ctx.method == null)
-                break;          // ignore ValDefs in classes, handled elsewhere
-
-            JType valType = typeStoJ(sym.info());
-            JLocalVariable var =
-                ctx.method.addNewLocalVariable(valType, name.toString());
-            ctx.locals.put(sym, new Integer(var.getIndex()));
-
-            assert (rhs != Tree.Empty) : Debug.show(sym);
-            genLoad(ctx, rhs, valType);
-            ctx.code.emitSTORE(var);
-        } break;
-
-        case DefDef(_, _, _, _, _, Tree rhs): {
+                assert (valDef.rhs != Tree.Empty) : Debug.show(sym);
+                genLoad(ctx, valDef.rhs, valType);
+                ctx.code.emitSTORE(var);
+            }
+        } else if (tree instanceof Tree.DefDef) {
             Tree.DefDef defDef = (Tree.DefDef)tree;
             boolean retry = false;
             do {
@@ -188,7 +177,7 @@ class GenJVM {
                 try {
                     if (! Modifiers.Helper.isAbstract(sym.flags)) {
                         JType retType = ctx1.method.getReturnType();
-                        genLoad(ctx1, rhs, retType);
+                        genLoad(ctx1, defDef.rhs, retType);
                         ctx1.code.emitRETURN(retType);
                         ctx1.method.freeze();
                     }
@@ -200,28 +189,22 @@ class GenJVM {
                     retry = true;
                 }
             } while (retry);
-        } break;
-
-        case Return(Tree expr): {
+        } else if (tree instanceof Tree.Return) {
+            Tree.Return ret = (Tree.Return)tree;
             JType retType = ctx.method.getReturnType();
-            genLoad(ctx, expr, retType);
+            genLoad(ctx, ret.expr, retType);
             ctx.code.emitRETURN(retType);
-        } break;
-
-        case Typed(Tree expr, _):
-            gen(ctx, expr);
-            break;
-
-        case Empty:
-        case AbsTypeDef(_, _, _, _):
-        case AliasTypeDef(_, _, _, _):
-        case TypeApply(_, _):
-        case FunType(_, _):
-        case CompoundType(_, _):
-        case AppliedType(_,_):
-            break;
-
-        default:
+        } else if (tree instanceof Tree.Typed) {
+            gen(ctx, ((Tree.Typed)tree).expr);
+        } else if (tree == Tree.Empty
+                   || tree instanceof Tree.AbsTypeDef
+                   || tree instanceof Tree.AliasTypeDef
+                   || tree instanceof Tree.TypeApply
+                   || tree instanceof Tree.FunType
+                   || tree instanceof Tree.CompoundType
+                   || tree instanceof Tree.AppliedType) {
+            // no-op
+        } else {
             genLoad(ctx, tree, JType.VOID);
         }
 
@@ -245,29 +228,24 @@ class GenJVM {
         JType generatedType = null;
         Symbol sym = tree.symbol();
 
-        switch (tree) {
-        case LabelDef(_, Tree.Ident[] params, Tree rhs): {
+        if (tree instanceof Tree.LabelDef) {
+            Tree.LabelDef labelDef = (Tree.LabelDef)tree;
             JCode.Label label = ctx.code.newLabel();
             label.anchorToNext();
-            ctx.labels.put(sym, new Pair(label, params));
-            generatedType = genLoad(ctx, rhs, expectedType);
+            ctx.labels.put(sym, new Pair(label, labelDef.params));
+            generatedType = genLoad(ctx, labelDef.rhs, expectedType);
             ctx.labels.remove(sym);
-        } break;
-
-        case Block(Tree[] stats, Tree value): {
-            int statsNum = stats.length;
-            for (int i = 0; i < stats.length; ++i)
-                gen(ctx, stats[i]);
-            genLoad(ctx, value, expectedType);
+        } else if (tree instanceof Tree.Block) {
+            Tree.Block block = (Tree.Block)tree;
+            for (int i = 0; i < block.stats.length; ++i)
+                gen(ctx, block.stats[i]);
+            genLoad(ctx, block.expr, expectedType);
             generatedType = expectedType;
-        } break;
-
-        case Typed(Tree expr, _):
-            genLoad(ctx, expr, expectedType);
+        } else if (tree instanceof Tree.Typed) {
+            genLoad(ctx, ((Tree.Typed)tree).expr, expectedType);
             generatedType = expectedType;
-            break;
-
-        case New(Tree.Template templ): {
+        } else if (tree instanceof Tree.New) {
+            Tree.Template templ = ((Tree.New)tree).templ;
             assert templ.body.length == 0;
             assert templ.parents.length == 1;
 
@@ -276,10 +254,14 @@ class GenJVM {
             ctx.code.emitDUP();
             gen(ctx, templ.parents[0]);
             generatedType = new JObjectType(className);
-        } break;
+        } else if (tree instanceof Tree.Apply
+                   && ((Tree.Apply)tree).fun instanceof Tree.TypeApply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+            Tree fun = typeApply.fun;
+            Tree[] args = typeApply.args;
 
-        case Apply(TypeApply(Tree fun, Tree[] args), _): {
-            genLoadQualifier(ctx, fun);
+            genLoadQualifier(ctx, fun, true);
 
             JType type = typeStoJ(args[0].type);
             if (fun.symbol() == defs.ANY_IS) {
@@ -288,11 +270,13 @@ class GenJVM {
             } else if (fun.symbol() == defs.ANY_AS) {
                 ctx.code.emitCHECKCAST((JReferenceType)type);
                 generatedType = type;
-            } else
+            } else {
                 global.fail("unexpected type application");
-        } break;
-
-        case Apply(Tree fun, Tree[] args): {
+            }
+        } else if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree fun = apply.fun;
+            Tree[] args = apply.args;
             Symbol funSym = fun.symbol();
 
             if (funSym.isLabel()) {
@@ -308,7 +292,7 @@ class GenJVM {
                 for (int i = 0; i < args.length; ++i)
                     genLoad(ctx, args[i], typeStoJ(args[i].type));
                 for (int i = idents.length; i > 0; --i)
-                    genStoreEpilogue(ctx, idents[i-1]);
+                    genStoreEpilogue(ctx, idents[i - 1]);
                 ctx.code.emitGOTO_maybe_W(label, ctx.useWideJumps);
                 generatedType = funType.getReturnType();
             } else if (isKnownPrimitive(funSym)) {
@@ -324,7 +308,7 @@ class GenJVM {
                 case ADD: case SUB: case MUL: case DIV: case MOD:
                 case NOT: case OR : case XOR: case AND:
                 case LSL: case LSR: case ASR:
-                    Tree[] allArgs = extractPrimitiveArgs((Tree.Apply)tree);
+                    Tree[] allArgs = extractPrimitiveArgs(apply);
                     allArgs[0] = unbox(allArgs[0]);
                     JType resType = typeStoJ(tree.type);
                     genArithPrim(ctx, prim, allArgs, resType, expectedType);
@@ -348,24 +332,21 @@ class GenJVM {
                 case THROW:
                     assert args.length == 0;
                     genThrow(ctx, ((Tree.Select)fun).qualifier);
-                    // We pretend that we generated something of the
-                    // expected type, to avoid trying to generate
-                    // bogus conversions.
+                    genUnreachableValue(ctx, expectedType);
                     generatedType = expectedType;
                     break;
 
-                case SYNCHRONIZED: {
+                case SYNCHRONIZED:
                     assert args.length == 1;
-                    Tree qual = ((Tree.Select)fun).qualifier;
-                    genSynchronized(ctx, qual, args[0], expectedType);
+                    genSynchronized(ctx, ((Tree.Select)fun).qualifier, args[0], expectedType);
                     generatedType = expectedType;
-                } break;
+                    break;
 
-                case NEW_OARRAY: {
+                case NEW_OARRAY:
                     assert args.length == 2;
                     genRefArrayCreate(ctx, args[0], args[1]);
                     generatedType = expectedType;
-                } break;
+                    break;
 
                 case NEW_ZARRAY : case NEW_BARRAY : case NEW_SARRAY :
                 case NEW_CARRAY : case NEW_IARRAY : case NEW_LARRAY :
@@ -421,10 +402,8 @@ class GenJVM {
                 JType[] argTypes = funType.getArgumentTypes();
 
                 boolean isConstrCall = funSym.isInitializer();
-                boolean isSuperCall = false;
-                switch (fun) {
-                case Select(Super(_, _), _): isSuperCall = true;
-                }
+                boolean isSuperCall = fun instanceof Tree.Select
+                    && ((Tree.Select)fun).qualifier instanceof Tree.Super;
 
                 boolean isStatic = isStaticMember(funSym);
                 if (!isStatic)
@@ -440,40 +419,37 @@ class GenJVM {
                 funSym.owner().info(); // [HACK] ensure that flags are
                                        // transformed.
 
-                if (funSym.owner().isInterface())
+                if (funSym.owner().isInterface()) {
                     ctx.code.emitINVOKEINTERFACE(clsName, mthName, funType);
-                else {
+                } else {
                     if (isConstrCall || isSuperCall) {
                         ctx.code.emitINVOKESPECIAL(clsName, mthName, funType);
                         if (isConstrCall && isSuperCall && ctx.isModuleClass) {
-                            // Initialise module instance field ASAP
                             ctx.code.emitALOAD_0();
                             ctx.code.emitPUTSTATIC(ctx.clazz.getName(),
                                                    MODULE_INSTANCE_FIELD_NAME,
                                                    ctx.clazz.getType());
                         }
-                    } else if (isStatic)
+                    } else if (isStatic) {
                         ctx.code.emitINVOKESTATIC(clsName, mthName, funType);
-                    else
+                    } else {
                         ctx.code.emitINVOKEVIRTUAL(clsName, mthName, funType);
+                    }
                 }
                 generatedType = funType.getReturnType();
             }
-        } break;
-
-        case Ident(_):
+        } else if (tree instanceof Tree.Ident) {
+            Tree.Ident ident = (Tree.Ident)tree;
             JType type = typeStoJ(sym.info());
-            if (sym.isModule()) {
-                String javaSymName = javaName(sym.moduleClass());
-                ctx.code.emitGETSTATIC(javaSymName,
-                                       MODULE_INSTANCE_FIELD_NAME,
-                                       type);
-                generatedType = type;
-            } else if (sym.owner().isClass()) {
-                JType fieldType = typeStoJ(sym.info());
-                String className = javaName(sym.owner());
-                String fieldName = sym.name.toString();
-                ctx.code.emitGETSTATIC(className, fieldName, fieldType);
+            if (sym.isModule())
+                generatedType = genLoadModule(ctx, sym);
+            else if (sym.owner().isClass()) {
+                if (isStaticMember(sym))
+                    ctx.code.emitGETSTATIC(javaName(sym.owner()), ident.name.toString(), type);
+                else {
+                    ctx.code.emitALOAD_0();
+                    ctx.code.emitGETFIELD(ctx.clazz.getName(), ident.name.toString(), type);
+                }
                 generatedType = type;
             } else {
                 assert ctx.locals.containsKey(sym)
@@ -482,90 +458,124 @@ class GenJVM {
                 ctx.code.emitLOAD(index, type);
                 generatedType = type;
             }
-            break;
-
-        case Select(Tree qualifier, _):
-            JType fieldType = typeStoJ(sym.info());
-            String className = javaName(sym.owner());
-            String fieldName = sym.name.toString();
-            genLoadQualifier(ctx, tree);
-            ctx.code.emitGETFIELD(className, fieldName, fieldType);
-            generatedType = fieldType;
-            break;
-
-        case Assign(Tree lhs, Tree rhs): {
-            genStorePrologue(ctx, lhs);
-            genLoad(ctx, rhs, typeStoJ(lhs.symbol().info()));
-            genStoreEpilogue(ctx, lhs);
+        } else if (tree instanceof Tree.Select) {
+            Tree.Select select = (Tree.Select)tree;
+            sym.info();
+            if (sym.isModule())
+                generatedType = genLoadModule(ctx, sym);
+            else {
+                JType fieldType = typeStoJ(sym.info());
+                String className = javaName(sym.owner());
+                String fieldName = select.selector.toString();
+                if (isStaticMember(sym))
+                    ctx.code.emitGETSTATIC(className, fieldName, fieldType);
+                else {
+                    genLoadQualifier(ctx, tree, true);
+                    ctx.code.emitGETFIELD(className, fieldName, fieldType);
+                }
+                generatedType = fieldType;
+            }
+        } else if (tree instanceof Tree.Assign) {
+            Tree.Assign assign = (Tree.Assign)tree;
+            genStorePrologue(ctx, assign.lhs);
+            genLoad(ctx, assign.rhs, typeStoJ(assign.lhs.symbol().info()));
+            genStoreEpilogue(ctx, assign.lhs);
             generatedType = JType.VOID;
-        } break;
-
-        case If(Tree cond, Tree thenp, Tree elsep): {
+        } else if (tree instanceof Tree.If) {
+            Tree.If ifTree = (Tree.If)tree;
             JType finalType = typeStoJ(tree.type);
 
             JCode.Label elseLabel = ctx.code.newLabel();
-            genCond(ctx, cond, elseLabel, false);
-            genLoad(ctx, thenp, finalType);
+            genCond(ctx, ifTree.cond, elseLabel, false);
+            genLoad(ctx, ifTree.thenp, finalType);
             JCode.Label afterLabel = ctx.code.newLabel();
-            ctx.code.emitGOTO_maybe_W(afterLabel, ctx.useWideJumps);
+            if (!isThrowingTree(ifTree.thenp))
+                ctx.code.emitGOTO_maybe_W(afterLabel, ctx.useWideJumps);
             elseLabel.anchorToNext();
-            if (elsep == Tree.Empty)
+            if (ifTree.elsep == Tree.Empty)
                 maybeGenLoadUnit(ctx, finalType);
             else
-                genLoad(ctx, elsep, finalType);
+                genLoad(ctx, ifTree.elsep, finalType);
             afterLabel.anchorToNext();
             generatedType = finalType;
-        } break;
-
-        case Switch(Tree test, int[] tags, Tree[] bodies, Tree otherwise): {
-            JCode.Label[] labels = ctx.code.newLabels(bodies.length);
+        } else if (tree instanceof Tree.Switch) {
+            Tree.Switch switchTree = (Tree.Switch)tree;
+            JCode.Label[] labels = ctx.code.newLabels(switchTree.bodies.length);
             JCode.Label defaultLabel = ctx.code.newLabel();
             JCode.Label afterLabel = ctx.code.newLabel();
 
-            genLoad(ctx, test, JType.INT);
-            ctx.code.emitSWITCH(tags, labels, defaultLabel, 0.9);
-            for (int i = 0; i < bodies.length; ++i) {
+            genLoad(ctx, switchTree.test, JType.INT);
+            ctx.code.emitSWITCH(switchTree.tags, labels, defaultLabel, 0.9);
+            for (int i = 0; i < switchTree.bodies.length; ++i) {
                 labels[i].anchorToNext();
-                genLoad(ctx, bodies[i], expectedType);
+                genLoad(ctx, switchTree.bodies[i], expectedType);
                 ctx.code.emitGOTO_maybe_W(afterLabel, ctx.useWideJumps);
             }
             defaultLabel.anchorToNext();
-            genLoad(ctx, otherwise, expectedType);
+            genLoad(ctx, switchTree.otherwise, expectedType);
             afterLabel.anchorToNext();
             generatedType = expectedType;
-        } break;
-
-        case This(_):
-        case Super(_, _):
+        } else if (tree instanceof Tree.This || tree instanceof Tree.Super) {
             ctx.code.emitALOAD_0();
             generatedType = JAVA_LANG_OBJECT_T;
-            break;
-
-        case Literal(AConstant value):
-            generatedType = genLoadLiteral(ctx, value, expectedType);
-            break;
-
-        case Empty:
-        case AbsTypeDef(_, _, _, _):
-        case AliasTypeDef(_, _, _, _):
-        case TypeApply(_, _):
-        case FunType(_, _):
-        case CompoundType(_, _):
-        case AppliedType(_,_):
+        } else if (tree instanceof Tree.Literal) {
+            AConstant value = ((Tree.Literal)tree).value;
+            if (value == AConstant.UNIT) {
+                maybeGenLoadUnit(ctx, expectedType);
+                generatedType = expectedType;
+            } else if (value instanceof AConstant.BooleanValue) {
+                ctx.code.emitPUSH(((AConstant.BooleanValue)value).value);
+                generatedType = JType.BOOLEAN;
+            } else if (value instanceof AConstant.ByteValue) {
+                ctx.code.emitPUSH(((AConstant.ByteValue)value).value);
+                generatedType = JType.BYTE;
+            } else if (value instanceof AConstant.ShortValue) {
+                ctx.code.emitPUSH(((AConstant.ShortValue)value).value);
+                generatedType = JType.SHORT;
+            } else if (value instanceof AConstant.CharValue) {
+                ctx.code.emitPUSH(((AConstant.CharValue)value).value);
+                generatedType = JType.CHAR;
+            } else if (value instanceof AConstant.IntValue) {
+                ctx.code.emitPUSH(((AConstant.IntValue)value).value);
+                generatedType = JType.INT;
+            } else if (value instanceof AConstant.LongValue) {
+                ctx.code.emitPUSH(((AConstant.LongValue)value).value);
+                generatedType = JType.LONG;
+            } else if (value instanceof AConstant.FloatValue) {
+                ctx.code.emitPUSH(((AConstant.FloatValue)value).value);
+                generatedType = JType.FLOAT;
+            } else if (value instanceof AConstant.DoubleValue) {
+                ctx.code.emitPUSH(((AConstant.DoubleValue)value).value);
+                generatedType = JType.DOUBLE;
+            } else if (value instanceof AConstant.StringValue) {
+                ctx.code.emitPUSH(((AConstant.StringValue)value).value);
+                generatedType = JAVA_LANG_STRING_T;
+            } else if (value == AConstant.NULL) {
+                if (expectedType != JType.VOID)
+                    ctx.code.emitACONST_NULL();
+                generatedType = expectedType;
+            } else {
+                throw Debug.abort("unknown literal", value);
+            }
+        } else if (tree == Tree.Empty
+                   || tree instanceof Tree.AbsTypeDef
+                   || tree instanceof Tree.AliasTypeDef
+                   || tree instanceof Tree.TypeApply
+                   || tree instanceof Tree.FunType
+                   || tree instanceof Tree.CompoundType
+                   || tree instanceof Tree.AppliedType) {
             generatedType = JType.VOID;
-            break;
-
-        case Sequence(_):
-        case ModuleDef(_,_,_,_):
-        case PatDef(_,_,_):
-        case Import(_, _):
-        case CaseDef(_, _, _):
-        case Visitor(_):
-        case Function(_, _):
+        } else if (tree instanceof Tree.Sequence
+                   || tree instanceof Tree.ModuleDef
+                   || tree instanceof Tree.PatDef
+                   || tree instanceof Tree.Import
+                   || tree instanceof Tree.CaseDef
+                   || tree instanceof Tree.Visitor
+                   || tree instanceof Tree.Function) {
             throw global.fail("unexpected node", tree);
-        case Bad():
+        } else if (tree instanceof Tree.Bad) {
             throw global.fail("bad tree");
-        default:
+        } else {
             throw global.fail("unknown node", tree);
         }
 
@@ -584,61 +594,97 @@ class GenJVM {
         return expectedType;
     }
 
+    private boolean isThrowingTree(Tree tree) {
+        if (tree.getType().symbol() == defs.ALL_CLASS)
+            return true;
+        if (tree instanceof Tree.Block) {
+            Tree.Block block = (Tree.Block)tree;
+            if (isThrowingTree(block.expr))
+                return true;
+            return block.stats.length != 0 &&
+                isThrowingTree(block.stats[block.stats.length - 1]);
+        }
+        if (tree instanceof Tree.Typed)
+            return isThrowingTree(((Tree.Typed)tree).expr);
+        Symbol symbol = TreeInfo.methSymbol(tree);
+        if (isKnownPrimitive(symbol) && prims.getPrimitive(symbol) == Primitive.THROW)
+            return true;
+        return false;
+    }
+
+    /**
+     * Generate code to load the module represented by the given symbol.
+     */
+    protected JType genLoadModule(Context ctx, Symbol sym) {
+        String javaSymName = javaName(sym.isModule() ? sym.moduleClass() : sym);
+        JType type = typeStoJ(sym.info());
+        if (javaSymName.equals(ctx.clazz.getName()))
+            ctx.code.emitALOAD_0();
+        else
+            ctx.code.emitGETSTATIC(javaSymName,
+                                   MODULE_INSTANCE_FIELD_NAME,
+                                   type);
+
+        return type;
+    }
+
     /**
      * Generate code to load the qualifier of the given tree, which
      * can be implicitely "this".
      */
     protected void genLoadQualifier(Context ctx, Tree tree)
         throws JCode.OffsetTooBigException {
-        switch (tree) {
-        case Ident(_):
-            break;
-        case Select(Tree qualifier, _):
-            genLoad(ctx, qualifier, JAVA_LANG_OBJECT_T);
-            break;
-        default:
+        genLoadQualifier(ctx, tree, false);
+    }
+
+    protected void genLoadQualifier(Context ctx, Tree tree, boolean implicitThis)
+        throws JCode.OffsetTooBigException {
+        if (tree instanceof Tree.Ident) {
+            if (implicitThis)
+                ctx.code.emitALOAD_0();
+        } else if (tree instanceof Tree.Select) {
+            genLoad(ctx, ((Tree.Select)tree).qualifier, JAVA_LANG_OBJECT_T);
+        } else {
             throw global.fail("unknown qualifier");
         }
     }
 
     protected JType genLoadLiteral(Context ctx, AConstant lit, JType type) {
-        switch (lit) {
-        case UNIT:
+        if (lit == AConstant.UNIT) {
             maybeGenLoadUnit(ctx, type);
             return type;
-        case BOOLEAN(boolean value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.BOOLEAN) {
+            ctx.code.emitPUSH(((AConstant.BOOLEAN)lit).value);
             return JType.BOOLEAN;
-        case BYTE(byte value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.BYTE) {
+            ctx.code.emitPUSH(((AConstant.BYTE)lit).value);
             return JType.BYTE;
-        case SHORT(short value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.SHORT) {
+            ctx.code.emitPUSH(((AConstant.SHORT)lit).value);
             return JType.SHORT;
-        case CHAR(char value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.CHAR) {
+            ctx.code.emitPUSH(((AConstant.CHAR)lit).value);
             return JType.CHAR;
-        case INT(int value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.INT) {
+            ctx.code.emitPUSH(((AConstant.INT)lit).value);
             return JType.INT;
-        case LONG(long value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.LONG) {
+            ctx.code.emitPUSH(((AConstant.LONG)lit).value);
             return JType.LONG;
-        case FLOAT(float value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.FLOAT) {
+            ctx.code.emitPUSH(((AConstant.FLOAT)lit).value);
             return JType.FLOAT;
-        case DOUBLE(double value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.DOUBLE) {
+            ctx.code.emitPUSH(((AConstant.DOUBLE)lit).value);
             return JType.DOUBLE;
-        case STRING(String value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.STRING) {
+            ctx.code.emitPUSH(((AConstant.STRING)lit).value);
             return JAVA_LANG_STRING_T;
-        case NULL:
+        } else if (lit == AConstant.NULL) {
             if (type != JType.VOID) ctx.code.emitACONST_NULL();
             return type;
-        default:
-            throw Debug.abort("unknown literal", lit);
         }
+        throw Debug.abort("unknown literal", lit);
     }
 
     /**
@@ -658,7 +704,16 @@ class GenJVM {
      */
     protected void genStorePrologue(Context ctx, Tree tree)
         throws JCode.OffsetTooBigException {
-        genLoadQualifier(ctx, tree);
+        Symbol sym = tree.symbol();
+        if (tree instanceof Tree.Ident) {
+            if (sym.owner().isClass() && !isStaticMember(sym))
+                ctx.code.emitALOAD_0();
+        } else if (tree instanceof Tree.Select) {
+            if (!isStaticMember(sym))
+                genLoadQualifier(ctx, tree, true);
+        } else {
+            throw global.fail("unexpected left-hand side", tree);
+        }
     }
 
     /**
@@ -695,11 +750,12 @@ class GenJVM {
                            JCode.Label target,
                            boolean when)
         throws JCode.OffsetTooBigException {
-        switch (tree) {
-        case Apply(Tree fun, Tree[] args):
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree fun = apply.fun;
             if (isKnownPrimitive(fun.symbol())) {
                 Primitive prim = prims.getPrimitive(fun.symbol());
-                Tree[] allArgs = extractPrimitiveArgs((Tree.Apply)tree);
+                Tree[] allArgs = extractPrimitiveArgs(apply);
 
                 switch (prim) {
                 case ID: case EQ: case NE:
@@ -916,28 +972,21 @@ class GenJVM {
         for (int i = 0; i < args.length; ++i) {
             boolean isIntZero = false;
             if (maxTypeIdx <= intTypeIdx) {
-                switch (args[i]) {
-                case Literal(AConstant constant):
+                if (args[i] instanceof Tree.Literal) {
+                    AConstant constant = ((Tree.Literal)args[i]).value;
                     int intVal;
-                    switch (constant) {
-                    case BOOLEAN(boolean value):
-                        intVal = value ? 1 : 0;
-                        break;
-                    case BYTE(byte value):
-                        intVal = value;
-                        break;
-                    case SHORT(short value):
-                        intVal = value;
-                        break;
-                    case CHAR(char value):
-                        intVal = value;
-                        break;
-                    case INT(int value):
-                        intVal = value;
-                        break;
-                    default:
+                    if (constant instanceof AConstant.BooleanValue)
+                        intVal = ((AConstant.BooleanValue)constant).value ? 1 : 0;
+                    else if (constant instanceof AConstant.ByteValue)
+                        intVal = ((AConstant.ByteValue)constant).value;
+                    else if (constant instanceof AConstant.ShortValue)
+                        intVal = ((AConstant.ShortValue)constant).value;
+                    else if (constant instanceof AConstant.CharValue)
+                        intVal = ((AConstant.CharValue)constant).value;
+                    else if (constant instanceof AConstant.IntValue)
+                        intVal = ((AConstant.IntValue)constant).value;
+                    else
                         throw Debug.abort("unknown literal", constant);
-                    }
                     if (intVal == 0) {
                         isIntZero = true;
                         if (i == 0) prim = prim.swap();
@@ -990,6 +1039,21 @@ class GenJVM {
         genLoad(ctx, arg, JAVA_LANG_OBJECT_T);
         ctx.code.emitCHECKCAST(JAVA_LANG_THROWABLE_T);
         ctx.code.emitATHROW();
+    }
+
+    protected void genUnreachableValue(Context ctx, JType type) {
+        if (type == JType.VOID)
+            return;
+        if (type == JType.LONG)
+            ctx.code.emitPUSH(0L);
+        else if (type == JType.FLOAT)
+            ctx.code.emitPUSH(0.0f);
+        else if (type == JType.DOUBLE)
+            ctx.code.emitPUSH(0.0d);
+        else if (type.isReferenceType())
+            ctx.code.emitACONST_NULL();
+        else
+            ctx.code.emitICONST_0();
     }
 
     /**
@@ -1058,9 +1122,12 @@ class GenJVM {
         genLoad(ctx, size, JType.INT);
 
         String className;
-        switch (classNameLit) {
-        case Literal(STRING(String name)): className = name; break;
-        default: throw global.fail("invalid argument for oarray " + classNameLit);
+        if (classNameLit instanceof Tree.Literal
+            && ((Tree.Literal)classNameLit).value instanceof AConstant.StringValue) {
+            className =
+                ((AConstant.StringValue)((Tree.Literal)classNameLit).value).value;
+        } else {
+            throw global.fail("invalid argument for oarray " + classNameLit);
         }
 
         JReferenceType elemType;
@@ -1125,17 +1192,19 @@ class GenJVM {
     }
 
     protected void liftStringConcatenations(Tree tree, LinkedList accu) {
-        switch (tree) {
-        case Apply(Select(Tree qualifier, Name selector), Tree[] args): {
-            Symbol funSym = ((Tree.Apply)tree).fun.symbol();
+        if (tree instanceof Tree.Apply
+            && ((Tree.Apply)tree).fun instanceof Tree.Select) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree.Select select = (Tree.Select)apply.fun;
+            Symbol funSym = select.symbol();
             if  (prims.isPrimitive(funSym)
                  && prims.getPrimitive(funSym) == Primitive.CONCAT) {
-                liftStringConcatenations(qualifier, accu);
-                liftStringConcatenations(args[0], accu);
-            } else
+                liftStringConcatenations(select.qualifier, accu);
+                liftStringConcatenations(apply.args[0], accu);
+            } else {
                 accu.addLast(tree);
-            } break;
-        default:
+            }
+        } else {
             accu.addLast(tree);
         }
     }
@@ -1249,16 +1318,14 @@ class GenJVM {
      * Return the unboxed version of the given tree.
      */
     protected Tree unbox(Tree tree) {
-        switch (tree) {
-        case Apply(Tree fun, Tree[] args):
-            if (prims.getPrimitive(fun.symbol()) == Primitive.BOX) {
-                assert args.length == 1;
-                return args[0];
-            } else
-                return tree;
-        default:
-            return tree;
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            if (prims.getPrimitive(apply.fun.symbol()) == Primitive.BOX) {
+                assert apply.args.length == 1;
+                return apply.args[0];
+            }
         }
+        return tree;
     }
 
     /// Modules
@@ -1441,44 +1508,50 @@ class GenJVM {
      * Return the Java type corresponding to the given Scala type.
      */
     protected JType typeStoJ(Type tp) {
-        switch (tp) {
-        case ConstantType(Type base, _):
-            return typeStoJ(base);
-        case TypeRef(_, Symbol sym, _):
-            Object value = typeMap.get(sym);
-            if (value != null) return (JType)value;
+        if (tp instanceof Type.UnboxedType) {
+            switch (((Type.UnboxedType)tp).tag) {
+            case TypeTags.BYTE:
+                return JType.BYTE;
+            case TypeTags.CHAR:
+                return JType.CHAR;
+            case TypeTags.SHORT:
+                return JType.SHORT;
+            case TypeTags.INT:
+                return JType.INT;
+            case TypeTags.LONG:
+                return JType.LONG;
+            case TypeTags.FLOAT:
+                return JType.FLOAT;
+            case TypeTags.DOUBLE:
+                return JType.DOUBLE;
+            case TypeTags.BOOLEAN:
+                return JType.BOOLEAN;
+            case TypeTags.UNIT:
+                return JType.VOID;
+            case TypeTags.STRING:
+                return JObjectType.JAVA_LANG_STRING;
+            default:
+                break;
+            }
+        } else if (tp instanceof Type.UnboxedArrayType) {
+            return new JArrayType(typeStoJ(((Type.UnboxedArrayType)tp).elemtp));
+        } else if (tp instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)tp;
+            JType[] argTypes = new JType[methodType.vparams.length];
+            for (int i = 0; i < methodType.vparams.length; ++i)
+                argTypes[i] = typeStoJ(methodType.vparams[i].info());
+            return new JMethodType(typeStoJ(methodType.result), argTypes);
+        }
+
+        Symbol sym = tp.symbol();
+        if (sym == Symbol.NONE)
+            throw global.fail("invalid type ", tp);
+        else if (typeMap.containsKey(sym))
+            return (JType)typeMap.get(sym);
+        else {
             JType jTp = new JObjectType(javaName(sym));
             typeMap.put(sym, jTp);
             return jTp;
-        case UnboxedType(TypeTags.BYTE):
-            return JType.BYTE;
-        case UnboxedType(TypeTags.CHAR):
-            return JType.CHAR;
-        case UnboxedType(TypeTags.SHORT):
-            return JType.SHORT;
-        case UnboxedType(TypeTags.INT):
-            return JType.INT;
-        case UnboxedType(TypeTags.LONG):
-            return JType.LONG;
-        case UnboxedType(TypeTags.FLOAT):
-            return JType.FLOAT;
-        case UnboxedType(TypeTags.DOUBLE):
-            return JType.DOUBLE;
-        case UnboxedType(TypeTags.BOOLEAN):
-            return JType.BOOLEAN;
-        case UnboxedType(TypeTags.UNIT):
-            return JType.VOID;
-        case UnboxedType(TypeTags.STRING):
-            return JObjectType.JAVA_LANG_STRING;
-        case UnboxedArrayType(Type elementType):
-            return new JArrayType(typeStoJ(elementType));
-        case MethodType(Symbol[] vparams, Type result):
-            JType[] argTypes = new JType[vparams.length];
-            for (int i = 0; i < vparams.length; ++i)
-                argTypes[i] = typeStoJ(vparams[i].info());
-            return new JMethodType(typeStoJ(result), argTypes);
-        default:
-            throw Debug.abort("invalid type", tp);
         }
     }
 
@@ -1647,15 +1720,9 @@ class GenJVM {
                                                             new byte[]{}));
 
         if (ctx.isRemote && mSym.isPublic()) {
-            // (see http://java.sun.com/docs/books/vmspec/html/ClassFile.doc.html#3129)
-            // Exceptions_attribute {
-            // ..
-            // u2 number_of_exceptions;
-    	    // u2 exception_index_table[number_of_exceptions];
-            // }
             JConstantPool cp = ctx.clazz.getConstantPool();
             int reInx = cp.addClass(JAVA_RMI_REMOTEEXCEPTION);
-            ByteBuffer contents = ByteBuffer.allocate(4); // u2 + u2[1]
+            ByteBuffer contents = ByteBuffer.allocate(4);
             contents.putShort((short) 1);
             contents.putShort((short) reInx);
             global.log("adding 'Exceptions_attribute' " + contents.toString()
@@ -1729,11 +1796,13 @@ class GenJVM {
                 new Scope.UnloadIterator(iSym.members().iterator());
             while (memberIt.hasNext()) {
                 Symbol member = memberIt.next();
-                if (member.isTerm() && !member.isMethod() && member.isPrivate())
-                    switch (member.info()) {
-                    case ConstantType(_, AConstant value):
+                if (member.isTerm() && !member.isMethod() && member.isPrivate()) {
+                    Type info = member.info();
+                    if (info instanceof Type.ConstantType) {
+                        AConstant value = ((Type.ConstantType)info).value;
                         staticMembers.put(member, value);
                     }
+                }
             }
             global.currentPhase = bkpCurrent;
 

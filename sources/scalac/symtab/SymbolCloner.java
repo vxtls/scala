@@ -10,6 +10,7 @@ package scalac.symtab;
 
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Iterator;
 
 import scalac.util.Debug;
 
@@ -62,128 +63,58 @@ public class SymbolCloner {
         Symbol oldowner = symbol.owner();
         Object newowner = clones.get(oldowner);
         if (newowner == null) newowner = owners.get(oldowner);
+        if (newowner == null && oldowner.isConstructor()) {
+            for (Iterator it = owners.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry entry = (Map.Entry)it.next();
+                Symbol owner = (Symbol)entry.getKey();
+                if (owner.isConstructor() &&
+                    owner.constructorClass() == oldowner.constructorClass()) {
+                    newowner = entry.getValue();
+                    break;
+                }
+            }
+        }
         assert newowner != null : Debug.show(symbol);
         return (Symbol)newowner;
     }
 
-    /** Clones the given symbol but not its type. */
-    public Symbol cloneSymbolWithoutType(Symbol symbol) {
-        assert !symbol.isPrimaryConstructor(): Debug.show(symbol);
-        assert !symbol.isClassType() || symbol.isCompoundSym(): Debug.show(symbol); // !!! isCompoundSym()
-        assert !symbol.isModule(): Debug.show(symbol);
-        assert !owners.containsKey(symbol): Debug.show(symbol);
-        assert !clones.containsKey(symbol):
+    /** Clones the given symbol. */
+    public Symbol cloneSymbol(Symbol symbol) {
+        assert !symbol.isPrimaryConstructor() : Debug.show(symbol);
+        assert !symbol.isModuleClass() : Debug.show(symbol);
+        assert !symbol.isClass() : Debug.show(symbol);
+        assert !symbol.isModule() : Debug.show(symbol);
+        assert !owners.containsKey(symbol) : Debug.show(symbol);
+        assert !clones.containsKey(symbol) :
             Debug.show(symbol) + " -> " + Debug.show(clones.get(symbol));
         Symbol clone = symbol.cloneSymbol(getOwnerFor(symbol));
         clones.put(symbol, clone);
-        return clone;
-    }
-
-    /** Clones the given symbols but not their types. */
-    public Symbol[] cloneSymbolsWithoutTypes(Symbol[] symbols) {
-        if (symbols.length == 0) return Symbol.EMPTY_ARRAY;
-        Symbol[] clones = new Symbol[symbols.length];
-        for (int i = 0; i < clones.length; i++)
-            clones[i] = cloneSymbolWithoutType(symbols[i]);
-        return clones;
-    }
-
-    /** Clones the given scope but not the type of its members. */
-    public Scope cloneScopeWithoutTypes(Scope scope) {
-        Scope clone = new Scope();
-        for (Scope.SymbolIterator i = scope.iterator(true); i.hasNext(); ) {
-            clone.enterOrOverload(cloneSymbolWithoutType(i.next()));
-        }
-        return clone;
-    }
-
-    /** Clones the given symbol and its type. */
-    public Symbol cloneSymbol(Symbol symbol) {
-        Symbol clone = cloneSymbolWithoutType(symbol);
         clone.setType(cloneType(symbol.info()));
         return clone;
     }
 
-    /** Clones the given symbols and their types. */
+    /** Clones the given symbols. */
     public Symbol[] cloneSymbols(Symbol[] symbols) {
-        Symbol[] clones = cloneSymbolsWithoutTypes(symbols);
+        if (symbols.length == 0) return Symbol.EMPTY_ARRAY;
+        Symbol[] clones = new Symbol[symbols.length];
         for (int i = 0; i < clones.length; i++)
-            clones[i].setType(cloneType(symbols[i].info()));
+            clones[i] = cloneSymbol(symbols[i]);
         return clones;
-    }
-
-    /** Clones the given scope and the type of its members. */
-    public Scope cloneScope(Scope scope) {
-        Scope clone = cloneScopeWithoutTypes(scope);
-        for (Scope.SymbolIterator i = scope.iterator(true); i.hasNext(); ) {
-            Symbol member = i.next();
-            member.setType(cloneType(member.info()));
-        }
-        return clone;
     }
 
     /** Clones the given type. */
     public Type cloneType(Type type) {
-        return typer.apply(type);
-    }
-
-    //########################################################################
-    // Private Method
-
-    private Symbol getCompoundClone(Symbol symbol) {
-        assert symbol.isCompoundSym(): Debug.show(symbol);
-        assert !owners.containsKey(symbol): Debug.show(symbol);
-        assert !clones.containsKey(symbol):
-            Debug.show(symbol) + " -> " + Debug.show(clones.get(symbol));
-        Symbol owner = (Symbol)clones.get(symbol.owner());
-        if (owner == null) owner = (Symbol)owners.get(symbol.owner());
-        if (owner == null) owner = symbol.owner();
-        Symbol clone = symbol.cloneSymbol(owner);
-        clones.put(symbol, clone);
-        return clone;
-    }
-
-    //########################################################################
-    // Private Class - Type cloner
-
-    /** The type cloner Type.Map */
-    private final Type.Map typer = new Type.Map(){public Type apply(Type type){
-        switch (type) {
-        case ErrorType:
-        case NoType:
-        case NoPrefix:
-            return type;
-        case ThisType(Symbol symbol):
-            Symbol clone = (Symbol)clones.get(symbol);
-            if (clone == null) return type;
-            return Type.ThisType(clone);
-        case SingleType(Type prefix, Symbol symbol):
-            Symbol clone = (Symbol)clones.get(symbol);
-            if (clone == null) return map(type);
-            return Type.singleType(apply(prefix), clone);
-        case ConstantType(_, _):
-            return map(type);
-        case TypeRef(Type prefix, Symbol symbol, Type[] args):
-            Symbol clone = (Symbol)clones.get(symbol);
-            if (clone == null) return map(type);
-            return Type.typeRef(apply(prefix), clone, map(args));
-        case CompoundType(Type[] parts, Scope members):
-            Symbol clone = /* !!! getCompoundClone */(type.symbol());
-            return Type.compoundType(map(parts), /* !!! cloneScope */(members), clone);
-        case MethodType(Symbol[] vparams, Type result):
-            Symbol[] clones = cloneSymbols(vparams);
-            return Type.MethodType(clones, apply(result));
-        case PolyType(Symbol[] tparams, Type result):
-            Symbol[] clones = cloneSymbols(tparams);
-            return Type.PolyType(clones, apply(result));
-        case UnboxedType(_):
-            return type;
-        case UnboxedArrayType(_):
-            return map(type);
-        default:
-            throw Debug.abort("illegal case", type);
+        if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)type;
+            Symbol[] clones = cloneSymbols(polyType.tparams);
+            Type clone = Type.PolyType(clones, cloneType(polyType.result));
+            return Type.getSubst(polyType.tparams, clones).applyParams(clone);
+        } else if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            return Type.MethodType(cloneSymbols(methodType.vparams), cloneType(methodType.result));
         }
-    }};
+        return type;
+    }
 
     //########################################################################
 }

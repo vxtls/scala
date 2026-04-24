@@ -13,23 +13,8 @@ package scala;
 public abstract class Char    extends AnyVal {
 
     public final char    value;
-    public final int     $plus;
-    public final int     $minus;
-    public final double  coerceToDouble;
-    public final float   coerceToFloat;
-    public final int     $tilde;
-    public final long    coerceToLong;
-    public final int     coerceToInt;
-
     public Char   (char    value) {
         this.value = value;
-        this.$plus = +value;
-        this.$minus = -value;
-        this.coerceToDouble = value;
-        this.coerceToFloat = value;
-        this.$tilde = ~value;
-        this.coerceToLong = value;
-        this.coerceToInt = value;
     }
 
     public boolean equals(java.lang.Object other) {

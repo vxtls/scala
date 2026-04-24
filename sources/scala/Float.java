@@ -13,15 +13,8 @@ package scala;
 public abstract class Float   extends AnyVal {
 
     public final float   value;
-    public final float   $plus;
-    public final float   $minus;
-    public final double  coerceToDouble;
-
     public Float  (float   value) {
         this.value = value;
-        this.$plus = +value;
-        this.$minus = -value;
-        this.coerceToDouble = value;
     }
 
     public boolean equals(java.lang.Object other) {

@@ -14,7 +14,7 @@ import scalac.*;
 import scalac.util.*;
 import scalac.ast.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 /** - uncurry all symbol and tree types (@see UnCurryPhase)
  *  - for every curried parameter list:  (ps_1) ... (ps_n) ==> (ps_1, ..., ps_n)
@@ -65,27 +65,28 @@ public class UnCurry extends OwnerTransformer
     /** tree of non-method type T ==> same tree with method type ()T
      */
     Tree asMethod(Tree tree) {
-	switch (tree.type) {
-	case MethodType(_, _):
+	if (tree.type instanceof Type.MethodType) {
 	    return tree;
-	default:
-	    return tree.setType(
-		Type.MethodType(Symbol.EMPTY_ARRAY, tree.type.widen()));
 	}
+	return tree.setType(
+	    Type.MethodType(Symbol.EMPTY_ARRAY, tree.type.widen()));
     }
 
     /** apply parameterless functions and def parameters
      */
     Tree applyDef(Tree tree1) {
 	assert tree1.symbol() != null : tree1;
-	switch (tree1.symbol().type()) {
-	case PolyType(Symbol[] tparams, Type restp):
+	Type symbolType = tree1.symbol().type();
+	if (symbolType instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)symbolType;
+            Symbol[] tparams = polyType.tparams;
+            Type restp = polyType.result;
 	    if (tparams.length == 0 && !(restp instanceof Type.MethodType)) {
 		return gen.Apply(asMethod(tree1), new Tree[0]);
 	    } else {
 		return tree1;
 	    }
-	default:
+	} else {
 	    if (tree1.symbol().isDefParameter()) {
 		tree1.type = global.definitions.FUNCTION_TYPE(
 		    Type.EMPTY_ARRAY, tree1.type.widen());
@@ -110,27 +111,39 @@ public class UnCurry extends OwnerTransformer
      *       (a_1, ..., a_n) => (Sequence(a_1, ..., a_n))
      */
     public Tree transform(Tree tree) {
-        System.out.flush();
+	//new scalac.ast.printer.TextTreePrinter().print("uncurry: ").print(tree).println().end();//DEBUG
 	//uncurry type and symbol
 	Type prevtype = tree.type;
 	if (prevtype != null) tree.type = descr.uncurry(prevtype);
-        switch (tree) {
-	case ClassDef(_, _, AbsTypeDef[] tparams, ValDef[][] vparams, Tree tpe, Template impl):
+        if (tree instanceof ClassDef) {
+            ClassDef classDef = (ClassDef)tree;
+            AbsTypeDef[] tparams = classDef.tparams;
+            ValDef[][] vparams = classDef.vparams;
+            Tree tpe = classDef.tpe;
+            Template impl = classDef.impl;
 	    return copy.ClassDef(
 		tree, tree.symbol(), tparams,
 		uncurry(transform(vparams, tree.symbol())),
 		tpe,
 		transform(impl, tree.symbol()));
-
-	case DefDef(_, _, AbsTypeDef[] tparams, ValDef[][] vparams, Tree tpe, Tree rhs):
+        }
+	if (tree instanceof DefDef) {
+            DefDef defDef = (DefDef)tree;
+            AbsTypeDef[] tparams = defDef.tparams;
+            ValDef[][] vparams = defDef.vparams;
+            Tree tpe = defDef.tpe;
+            Tree rhs = defDef.rhs;
 	    Symbol sym = tree.symbol();
 	    if (descr.isUnaccessedConstant(sym))
                 return gen.mkUnitLit(tree.pos);
 	    Tree rhs1 = transform(rhs, sym);
 	    return copy.DefDef(
 		tree, sym, tparams, uncurry(transform(vparams, sym)), tpe, rhs1);
-
-	case ValDef(_, _, Tree tpe, Tree rhs):
+        }
+	if (tree instanceof ValDef) {
+            ValDef valDef = (ValDef)tree;
+            Tree tpe = valDef.tpe;
+            Tree rhs = valDef.rhs;
 	    Symbol sym = tree.symbol();
 	    if (descr.isUnaccessedConstant(sym))
                 return gen.mkUnitLit(tree.pos);
@@ -141,77 +154,90 @@ public class UnCurry extends OwnerTransformer
 	    } else {
 		return super.transform(tree);
 	    }
-
-	case TypeApply(Tree fn, Tree[] args):
+        }
+	if (tree instanceof TypeApply) {
 	    Tree tree1 = asMethod(super.transform(tree));
 	    return gen.Apply(tree1, new Tree[0]);
-
-
-	case Apply(Tree fn, Tree[] args):
+        }
+	if (tree instanceof Apply) {
+            Apply apply = (Apply)tree;
+            Tree fn = apply.fun;
+            Tree[] args = apply.args;
 	    // f(x)(y) ==> f(x, y)
 	    // argument to parameterless function e => ( => e)
 	    Type ftype = fn.type;
 	    Tree fn1 = transform(fn);
-            boolean myInArray = TreeInfo.methSymbol(fn1) == global.definitions.PREDEF_ARRAY();
+            boolean myInArray =
+                TreeInfo.methSymbol(fn1) == global.definitions.PREDEF_ARRAY();
             inArray = myInArray;
 	    Tree[] args1 = transformArgs(tree.pos, args, ftype);
-            if( myInArray )
-                  switch( fn1 ) {
-                  case Apply( TypeApply( Select(Tree fn2, _), Tree[] targs), _ ):
-                        return gen.mkBlock(args1[0].pos, fn2, args1[0]);
-                  default:
-                        assert false : "dead";
-                  }
+            if (myInArray) {
+                if (fn1 instanceof Apply) {
+                    Apply apply1 = (Apply)fn1;
+                    if (apply1.fun instanceof TypeApply) {
+                        TypeApply typeApply = (TypeApply)apply1.fun;
+                        if (typeApply.fun instanceof Select) {
+                            Select select = (Select)typeApply.fun;
+                            return gen.mkBlock(args1[0].pos, select.qualifier, args1[0]);
+                        }
+                    }
+                }
+                throw Debug.abort("illegal Array application", fn1);
+            }
 	    if (TreeInfo.methSymbol(fn1) == global.definitions.ANY_MATCH &&
 		!(args1[0] instanceof Tree.Visitor)) {
-		switch (TreeInfo.methPart(fn1)) {
-		case Select(Tree qual, Name name):
+                Tree methPart = TreeInfo.methPart(fn1);
+                if (methPart instanceof Select) {
+                    Select select = (Select)methPart;
+                    Tree qual = select.qualifier;
+                    Name name = select.selector;
 		    assert name == Names.match;
 		    return gen.postfixApply(qual, args1[0], currentOwner);
-		default:
-		    throw new ApplicationError("illegal prefix for match: " + tree);
-		}
+                }
+                throw new ApplicationError("illegal prefix for match: " + tree);
 
 	    } else {
-		switch (fn1) {
-		case Apply(Tree fn2, Tree[] args2):
+                if (fn1 instanceof Apply) {
+                    Apply applied = (Apply)fn1;
+                    Tree fn2 = applied.fun;
+                    Tree[] args2 = applied.args;
 		    Tree[] newargs = new Tree[args1.length + args2.length];
 		    System.arraycopy(args2, 0, newargs, 0, args2.length);
 		    System.arraycopy(args1, 0, newargs, args2.length, args1.length);
 		    return copy.Apply(tree, fn2, newargs);
-		default:
-		    return copy.Apply(tree, fn1, args1);
-		}
+                }
+		return copy.Apply(tree, fn1, args1);
 	    }
-
-	case Select(_, _):
+        }
+	if (tree instanceof Select) {
 	    return applyDef(super.transform(tree));
-
-	case Ident(Name name):
+        }
+	if (tree instanceof Ident) {
+            Name name = ((Ident)tree).name;
 	    if (name == TypeNames.WILDCARD_STAR) {
 		unit.error(tree.pos, " argument does not correspond to `*'-parameter");
 		return tree;
 	    } else if (tree.symbol() == global.definitions.PATTERN_WILDCARD) {
 		return tree;
 	    } else {
-		return applyDef(super.transform(tree));
+	        return applyDef(super.transform(tree));
 	    }
-
-        case CaseDef(Tree pat, Tree guard, Tree body):
-              inPattern = true;
-              Tree pat1 = transform( pat );
-              inPattern = false;
-              Tree guard1 = transform( guard );
-              Tree body1 = transform( body );
-              return copy.CaseDef( tree, pat1, guard1, body1 );
-
-	default:
-	    return super.transform(tree);
 	}
+        if (tree instanceof CaseDef) {
+            CaseDef caseDef = (CaseDef)tree;
+            inPattern = true;
+            Tree pat1 = transform(caseDef.pat);
+            inPattern = false;
+            Tree guard1 = transform(caseDef.guard);
+            Tree body1 = transform(caseDef.body);
+            return copy.CaseDef(tree, pat1, guard1, body1);
+        }
+	return super.transform(tree);
     }
 
-      boolean inPattern = false;
-      boolean inArray = false;
+    boolean inPattern = false;
+    boolean inArray = false;
+
 //    java.util.HashSet visited = new java.util.HashSet();//DEBUG
 
     /** Transform arguments `args' to method with type `methtype'.
@@ -223,8 +249,9 @@ public class UnCurry extends OwnerTransformer
 //	}
 //	visited.add(args);//DEBUG
 
-	switch (methtype) {
-	case MethodType(Symbol[] params, _):
+	if (methtype instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)methtype;
+            Symbol[] params = methodType.vparams;
 	    if (params.length > 0 &&
 		(params[params.length-1].flags & REPEATED) != 0) {
 		args = toSequence(pos, params, args);
@@ -240,12 +267,13 @@ public class UnCurry extends OwnerTransformer
 		args1[i] = arg1;
 	    }
 	    return args1;
-	case PolyType(_, Type restp):
+        }
+	if (methtype instanceof Type.PolyType) {
+            Type restp = ((Type.PolyType)methtype).result;
 	    return transformArgs(pos, args, restp);
-	default:
-	    if (args.length == 0) return args; // could be arguments of nullary case pattern
-	    else throw new ApplicationError(methtype);
 	}
+	if (args.length == 0) return args; // could be arguments of nullary case pattern
+	else throw new ApplicationError(methtype);
     }
 
     /** converts `a_1,...,a_n' to Seq(a_1,...,a_n)
@@ -255,19 +283,20 @@ public class UnCurry extends OwnerTransformer
      */
     private Tree[] toSequence( int pos, Symbol[] params, Tree[] args ) {
 	Tree[] result = new Tree[params.length];
-        System.arraycopy(args, 0, result, 0, params.length - 1);
-        /*
 	for (int i = 0; i < params.length - 1; i++)
 	    result[i] = args[i];
-        */
 	assert (args.length != params.length
 		|| !(args[params.length-1] instanceof Tree.Sequence)
 		|| TreeInfo.isSequenceValued(args[params.length-1]));
  	if (args.length == params.length) {
-            switch (args[params.length-1]) {
-            case Typed(Tree arg, Ident(TypeNames.WILDCARD_STAR)): // seq:_* escape
+            if (args[params.length-1] instanceof Typed) {
+                Typed typed = (Typed)args[params.length-1];
+                if (typed.tpe instanceof Ident &&
+                    ((Ident)typed.tpe).name == TypeNames.WILDCARD_STAR) {
+                    Tree arg = typed.expr;
 		result[params.length-1] = arg;
 		return result;
+                }
             }
         }
 	Tree[] args1 = args;
@@ -275,21 +304,17 @@ public class UnCurry extends OwnerTransformer
 	    args1 = new Tree[args.length - (params.length - 1)];
 	    System.arraycopy(args, params.length - 1, args1, 0, args1.length);
 	}
-        Type theType = params[params.length-1].type();
-        if( inPattern )
-              result[params.length-1] =
-                    make.Sequence(pos, args1).setType( theType );
-        else if( inArray ) {
-              result[params.length-1] = gen.mkNewArray(pos,
-                                                       theType.typeArgs()[0],
-                                                       args1,
-                                                       currentOwner);
-
-        } else
-              result[params.length-1] =
-                    gen.mkNewList(pos,
-                                  theType.typeArgs()[0],
-                                  args1);
+        Type sequenceType = params[params.length-1].type();
+        if (inPattern) {
+            result[params.length-1] =
+                make.Sequence(pos, args1).setType(sequenceType);
+        } else if (inArray) {
+            result[params.length-1] = gen.mkNewArray(
+                pos, sequenceType.typeArgs()[0], args1, currentOwner);
+        } else {
+            result[params.length-1] = gen.mkNewList(
+                pos, sequenceType.typeArgs()[0], args1);
+        }
 	return result;
     }
 
@@ -302,14 +327,20 @@ public class UnCurry extends OwnerTransformer
 	    Symbol sym = arg.symbol();
 	    if (sym != null && (sym.flags & DEF) != 0) {
 		Tree arg1 = transform(arg);
-		switch (arg1) {
-		case Apply(Select(Tree qual, Name name), Tree[] args1):
+		if (arg1 instanceof Apply) {
+                    Apply apply = (Apply)arg1;
+                    Tree fun = apply.fun;
+                    Tree[] args1 = apply.args;
+                    if (fun instanceof Select) {
+                        Select select = (Select)fun;
+                        Tree qual = select.qualifier;
+                        Name name = select.selector;
 		    assert name == Names.apply && args1.length == 0;
 		    return qual;
-		default:
-		    System.err.println(arg1);//debug
-		    throw new ApplicationError();
-		}
+                    }
+                }
+		System.err.println(arg1);//debug
+		throw new ApplicationError();
 	    }
 	    return transform(
 		gen.mkUnitFunction(arg, descr.uncurry(arg.type.widen()), currentOwner));

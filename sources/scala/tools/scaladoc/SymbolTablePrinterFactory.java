@@ -21,7 +21,6 @@ import scalac.util.Debug;
 import scalac.util.Name;
 import scalac.util.Names;
 import scalac.util.Strings;
-import SymbolBooleanFunction;
 
 class SymbolTablePrinterFactory {
 
@@ -93,15 +92,20 @@ class SymbolTablePrinterFactory {
 	// Next line should be removed in theory.
         if (prefix.symbol() == global.definitions.JAVALANG) return null;
 
-	switch(prefix) {
-	case ThisType(Symbol sym):
+	if (prefix instanceof Type.ThisType) {
+	    Symbol sym = ((Type.ThisType)prefix).sym;
 	    if (sym.isPackageClass() && isDocumented.apply(sym.module()))
 		return null;
 	    else if (isDocumented.apply(sym))
 		return null;
 	    else
 		return prefix;
-	case TypeRef(Type pre, Symbol sym, Type[] args):
+	}
+	if (prefix instanceof Type.TypeRef) {
+	    Type.TypeRef typeRef = (Type.TypeRef)prefix;
+	    Type pre = typeRef.pre;
+	    Symbol sym = typeRef.sym;
+	    Type[] args = typeRef.args;
 	    Type pre1 = cleanPrefix(pre, global, isDocumented);
 	    if (pre1 == null && args.length == 0 && isDocumented.apply(sym))
 		return null;
@@ -109,7 +113,11 @@ class SymbolTablePrinterFactory {
 		pre1 = pre1 == null ? global.definitions.ROOT_CLASS.thisType() : pre1;
 		return Type.typeRef(pre1, sym, args);
 	    }
-	case SingleType(Type pre, Symbol sym):
+	}
+	if (prefix instanceof Type.SingleType) {
+	    Type.SingleType singleType = (Type.SingleType)prefix;
+	    Type pre = singleType.pre;
+	    Symbol sym = singleType.sym;
 	    Type pre1 = cleanPrefix(pre, global, isDocumented);
 	    if (pre1 == null) {
 		if (sym.isClass() || sym.isModule())
@@ -123,9 +131,8 @@ class SymbolTablePrinterFactory {
 	    }
 	    else
 		return Type.singleType(pre1, sym);
-	default:
-	    return prefix;
 	}
+	return prefix;
     }
 
 

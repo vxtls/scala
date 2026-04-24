@@ -15,7 +15,6 @@ import scala.tools.util.Position;
 import scalac.ApplicationError;
 import scalac.Global;
 import scalac.Phase;
-import scalac.framework.History;
 import scalac.util.ArrayApply;
 import scalac.util.Name;
 import scalac.util.Names;
@@ -35,7 +34,10 @@ public abstract class Symbol implements Modifiers, Kinds {
     public static final Symbol ERROR = new ErrorSymbol();
 
     /** The absent symbol */
-    public static final Symbol NONE = new NoSymbol();
+    public static final NoSymbol NONE = new NoSymbol();
+    static {
+        Type.localThisType = Type.ThisType(NONE);
+    }
 
 // Attribues -------------------------------------------------------------
 
@@ -566,17 +568,16 @@ public abstract class Symbol implements Modifiers, Kinds {
      */
     public final boolean isInitializedMethod() {
         if (infos == null) return false;
-        switch (rawInfo()) {
-        case MethodType(_, _):
-        case PolyType(_, _):
+        Type rawInfo = rawInfo();
+        if (rawInfo instanceof Type.MethodType || rawInfo instanceof Type.PolyType) {
             return true;
-        case OverloadedType(Symbol[] alts, _):
+        } else if (rawInfo instanceof Type.OverloadedType) {
+            Symbol[] alts = ((Type.OverloadedType)rawInfo).alts;
             for (int i = 0; i < alts.length; i++)
                 if (alts[i].isMethod()) return true;
             return false;
-        default:
-            return false;
         }
+        return false;
     }
 
     public final boolean isMethod() {
@@ -778,10 +779,7 @@ public abstract class Symbol implements Modifiers, Kinds {
 
     /** Is this symbol an overloaded symbol? */
     public final boolean isOverloaded() {
-        switch (info()) {
-        case OverloadedType(_,_): return true;
-        default                 : return false;
-        }
+        return info() instanceof Type.OverloadedType;
     }
 
     /** Does this symbol denote a label? */
@@ -871,6 +869,11 @@ public abstract class Symbol implements Modifiers, Kinds {
 
     /** Get dual class */
     public Symbol dualClass() {
+        return NONE;
+    }
+
+    /** Get accessor for a case class field. */
+    public Symbol caseFieldAccessor(int index) {
         return NONE;
     }
 
@@ -1086,8 +1089,7 @@ public abstract class Symbol implements Modifiers, Kinds {
         assert infos != null : this;
         assert phase != null : this;
         if (infos.limit().id <= phase.id) {
-            switch (infos.info) {
-            case LazyType():
+            if (infos.info instanceof Type.LazyType) {
                 // don't force lazy types
                 return infos.info;
             }
@@ -1114,11 +1116,12 @@ public abstract class Symbol implements Modifiers, Kinds {
         private Type transformInfo(Phase phase, Type info) {
             Global global = phase.global;
             Phase current = global.currentPhase;
-            switch (info) {
-            case ErrorType:
-            case NoType:
+            if (info == Type.ErrorType || info == Type.NoType) {
                 return info;
-            case OverloadedType(Symbol[] alts, Type[] alttypes):
+            } else if (info instanceof Type.OverloadedType) {
+                Type.OverloadedType overloadedType = (Type.OverloadedType)info;
+                Symbol[] alts = overloadedType.alts;
+                Type[] alttypes = overloadedType.alttypes;
                 global.currentPhase = phase.next;
                 for (int i = 0; i < alts.length; i++) {
                     Type type = alts[i].info();
@@ -1134,12 +1137,11 @@ public abstract class Symbol implements Modifiers, Kinds {
                 }
                 global.currentPhase = current;
                 return info;
-            default:
-                global.currentPhase = phase;
-                info = phase.transformInfo(this, info);
-                global.currentPhase = current;
-                return info;
             }
+            global.currentPhase = phase;
+            info = phase.transformInfo(this, info);
+            global.currentPhase = current;
+            return info;
         }
 
     /** Get first defined info, without forcing lazy types.
@@ -1518,400 +1520,6 @@ public abstract class Symbol implements Modifiers, Kinds {
     }
 }
 
-/** A class for term symbols
- */
-final class TermSymbol extends Symbol {
-
-    /**
-     * The module class if this is a module, the constructed class if
-     * this is a constructor and null otherwise
-     */
-    private final Symbol clasz;
-
-    /** Constructor */
-    TermSymbol(int pos, Name name, Symbol owner, int flags, int attrs, Symbol clasz) {
-        super(VAL, pos, name, owner, flags, attrs);
-        this.clasz = clasz;
-        assert name.isTermName(): Debug.show(this);
-    }
-
-    /** Is this symbol an instance initializer? */
-    public boolean isInitializer() {
-        return clasz == null && name == Names.INITIALIZER;
-    }
-
-    /** Is this symbol a constructor? */
-    public boolean isConstructor() {
-        return clasz != null && name == Names.CONSTRUCTOR;
-    }
-
-    public Symbol[] typeParams() {
-        return type().typeParams();
-    }
-
-    public Symbol[] valueParams() {
-        return type().valueParams();
-    }
-
-    public Symbol constructorClass() {
-        return isConstructor() ? clasz : this;
-    }
-
-    public Symbol moduleClass() {
-        return isModule() ? clasz : this;
-    }
-
-    protected final Symbol cloneSymbolImpl(Symbol owner, int attrs) {
-        assert !isPrimaryConstructor() : Debug.show(this);
-        return new TermSymbol(pos, name, owner, flags, attrs, clasz);
-    }
-
-}
-
-/** A base class for all type symbols.
- *  It has AliasTypeSymbol, AbsTypeSymbol, ClassSymbol as subclasses.
- */
-abstract class TypeSymbol extends Symbol {
-
-     /** The history of closures of this symbol */
-    private final History/*<Type[]>*/ closures;
-
-    /** A cache for type constructors
-     */
-    private Type tycon = null;
-
-    /** The primary constructor of this type */
-    private Symbol constructor;
-
-    /** Constructor */
-    public TypeSymbol(int kind, int pos, Name name, Symbol owner, int flags, int attrs) {
-        super(kind, pos, name, owner, flags, attrs);
-        this.closures = new ClosureHistory();
-        assert name.isTypeName() : this;
-        this.constructor = newConstructor(pos, flags & CONSTRFLAGS);
-    }
-
-    protected final void copyConstructorInfo(TypeSymbol other) {
-        {
-            Type info = primaryConstructor().info().cloneType(
-                primaryConstructor(), other.primaryConstructor());
-            if (!isTypeAlias()) info = fixConstrType(info, other);
-            other.primaryConstructor().setInfo(info);
-        }
-        Symbol[] alts = allConstructors().alternativeSymbols();
-        for (int i = 1; i < alts.length; i++) {
-            Symbol constr = other.newConstructor(alts[i].pos, alts[i].flags);
-            other.addConstructor(constr);
-            Type info = alts[i].info().cloneType(alts[i], constr);
-            if (!isTypeAlias()) info = fixConstrType(info, other);
-            constr.setInfo(info);
-        }
-    }
-
-    private final Type fixConstrType(Type type, Symbol clone) {
-        switch (type) {
-        case MethodType(Symbol[] vparams, Type result):
-            result = fixConstrType(result, clone);
-            return new Type.MethodType(vparams, result);
-        case PolyType(Symbol[] tparams, Type result):
-            result = fixConstrType(result, clone);
-            return new Type.PolyType(tparams, result);
-        case TypeRef(Type pre, Symbol sym, Type[] args):
-            if (sym != this && isTypeAlias() && owner().isCompoundSym())
-                return type;
-            assert sym == this: Debug.show(sym) + " != " + Debug.show(this);
-            return Type.typeRef(pre, clone, args);
-        case LazyType():
-            return type;
-        default:
-            throw Debug.abort("unexpected constructor type:" + clone + ":" + type);
-        }
-    }
-
-    /** add a constructor
-     */
-    public final void addConstructor(Symbol constr) {
-        assert constr.isConstructor(): Debug.show(constr);
-        constructor = constructor.overloadWith(constr);
-    }
-
-    /** Get primary constructor */
-    public final Symbol primaryConstructor() {
-        return constructor.firstAlternative();
-    }
-
-    /** Get all constructors */
-    public final Symbol allConstructors() {
-        return constructor;
-    }
-
-    /** Get type parameters */
-    public final Symbol[] typeParams() {
-        return primaryConstructor().info().typeParams();
-    }
-
-    /** Get value parameters */
-    public final Symbol[] valueParams() {
-        return (kind == CLASS) ? primaryConstructor().info().valueParams()
-            : Symbol.EMPTY_ARRAY;
-    }
-
-    /** Get type constructor */
-    public final Type typeConstructor() {
-        if (tycon == null)
-            tycon = Type.typeRef(owner().thisType(), this, Type.EMPTY_ARRAY);
-        return tycon;
-    }
-
-    public Symbol setOwner(Symbol owner) {
-        tycon = null;
-        constructor.setOwner0(owner);
-        switch (constructor.type()) {
-        case OverloadedType(Symbol[] alts, _):
-            for (int i = 0; i < alts.length; i++) alts[i].setOwner0(owner);
-        }
-        return super.setOwner(owner);
-    }
-
-    /** Get type */
-    public final Type type() {
-        return primaryConstructor().type().resultType();
-    }
-    public final Type getType() {
-        return primaryConstructor().type().resultType();
-    }
-
-    /**
-     * Get closure at start of current phase. The closure of a symbol
-     * is a list of types which contains the type of the symbol
-     * followed by all its direct and indirect base types, sorted by
-     * isLess().
-     */
-    public final Type[] closure() {
-        if (kind == ALIAS) return info().symbol().closure();
-        return (Type[])closures.getValue(this);
-    }
-
-    public void reset(Type completer) {
-        super.reset(completer);
-        closures.reset();
-        tycon = null;
-    }
-
-
-    protected final Symbol cloneSymbolImpl(Symbol owner, int attrs) {
-        TypeSymbol clone = cloneTypeSymbolImpl(owner, attrs);
-        copyConstructorInfo(clone);
-        return clone;
-    }
-
-    protected abstract TypeSymbol cloneTypeSymbolImpl(Symbol owner, int attrs);
-}
-
-final class AliasTypeSymbol extends TypeSymbol {
-
-    /** Initializes this instance. */
-    AliasTypeSymbol(int pos, Name name, Symbol owner, int flags, int attrs) {
-        super(ALIAS, pos, name, owner, flags, attrs);
-    }
-
-    protected TypeSymbol cloneTypeSymbolImpl(Symbol owner, int attrs) {
-        return new AliasTypeSymbol(pos, name, owner, flags, attrs);
-    }
-
-}
-
-final class AbsTypeSymbol extends TypeSymbol {
-
-    private Type lobound = null;
-
-    /** Initializes this instance. */
-    AbsTypeSymbol(int pos, Name name, Symbol owner, int flags, int attrs) {
-        super(TYPE, pos, name, owner, flags, attrs);
-        allConstructors().setInfo(Type.MethodType(EMPTY_ARRAY, Type.typeRef(owner.thisType(), this, Type.EMPTY_ARRAY)));
-    }
-
-    public Type loBound() {
-        initialize();
-        return lobound == null ? Global.instance.definitions.ALL_TYPE() : lobound;
-    }
-
-    public Symbol setLoBound(Type lobound) {
-        this.lobound = lobound;
-        return this;
-    }
-
-    protected TypeSymbol cloneTypeSymbolImpl(Symbol owner, int attrs) {
-        TypeSymbol clone = new AbsTypeSymbol(pos, name, owner, flags, attrs);
-        clone.setLoBound(loBound());
-        return clone;
-    }
-
-}
-
-/** A class for class symbols. */
-public final class ClassSymbol extends TypeSymbol {
-
-    /**
-     * The dual class of this class or NONE. The dual class is:
-     * - the corresponding module class if this is a value class
-     * - the corresponding value class if this is a module class
-     */
-    private final Symbol dual;
-
-    /** The module belonging to the class or NONE. */
-    private final Symbol module;
-
-    /** The given type of self, or NoType, if no explicit type was given.
-     */
-    private Symbol thisSym = this;
-
-    public Symbol thisSym() { return thisSym; }
-
-    /** A cache for this.thisType()
-     */
-    final private Type thistp = Type.ThisType(this);
-
-    private final Symbol rebindSym;
-
-    /** Initializes this instance. */
-    ClassSymbol(int pos, Name name, Symbol owner, int flags, int attrs, Symbol dual) {
-        super(CLASS, pos, name, owner, flags, attrs);
-        this.rebindSym = owner.newTypeAlias(pos, 0, Names.ALIAS(this));
-        Type rebindType = new ClassAliasLazyType();
-        this.rebindSym.setInfo(rebindType);
-        this.rebindSym.primaryConstructor().setInfo(rebindType);
-        this.module = isModuleClass() ? newModule() : NONE;
-        this.dual = dual == null ? newModuleClass() : dual;
-    }
-
-    private class ClassAliasLazyType extends Type.LazyType {
-        public void complete(Symbol ignored) {
-            Symbol clasz = ClassSymbol.this;
-            Symbol alias = rebindSym;
-            Type prefix = clasz.owner().thisType();
-            Type constrtype = clasz.type();
-            constrtype = Type.MethodType(Symbol.EMPTY_ARRAY, constrtype);
-            constrtype = Type.PolyType(clasz.typeParams(), constrtype);
-            constrtype = constrtype.cloneType(
-                clasz.primaryConstructor(), alias.primaryConstructor());
-            alias.primaryConstructor().setInfo(constrtype);
-            alias.setInfo(constrtype.resultType());
-        }
-    }
-
-    /** Creates the root class. */
-    public static Symbol newRootClass(Global global) {
-        int pos = Position.NOPOS;
-        Name name = Names.ROOT.toTypeName();
-        Symbol owner = Symbol.NONE;
-        int flags = JAVA | PACKAGE | FINAL | SYNTHETIC;
-        int attrs = IS_ROOT;
-        Symbol clasz = new ClassSymbol(pos, name, owner, flags, attrs, NONE);
-        clasz.setInfo(global.getRootLoader());
-        clasz.primaryConstructor().setInfo(
-            Type.MethodType(Symbol.EMPTY_ARRAY, clasz.typeConstructor()));
-        // !!! Type.MethodType(Symbol.EMPTY_ARRAY, clasz.thisType()));
-        return clasz;
-    }
-
-    /** Creates the this-type symbol associated to this class. */
-    private final Symbol newThisType() {
-        return newTerm(pos, SYNTHETIC, Names.this_, IS_THISTYPE);
-    }
-
-    /** Creates the module associated to this module class. */
-    final Symbol newModule() {
-        assert isModuleClass(): Debug.show(this);
-        int flags = (this.flags & CLASS2MODULEFLAGS) | MODUL | FINAL | STABLE;
-        Name name = this.name.toTermName();
-        Symbol module = new TermSymbol(pos, name, owner(), flags, 0, this);
-        module.setType(typeConstructor());
-        return module;
-    }
-
-    /** Creates the dual module class associated to this class. */
-    final ClassSymbol newModuleClass() {
-        assert !isModuleClass(): Debug.show(this);
-        return owner().newModuleClass(pos, flags, name, 0, this);
-    }
-
-   /** Get module */
-    public Symbol module() {
-        assert !isRoot(): this + ".module()";
-        return module;
-    }
-
-    /** Get dual class */
-    public Symbol dualClass() {
-        return dual;
-    }
-
-    public Type thisType() {
-        Global global = Global.instance;
-        if (global.currentPhase.id > global.PHASE.ERASURE.id()) return type();
-        return thistp;
-    }
-
-    public Type typeOfThis() {
-        return thisSym.type();
-    }
-
-    public Symbol setTypeOfThis(Type tp) {
-        thisSym = newThisType();
-        thisSym.setInfo(tp);
-        return this;
-    }
-
-    /** Return the next enclosing class */
-    public Symbol enclClass() {
-        return this;
-    }
-
-    public Symbol caseFieldAccessor(int index) {
-        assert (flags & CASE) != 0 : this;
-        Scope.SymbolIterator it = info().members().iterator();
-        Symbol sym = null;
-        if ((flags & JAVA) == 0) {
-			for (int i = 0; i <= index; i++) {
-				do {
-					sym = it.next();
-				} while (sym.kind != VAL || (sym.flags & CASEACCESSOR) == 0 || !sym.isMethod());
-			}
-			//System.out.println(this + ", case field[" + index + "] = " + sym);//DEBUG
-		} else {
-			sym = it.next();
-			while ((sym.flags & SYNTHETIC) == 0) {
-			    //System.out.println("skipping " + sym);
-			    sym = it.next();
-			}
-			for (int i = 0; i < index; i++)
-				sym = it.next();
-			//System.out.println("field accessor = " + sym);//DEBUG
-		}
-		assert sym != null : this;
-		return sym;
-    }
-
-    public final Symbol rebindSym() {
-        return rebindSym;
-    }
-
-    public void reset(Type completer) {
-        super.reset(completer);
-        module().reset(completer);
-        thisSym = this;
-    }
-
-    protected TypeSymbol cloneTypeSymbolImpl(Symbol owner, int attrs) {
-        assert !isModuleClass(): Debug.show(this);
-        ClassSymbol clone = new ClassSymbol(pos, name, owner,flags,attrs,NONE);
-        if (thisSym != this) clone.setTypeOfThis(typeOfThis());
-        return clone;
-    }
-
-}
-
 /** A class for error symbols.
  */
 final class ErrorSymbol extends Symbol {
@@ -1954,61 +1562,6 @@ final class ErrorSymbol extends Symbol {
         throw Debug.abort("illegal clone", this);
     }
 
-}
-
-/** The class of Symbol.NONE
- */
-final class NoSymbol extends Symbol {
-
-    /** Constructor */
-    public NoSymbol() {
-        super(Kinds.NONE, Position.NOPOS, Names.NOSYMBOL, null, 0, 0);
-        super.setInfo(Type.NoType);
-    }
-
-    /** Set type */
-    public Symbol setInfo(Type info) {
-        assert info == Type.NoType : info;
-        return this;
-    }
-
-    /** Return the next enclosing class */
-    public Symbol enclClass() {
-        return this;
-    }
-
-    /** Return the next enclosing method */
-    public Symbol enclMethod() {
-        return this;
-    }
-
-    public Symbol owner() {
-        throw new ApplicationError();
-    }
-
-    public Type thisType() {
-        return Type.NoPrefix;
-    }
-
-    public void reset(Type completer) {
-    }
-
-    protected Symbol cloneSymbolImpl(Symbol owner, int attrs) {
-        throw Debug.abort("illegal clone", this);
-    }
-
-}
-
-/** An exception for signalling cyclic references.
- */
-public class CyclicReference extends Type.Error {
-    public Symbol sym;
-    public Type info;
-    public CyclicReference(Symbol sym, Type info) {
-        super("illegal cyclic reference involving " + sym);
-        this.sym = sym;
-        this.info = info;
-    }
 }
 
 /** A base class for values indexed by phases. */

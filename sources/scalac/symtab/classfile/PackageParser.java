@@ -108,10 +108,6 @@ public class PackageParser extends SymbolLoader {
             peckage.newLoadedPackage(Name.fromString(name), loader, members);
         }
 
-        // collect and create CLR members
-	if (global.target == global.TARGET_MSIL)
-            CLRPackageParser.instance(global).importCLRTypes(peckage, members);
-
         // initialize package
         peckage.setInfo(Type.compoundType(Type.EMPTY_ARRAY, members, peckage));
         return "directory path '" + directory + "'";

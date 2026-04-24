@@ -219,19 +219,14 @@ public class Compiler {
             fields = new ArrayList();
         } else {
             Template template = environment.lookupTemplate(bases[0].symbol());
-            switch (template) {
-
-            case Global(ScalaTemplate template_): // !!!
+            if (template instanceof Template.Global) {
+                ScalaTemplate template_ = ((Template.Global)template).template;
                 methods = template_.getMethods();
                 fields = template_.getFields();
-                break;
-
-            case JavaClass(_):
+            } else if (template instanceof Template.JavaClass) {
                 methods = new HashMap(any_methods);
                 fields = new ArrayList();
-                break;
-
-            default:
+            } else {
                 throw Debug.abort("illegal case", template);
             }
         }
@@ -284,29 +279,27 @@ public class Compiler {
 
     private void declare(SourceFile source, Tree tree) {
         Symbol symbol = tree.symbol();
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return;
-
-        case ClassDef(_, _, _, _, _, _):
+        }
+        if (tree instanceof Tree.ClassDef) {
             sources.put(tree, source);
             environment.insertClassDef(symbol, (Tree.ClassDef)tree);
             if (symbol.isModuleClass() && symbol.isStatic()) {
                 environment.insertVariable(symbol.module(), Variable.Module(new CodePromise(new ModuleBuilder(this, source, symbol.module())), null));
             }
             return;
-
-        // !!! these could be removed
-        case PackageDef(Tree packaged, Tree.Template(Tree[] bases, Tree[] body)):
-            assert packaged.symbol().isPackage() : Debug.show(tree); // !!! was isJavaPackage
-            assert bases.length == 0 : Debug.show(tree);
-            declare(source, body);
-            return;
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        if (tree instanceof Tree.PackageDef) {
+            Tree.PackageDef packageDef = (Tree.PackageDef)tree;
+            Tree packaged = packageDef.packaged;
+            Tree.Template template = packageDef.impl;
+            assert packaged.symbol().isPackage() : Debug.show(tree); // !!! was isJavaPackage
+            assert template.parents.length == 0 : Debug.show(tree);
+            declare(source, template.body);
+            return;
+        }
+        throw Debug.abort("illegal case", tree);
     }
 
     //########################################################################
@@ -333,13 +326,11 @@ public class Compiler {
             return;
         } else {
         Template template = environment.lookupTemplate(type);
-        switch (template) {
-        case JavaClass(Class clasz):
-            getTypes(supertypes, interfaces, clasz);
+        if (template instanceof Template.JavaClass) {
+            getTypes(supertypes, interfaces, ((Template.JavaClass)template).clasz);
             return;
-        default:
-            Debug.abort("illegal template", template);
         }
+        Debug.abort("illegal template", template);
         }
     }
 
@@ -376,25 +367,24 @@ public class Compiler {
 
     private void addTemplateMember(SourceFile source, Map methods, List fields, Tree tree) {
         Symbol symbol = tree.symbol();
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return;
-
-        case ClassDef(_, _, _, _, _, _):
+        }
+        if (tree instanceof Tree.ClassDef) {
             sources.put(tree, source);
             environment.insertClassDef(symbol, (Tree.ClassDef)tree);
             return;
-
-        case ValDef(_, _, _, Tree body):
+        }
+        if (tree instanceof Tree.ValDef) {
+            Tree body = ((Tree.ValDef)tree).rhs;
             assert body == Tree.Empty : Debug.show(tree);
             assert !symbol.isModule() : Debug.show(tree);
             int index = fields.size();
             fields.add(constants.zero(symbol.type()));
             environment.insertVariable(symbol, Variable.Member(index));
             return;
-
-        case DefDef(_, _, _, _, _, _):
+        }
+        if (tree instanceof Tree.DefDef) {
             assert !methods.containsKey(symbol) : Debug.show(symbol);
             CodePromise function = compile(source, symbol, (Tree.DefDef)tree);
             Override override = environment.lookupOverride(symbol);
@@ -403,10 +393,8 @@ public class Compiler {
             }
             environment.insertFunction(symbol, Function.Member(symbol));
             return;
-
-        default:
-            throw Debug.abort("illegal tree", tree);
         }
+        throw Debug.abort("illegal tree", tree);
     }
 
     //########################################################################

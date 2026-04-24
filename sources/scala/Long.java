@@ -13,19 +13,8 @@ package scala;
 public abstract class Long    extends AnyVal {
 
     public final long    value;
-    public final long    $plus;
-    public final long    $minus;
-    public final double  coerceToDouble;
-    public final float   coerceToFloat;
-    public final long    $tilde;
-
     public Long   (long    value) {
         this.value = value;
-        this.$plus = +value;
-        this.$minus = -value;
-        this.coerceToDouble = value;
-        this.coerceToFloat = value;
-        this.$tilde = ~value;
     }
 
     public boolean equals(java.lang.Object other) {

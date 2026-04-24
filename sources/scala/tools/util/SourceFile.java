@@ -16,9 +16,9 @@ public class SourceFile {
     // Public Constants
 
     /** Constants used for source parsing */
-    public static final char LF = '\u000A';
+    public static final char LF = '\n';
     public static final char FF = '\u000C';
-    public static final char CR = '\u000D';
+    public static final char CR = '\r';
     public static final char SU = '\u001A';
 
     //########################################################################

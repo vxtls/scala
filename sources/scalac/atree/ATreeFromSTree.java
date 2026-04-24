@@ -66,8 +66,9 @@ public class ATreeFromSTree {
             definitions.FLOAT_CLASS,
             definitions.DOUBLE_CLASS,
         };
-        for (int i = 0; i < classes.length; i++)
+        for (int i = 0; i < classes.length; i++) {
             states.put(classes[i], Boolean.FALSE);
+        }
     }
 
     //########################################################################
@@ -83,28 +84,27 @@ public class ATreeFromSTree {
 
     /** Translates the templates and adds them to the repository. */
     private void template(ARepository repository, Tree[] trees) {
-        for (int i = 0; i < trees.length; i++) template(repository, trees[i]);
+        for (int i = 0; i < trees.length; i++) {
+            template(repository, trees[i]);
+        }
     }
 
     /** Translates the template and adds it to the repository. */
     private void template(ARepository repository, Tree tree) {
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return;
-
-        case ClassDef(_, _, _, _, _, Template(_, Tree[] body)):
+        } else if (tree instanceof Tree.ClassDef) {
+            Tree.ClassDef classDef = (Tree.ClassDef) tree;
             AClass clasz = new AClass(tree.symbol());
             // !!! add static field to global modules
             repository.addClass(clasz);
-            member(clasz, body);
+            member(clasz, classDef.impl.body);
             return;
-
-        case PackageDef(_, Template(_, Tree[] body)):
-            template(repository, body);
+        } else if (tree instanceof Tree.PackageDef) {
+            Tree.PackageDef packageDef = (Tree.PackageDef) tree;
+            template(repository, packageDef.impl.body);
             return;
-
-        default:
+        } else {
             throw Debug.abort("illegal case", tree);
         }
     }
@@ -114,32 +114,31 @@ public class ATreeFromSTree {
 
     /** Translates the members and adds them to the class. */
     private void member(AClass clasz, Tree[] trees) {
-        for (int i = 0; i < trees.length; i++) member(clasz, trees[i]);
+        for (int i = 0; i < trees.length; i++) {
+            member(clasz, trees[i]);
+        }
     }
 
     /** Translates the member and adds it to the class. */
     private void member(AClass clasz, Tree tree) {
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return;
-
-        case ClassDef(_, _, _, _, _, _):
+        } else if (tree instanceof Tree.ClassDef) {
             template(clasz, tree);
             return;
-
-        case ValDef(_, _, _, Tree rhs):
+        } else if (tree instanceof Tree.ValDef) {
             AField field = new AField(tree.symbol(), false);
             clasz.addField(field);
             return;
-
-        case DefDef(_, _, _, _, _, Tree rhs):
+        } else if (tree instanceof Tree.DefDef) {
+            Tree.DefDef defDef = (Tree.DefDef) tree;
             AMethod method = new AMethod(tree.symbol(), false);
             clasz.addMethod(method);
-            if (!method.isAbstract()) method.setCode(expression(rhs));
+            if (!method.isAbstract()) {
+                method.setCode(expression(defDef.rhs));
+            }
             return;
-
-        default:
+        } else {
             throw Debug.abort("illegal case", tree);
         }
     }
@@ -152,25 +151,24 @@ public class ATreeFromSTree {
         List codes = new ArrayList();
         for (int i = 0; i < trees.length; i++) {
             ACode code = statement(locals, trees[i]);
-            if (code != ACode.Void) codes.add(code);
+            if (code != ACode.Void) {
+                codes.add(code);
+            }
         }
         return (ACode[])codes.toArray(new ACode[codes.size()]);
     }
 
     /** Translates the statement. */
     private ACode statement(List locals, Tree tree) {
-        switch (tree) {
-
-        case Empty:
+        if (tree == Tree.Empty) {
             return make.Void;
-
-        case ValDef(_, _, _, Tree rhs):
+        } else if (tree instanceof Tree.ValDef) {
+            Tree.ValDef valDef = (Tree.ValDef) tree;
             Symbol symbol = tree.symbol();
             locals.add(symbol);
             ALocation location = ALocation.Local(symbol, false);
-            return make.Store(tree, location, expression(rhs));
-
-        default:
+            return make.Store(tree, location, expression(valDef.rhs));
+        } else {
             return ACode.Drop(expression(tree), tree.type());
         }
     }
@@ -181,72 +179,72 @@ public class ATreeFromSTree {
     /** Translates the expressions. */
     private ACode[] expression(Tree[] trees) {
         ACode[] codes = new ACode[trees.length];
-        for (int i = 0; i < codes.length; i++) codes[i] = expression(trees[i]);
+        for (int i = 0; i < codes.length; i++) {
+            codes[i] = expression(trees[i]);
+        }
         return codes;
     }
 
     /** Translates the expression. */
     private ACode expression(Tree tree) {
-        switch (tree) {
-
-        case LabelDef(_, Ident[] idents, Tree rhs):
-            Symbol[] locals = Tree.symbolOf(idents);
-            return make.Label(tree, tree.symbol(), locals, expression(rhs));
-
-        case Block(Tree[] stats, Tree value):
+        if (tree instanceof Tree.LabelDef) {
+            Tree.LabelDef labelDef = (Tree.LabelDef) tree;
+            Symbol[] locals = Tree.symbolOf(labelDef.params);
+            return make.Label(tree, tree.symbol(), locals, expression(labelDef.rhs));
+        } else if (tree instanceof Tree.Block) {
+            Tree.Block block = (Tree.Block) tree;
             List locals = new ArrayList();
-            ACode[] codes = statement(locals, stats);
-            ACode code = expression(value);
-            if (locals.size() == 0 && codes.length == 0) return code;
+            ACode[] codes = statement(locals, block.stats);
+            ACode code = expression(block.expr);
+            if (locals.size() == 0 && codes.length == 0) {
+                return code;
+            }
             Symbol[] symbols =
                 (Symbol[])locals.toArray(new Symbol[locals.size()]);
             return make.Block(tree, symbols, codes, code);
-
-        case Assign(Tree lhs, Tree rhs):
+        } else if (tree instanceof Tree.Assign) {
+            Tree.Assign assign = (Tree.Assign) tree;
             return make.Block(tree, Symbol.EMPTY_ARRAY, new ACode[] {
-                make.Store(tree, location(lhs), expression(rhs))},
+                make.Store(tree, location(assign.lhs), expression(assign.rhs))},
                 make.Void);
-
-        case If(Tree cond, Tree thenp, Tree elsep):
-            ACode test = expression(cond);
-            return make.If(tree, test, expression(thenp), expression(elsep));
-
-        case Switch(Tree test, int[] tags, Tree[] bodies, Tree otherwise):
-            int[][] tagss = new int[tags.length][];
-            for (int i = 0; i < tagss.length; i++)
-                tagss[i] = new int[] {tags[i]};
-            ACode[] codes = new ACode[bodies.length + 1];
-            for (int i = 0; i < bodies.length; i++)
-                codes[i] = expression(bodies[i]);
-            codes[tags.length] = expression(otherwise);
-            return make.Switch(tree, expression(test), tagss, codes);
-
-        case Return(Tree value):
-            return make.Return(tree, tree.symbol(), expression(value));
-
-        case Throw(Tree value):
-            return make.Throw(tree, expression(value));
-
-        case New(Template(Tree[] bases, _)):
-            return expression(bases[0]);
-
-        case Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs):
-            return apply(tree, fun, targs, vargs);
-        case Apply(Tree fun, Tree[] vargs):
-            return apply(tree, fun, Tree.EMPTY_ARRAY, vargs);
-
-        case Super(_, _):
-        case This(_):
+        } else if (tree instanceof Tree.If) {
+            Tree.If ifTree = (Tree.If) tree;
+            ACode test = expression(ifTree.cond);
+            return make.If(tree, test, expression(ifTree.thenp), expression(ifTree.elsep));
+        } else if (tree instanceof Tree.Switch) {
+            Tree.Switch switchTree = (Tree.Switch) tree;
+            int[][] tagss = new int[switchTree.tags.length][];
+            for (int i = 0; i < tagss.length; i++) {
+                tagss[i] = new int[] {switchTree.tags[i]};
+            }
+            ACode[] codes = new ACode[switchTree.bodies.length + 1];
+            for (int i = 0; i < switchTree.bodies.length; i++) {
+                codes[i] = expression(switchTree.bodies[i]);
+            }
+            codes[switchTree.tags.length] = expression(switchTree.otherwise);
+            return make.Switch(tree, expression(switchTree.test), tagss, codes);
+        } else if (tree instanceof Tree.Return) {
+            return make.Return(tree, tree.symbol(), expression(((Tree.Return) tree).expr));
+        } else if (tree instanceof Tree.Throw) {
+            return make.Throw(tree, expression(((Tree.Throw) tree).expr));
+        } else if (tree instanceof Tree.New) {
+            Tree.New newTree = (Tree.New) tree;
+            return expression(newTree.templ.parents[0]);
+        } else if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply) tree;
+            if (apply.fun instanceof Tree.TypeApply) {
+                Tree.TypeApply typeApply = (Tree.TypeApply) apply.fun;
+                return apply(tree, typeApply.fun, typeApply.args, apply.args);
+            }
+            return apply(tree, apply.fun, Tree.EMPTY_ARRAY, apply.args);
+        } else if (tree instanceof Tree.Super || tree instanceof Tree.This) {
             return make.This(tree, tree.symbol());
-
-        case Select(_, _):
-        case Ident(_):
+        } else if (tree instanceof Tree.Select || tree instanceof Tree.Ident) {
             return make.Load(tree, location(tree));
-
-        case Literal(AConstant value):
-            return make.Constant(tree, value);
-
-        default:
+        } else if (tree instanceof Tree.Literal) {
+            Tree.Literal literal = (Tree.Literal) tree;
+            return make.Constant(tree, literal.value);
+        } else {
             throw Debug.abort("illegal case", tree);
         }
     }
@@ -258,16 +256,18 @@ public class ATreeFromSTree {
         if (symbol.isLabel()) return make.Goto(tree, symbol, codes);
         Type[] types = Tree.typeOf(targs);
         AFunction function = function(fun);
-        switch (function) {
-        case Method(ACode object, Symbol method, AInvokeStyle style):
-            if (!style.isDynamic()) break;
-            Symbol clasz = method.owner();
-            Object state = states.get(clasz);
-            if (state == null) break;
-            if (state != Boolean.TRUE) addGeneratorsOf(clasz);
-            Object generator = generators.get(method);
-            if (generator == null) break;
-            return generate((Generator)generator, tree, object, types, vargs);
+        if (function instanceof AFunction.Method) {
+            AFunction.Method methodFunction = (AFunction.Method) function;
+            if (methodFunction.style.isDynamic()) {
+                Symbol clasz = methodFunction.method.owner();
+                Object state = states.get(clasz);
+                if (state != null) {
+                    if (state != Boolean.TRUE) addGeneratorsOf(clasz);
+                    Object generator = generators.get(methodFunction.method);
+                    if (generator != null)
+                        return generate((Generator)generator, tree, methodFunction.object, types, vargs);
+                }
+            }
         }
         return make.Apply(tree, function, types, codes);
     }
@@ -278,29 +278,25 @@ public class ATreeFromSTree {
     /** Translates the method. */
     private AFunction function(Tree tree) {
         Symbol symbol = tree.symbol();
-        switch (tree) {
-
-        case Select(Tree qualifier, _):
-            AInvokeStyle style = invokeStyle(qualifier);
-            return AFunction.Method(expression(qualifier), symbol, style);
-
-        case Ident(_):
-            AInvokeStyle style = symbol.isInitializer()
-                ? AInvokeStyle.New
-                : AInvokeStyle.StaticClass;
-            return AFunction.Method(make.Void, symbol, style);
-
-        default:
+        if (tree instanceof Tree.Select) {
+            Tree.Select select = (Tree.Select) tree;
+            if (symbol.isJava() && symbol.owner().isModuleClass()) {
+                return AFunction.Method(make.Void, symbol, AInvokeStyle.StaticClass);
+            }
+            ACode object = expression(select.qualifier);
+            return AFunction.Method(object, symbol, invokeStyle(select.qualifier));
+        } else if (tree instanceof Tree.Ident) {
+            return AFunction.Method(make.Void, symbol, AInvokeStyle.New);
+        } else {
             throw Debug.abort("illegal case", tree);
         }
     }
 
     /** Returns the InvokeStyle to use for the qualifier. */
     private AInvokeStyle invokeStyle(Tree qualifier) {
-        switch (qualifier) {
-        case Super(_, _):
+        if (qualifier instanceof Tree.Super) {
             return AInvokeStyle.StaticInstance;
-        default:
+        } else {
             return AInvokeStyle.Dynamic;
         }
     }
@@ -311,18 +307,21 @@ public class ATreeFromSTree {
     /** Translates the location. */
     private ALocation location(Tree tree) {
         Symbol symbol = tree.symbol();
-        switch (tree) {
-
-        case Select(Tree qualifier, _):
-            return ALocation.Field(expression(qualifier), symbol, false);
-
-        case Ident(_):
-            if (symbol.isModule()) return ALocation.Module(symbol);
-            return symbol.owner().isClass()
-                ? ALocation.Field(make.Void, symbol, true)
-                : ALocation.Local(symbol, symbol.isParameter());
-
-        default:
+        if (tree instanceof Tree.Select) {
+            Tree.Select select = (Tree.Select) tree;
+            if (symbol.isModule()) {
+                return ALocation.Module(symbol);
+            }
+            if (symbol.isJava() && symbol.owner().isModuleClass()) {
+                return ALocation.Field(make.Void, symbol, true);
+            }
+            return ALocation.Field(expression(select.qualifier), symbol, false);
+        } else if (tree instanceof Tree.Ident) {
+            if (symbol.isModule()) {
+                return ALocation.Module(symbol);
+            }
+            return ALocation.Local(symbol, symbol.isParameter());
+        } else {
             throw Debug.abort("illegal case", tree);
         }
     }
@@ -341,7 +340,7 @@ public class ATreeFromSTree {
         if (value instanceof Float    ) return make.FLOAT  ((Float    )value);
         if (value instanceof Double   ) return make.DOUBLE ((Double   )value);
         if (value instanceof String   ) return make.STRING ((String   )value);
-        throw Debug.abort("illegal constant", value +" -- "+ value.getClass());
+        throw Debug.abort("illegal constant", value + " -- " + value.getClass());
     }
 
     //########################################################################
@@ -351,13 +350,10 @@ public class ATreeFromSTree {
     private ACode generate(Generator generator, Tree tree, ACode object,
         Type[] targs, Tree[] vargs)
     {
-        switch (generator) {
-
-        case ANYID:
+        if (generator == Generator.ANYID) {
             assert targs.length == 0 && vargs.length == 1: tree;
             return make.EQ(tree, ATypeKind.REF, object, expression(vargs[0]));
-
-        case ANYEQ:
+        } else if (generator == Generator.ANYEQ) {
             Symbol lf = newLocal(tree, definitions.ANY_TYPE());
             Symbol rg = newLocal(tree, definitions.ANY_TYPE());
             return make.Block(tree,
@@ -375,8 +371,7 @@ public class ATreeFromSTree {
                             AInvokeStyle.Dynamic),
                         Type.EMPTY_ARRAY,
                         new ACode[] {load(tree, rg)})));
-
-        case ANYNE:
+        } else if (generator == Generator.ANYNE) {
             Symbol lf = newLocal(tree, definitions.ANY_TYPE());
             Symbol rg = newLocal(tree, definitions.ANY_TYPE());
             return make.Block(tree,
@@ -396,26 +391,21 @@ public class ATreeFromSTree {
                                 AInvokeStyle.Dynamic),
                             Type.EMPTY_ARRAY,
                             new ACode[] {load(tree, rg)}))));
-
-        case ISAS(boolean cast):
+        } else if (generator.isIsAs()) {
             assert targs.length == 1 && vargs.length == 0: tree;
-            return make.IsAs(tree, object, targs[0], cast);
-
-        case SYNCHRONIZED:
+            return make.IsAs(tree, object, targs[0], generator.cast());
+        } else if (generator == Generator.SYNCHRONIZED) {
             assert targs.length == 1 && vargs.length == 1: tree;
             return make.Synchronized(tree, object, expression(vargs[0]));
-
-        case THROW:
+        } else if (generator == Generator.THROW) {
             assert targs.length == 0 && vargs.length == 0: tree;
             return make.Throw(tree, object);
-
-        case CONCAT(ATypeKind prefix):
+        } else if (generator.isConcat()) {
             assert targs.length == 0 && vargs.length == 1: tree;
             ATypeKind suffix = kind(vargs[0].type());
             ACode argument = expression(vargs[0]);
-            return make.CONCAT(tree, prefix, suffix, object, argument);
-
-        default:
+            return make.CONCAT(tree, generator.prefix(), suffix, object, argument);
+        } else {
             throw Debug.abort("unknown case", generator);
         }
     }
@@ -441,11 +431,10 @@ public class ATreeFromSTree {
 
     /** Returns the type kind of given type. */
     private ATypeKind kind(Type type) {
-        switch (type) {
-        case SingleType(_, _):
-        case ConstantType(_, _):
+        if (type instanceof Type.SingleType || type instanceof Type.ConstantType) {
             return kind(type.singleDeref());
-        case TypeRef(_, Symbol clasz, _):
+        } else if (type instanceof Type.TypeRef) {
+            Symbol clasz = type.symbol();
             if (clasz == definitions.BOOLEAN_CLASS) return ATypeKind.BOOL;
             if (clasz == definitions.BYTE_CLASS) return ATypeKind.I1;
             if (clasz == definitions.SHORT_CLASS) return ATypeKind.I2;
@@ -456,7 +445,7 @@ public class ATreeFromSTree {
             if (clasz == definitions.DOUBLE_CLASS) return ATypeKind.R8;
             if (clasz == definitions.STRING_CLASS) return ATypeKind.STR;
             return ATypeKind.REF;
-        default:
+        } else {
             return ATypeKind.REF;
         }
     }
@@ -527,13 +516,58 @@ public class ATreeFromSTree {
 
     /** Code generators for primitive methods. */
     private static class Generator {
-        case ANYID;
-        case ANYEQ;
-        case ANYNE;
-        case ISAS(boolean cast);
-        case SYNCHRONIZED;
-        case THROW;
-        case CONCAT(ATypeKind prefix);
+        private final String name;
+        private final Boolean cast;
+        private final ATypeKind prefix;
+
+        private Generator(String name, Boolean cast, ATypeKind prefix) {
+            this.name = name;
+            this.cast = cast;
+            this.prefix = prefix;
+        }
+
+        private static final Generator ANYID =
+            new Generator("ANYID", null, null);
+        private static final Generator ANYEQ =
+            new Generator("ANYEQ", null, null);
+        private static final Generator ANYNE =
+            new Generator("ANYNE", null, null);
+        private static final Generator SYNCHRONIZED =
+            new Generator("SYNCHRONIZED", null, null);
+        private static final Generator THROW =
+            new Generator("THROW", null, null);
+        private static final Generator ISAS_FALSE =
+            new Generator("ISAS", Boolean.FALSE, null);
+        private static final Generator ISAS_TRUE =
+            new Generator("ISAS", Boolean.TRUE, null);
+
+        private static Generator ISAS(boolean cast) {
+            return cast ? ISAS_TRUE : ISAS_FALSE;
+        }
+
+        private static Generator CONCAT(ATypeKind prefix) {
+            return new Generator("CONCAT", null, prefix);
+        }
+
+        private boolean isIsAs() {
+            return "ISAS".equals(name);
+        }
+
+        private boolean cast() {
+            return cast.booleanValue();
+        }
+
+        private boolean isConcat() {
+            return "CONCAT".equals(name);
+        }
+
+        private ATypeKind prefix() {
+            return prefix;
+        }
+
+        public String toString() {
+            return name;
+        }
     }
 
     //########################################################################

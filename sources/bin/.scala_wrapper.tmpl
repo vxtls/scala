@@ -56,13 +56,13 @@ configure() {
     # This variable must refer a directory or a zip or jar file.
     FJBG_CLASSES={#FJBG_CLASSES#};
 
-    # Location of the compiled msil library. This library is included
-    # in the Scala distribution.
-    # This variable must refer a directory or a zip or jar file.
-    MSIL_CLASSES={#MSIL_CLASSES#};
-
     # Command to start the Java VM.
-    JAVA_EXEC="java";
+    java_home=`get_default_java_home`;
+    if [ -n "$java_home" -a -x "$java_home/bin/java" ]; then
+        JAVA_EXEC="$java_home/bin/java";
+    else
+        JAVA_EXEC="java";
+    fi;
 
     # Additional arguments to pass to the Java VM.
     JAVA_ARGS={#JAVA_ARGS#};
@@ -130,6 +130,43 @@ get_unix_pathlist() {
         CYGWIN* ) cygpath --unix --path "$1";;
         *       ) echo "$@";;
     esac;
+}
+
+# Prints the preferred Java home used by Scala tools.
+get_default_java_home() {
+    if [ -n "$SCALA_JAVA_HOME" ]; then
+        echo "$SCALA_JAVA_HOME";
+        return;
+    fi;
+    for java_home in \
+        "$HOME"/jdk/*1.8*/Contents/Home \
+        "$HOME"/jdk/*1.8* \
+        "$HOME"/.jdks/*1.8*/Contents/Home \
+        "$HOME"/Library/Java/JavaVirtualMachines/*1.8*/Contents/Home
+    do
+        if [ -x "$java_home/bin/java" ]; then
+            echo "$java_home";
+            return;
+        fi;
+    done;
+    if [ -x /usr/libexec/java_home ]; then
+        java_home=`/usr/libexec/java_home -v 1.8 2>/dev/null`;
+        if [ -n "$java_home" ]; then
+            echo "$java_home";
+            return;
+        fi;
+    fi;
+    if [ -n "$JAVA_HOME" ]; then
+        echo "$JAVA_HOME";
+    fi;
+}
+
+# Prints the default rt.jar used by Scala compile tools.
+get_default_rt_jar() {
+    java_home=`get_default_java_home`;
+    if [ -n "$java_home" -a -f "$java_home/jre/lib/rt.jar" ]; then
+        echo "$java_home/jre/lib/rt.jar";
+    fi;
 }
 
 ##############################################################################
@@ -214,6 +251,14 @@ compute_default_scala_bootclasspath() {
     eval SCALA_BOOTCLASSPATH="";
     prepend_path SCALA_BOOTCLASSPATH RUNTIME_SOURCES;
     prepend_path SCALA_BOOTCLASSPATH RUNTIME_CLASSES;
+    java_rt_jar=`get_default_rt_jar`;
+    if [ -n "$java_rt_jar" ]; then
+        if [ -z "$SCALA_BOOTCLASSPATH" ]; then
+            SCALA_BOOTCLASSPATH="$java_rt_jar";
+        else
+            SCALA_BOOTCLASSPATH="$SCALA_BOOTCLASSPATH:$java_rt_jar";
+        fi;
+    fi;
 }
 
 
@@ -235,7 +280,6 @@ compute_variable() {
         RUNTIME_CLASSES     ) configure_path_variable "$1";;
         TOOLS_CLASSES       ) configure_path_variable "$1";;
         FJBG_CLASSES        ) configure_path_variable "$1";;
-        MSIL_CLASSES        ) configure_path_variable "$1";;
         JAVA_EXEC           ) configure_variable "$1";;
         JAVA_ARGS           ) configure_variable "$1";;
         EXEC                ) configure_variable "$1";;
@@ -320,7 +364,6 @@ exec_compiler() {
     language="$1"; shift 1;
 
     # augment Java classpath
-    prepend_path JAVA_CLASSPATH MSIL_CLASSES;
     prepend_path JAVA_CLASSPATH FJBG_CLASSES;
 
     exec_compile_tool "$language" "$@";
@@ -382,7 +425,6 @@ scala_info_option_x_variable() {
         RUNTIME_CLASSES     ) variable=$2;;
         TOOLS_CLASSES       ) variable=$2;;
         FJBG_CLASSES        ) variable=$2;;
-        MSIL_CLASSES        ) variable=$2;;
         JAVA_EXEC           ) variable=$2;;
         JAVA_ARGS           ) variable=$2;;
         EXEC                ) variable=$2;;
@@ -408,7 +450,6 @@ scala_info_option_help() {
     echo "  RUNTIME_CLASSES       Location of the Scala library";
     echo "  TOOLS_CLASSES         Location of the Scala tools";
     echo "  FJBG_CLASSES          Location of the fjbg library";
-    echo "  MSIL_CLASSES          Location of the msil library";
     echo "  JAVA_EXEC             Command to start the Java VM";
     echo "  JAVA_ARGS             Additional arguments to pass to the Java VM";
     echo "  EXEC                  Command to start subprocesses";

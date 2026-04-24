@@ -1503,10 +1503,13 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
     if (!(owntype.isInstanceOf[Type$PolyType] || owntype.isSubType(pt))) {
       tree match {
 	case Tree$Literal(constant) =>
-	  var n: int = constant match {
-            case AConstant$INT(value) => value
-            case AConstant$CHAR(value) => value
-            case _ => Integer.MAX_VALUE
+	  var n: int = {
+            if (constant.isInstanceOf[AConstant$INT])
+              constant.asInstanceOf[AConstant$INT].value
+            else if (constant.isInstanceOf[AConstant$CHAR])
+              constant.asInstanceOf[AConstant$CHAR].value.asInstanceOf[int]
+            else
+              Integer.MAX_VALUE
           }
 	  val value1: AConstant =
 	    if (pt.symbol() == definitions.BYTE_CLASS && -128 <= n && n <= 127)
@@ -1540,14 +1543,14 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 	    return adapt(tree1, mode, pt);
 	  }
 	  // todo: remove
- 	  val coerceMeth: Symbol = tree.getType().lookup(Names.coerce);
- 	  if (coerceMeth != Symbol.NONE) {
- 	    val coerceType: Type = checkAccessible(
- 	      tree.pos, coerceMeth, tree.getType().memberType(coerceMeth),
- 	      tree, tree.getType());
- 	    val tree1 = make.Select(tree.pos, tree, Names.coerce)
- 	    .setSymbol(coerceMeth)
- 	    .setType(coerceType);
+	  val coerceMeth: Symbol = infer.coerceMethod(tree.getType(), pt);
+	  if (coerceMeth != Symbol.NONE) {
+	    val coerceType: Type = checkAccessible(
+	      tree.pos, coerceMeth, tree.getType().memberType(coerceMeth),
+	      tree, tree.getType());
+	    val tree1 = make.Select(tree.pos, tree, coerceMeth.name)
+	    .setSymbol(coerceMeth)
+	    .setType(coerceType);
 	    return adapt(tree1, mode, pt);
 	  }
 	}
@@ -2646,8 +2649,7 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 	    case Type$OverloadedType(alts, alttypes) =>
 	      var matching1: int = -1;
 	      var matching2: int = -1;
-	      for (val i <- Iterator.range(0, alttypes.length)) {
-		// can't replace with while because of backend crash???
+	      { var i = 0; while (i < alttypes.length) {
 		val alttp: Type = alttypes(i) match {
 		  case Type$PolyType(_, restp) => restp;
 		  case t => t
@@ -2663,7 +2665,8 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 		    }
 		  case _ =>
 		}
-	      }
+		i = i + 1
+	      }}
 	      if (matching1 >= 0 && matching2 < 0)
 		fn1.setSymbol(alts(matching1)).setType(alttypes(matching1));
 	    case _ =>

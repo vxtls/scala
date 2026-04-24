@@ -406,25 +406,25 @@ public class SymbolTablePrinter {
 
     /** Returns the type to print for the given type (non-transitive). */
     public Type getTypeToPrintForType0(Type type) {
-        switch (type) {
-        case ThisType(Symbol clasz):
-            if (global.debug || !clasz.isModuleClass()) return type;
-            Type prefix = getTypeToPrintForType(clasz.owner().thisType());
-            return Type.singleType(prefix, clasz.module());
-        case SingleType(_, Symbol sym):
+        if (type instanceof Type.ThisType) {
+            if (global.debug) return type;
+            return type.expandModuleThis();
+        } else if (type instanceof Type.SingleType) {
+            Symbol sym = ((Type.SingleType)type).sym;
             if (global.debug) return type;
             if (sym.isSynthetic()) return type.widen();
             return type;
-        case CompoundType(Type[] parts, Scope members):
+        } else if (type instanceof Type.CompoundType) {
+            Type[] parts = ((Type.CompoundType)type).parts;
             if (global.debug) return type;
             if (type.isFunctionType()) return parts[1];
             return type;
-        case TypeVar(Type origin, Constraint constr):
+        } else if (type instanceof Type.TypeVar) {
+            Type.Constraint constr = ((Type.TypeVar)type).constr;
             if (constr.inst != Type.NoType) return constr.inst;
             return type;
-        default:
-            return type;
         }
+        return type;
     }
 
     /** Prints the given types separated by infix. */
@@ -442,14 +442,10 @@ public class SymbolTablePrinter {
     }
     public SymbolTablePrinter printType0(Type type) {
         printCommonPart(type);
-        switch (type) {
-        case NoPrefix:
-        case ThisType(_):
-        case SingleType(_,_):
+        if (type instanceof Type.ThisType || type instanceof Type.SingleType) {
             return print(".type");
-        default:
-            return this;
         }
+        return this;
     }
 
     /** Prints the given type with the given inner string. */
@@ -461,19 +457,19 @@ public class SymbolTablePrinter {
             return printType0(getTypeToPrintForType(type), inner);
     }
     public SymbolTablePrinter printType0(Type type, String inner) {
-        switch (type) {
-        case PolyType(Symbol[] tparams, Type result):
-            if (tparams.length != 0 || global.debug) printTypeParams(tparams);
-            return printType(result, inner);
-        case MethodType(Symbol[] vparams, Type result):
-            return printValueParams(vparams).printType(result, inner);
-        default:
-            if (inner != null) {
-                if (!inner.startsWith(":")) space();
-                print(inner).space();
-            }
-            return printType0(type);
+        if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)type;
+            if (polyType.tparams.length != 0 || global.debug) printTypeParams(polyType.tparams);
+            return printType(polyType.result, inner);
+        } else if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            return printValueParams(methodType.vparams).printType(methodType.result, inner);
         }
+        if (inner != null) {
+            if (!inner.startsWith(":")) space();
+            print(inner).space();
+        }
+        return printType0(type);
     }
 
     /** Prints a function type with the given type arguments. */
@@ -493,20 +489,23 @@ public class SymbolTablePrinter {
 
     /** Prints the type and prefix common part of the given type. */
     public SymbolTablePrinter printCommonPart(Type type) {
-        switch (type) {
-        case ErrorType:
+        if (type == Type.ErrorType) {
             return print("<error>");
-        case AnyType:
+        } else if (type == Type.AnyType) {
             return print("<any type>");
-        case NoType:
+        } else if (type == Type.NoType) {
             return print("<notype>");
-        case NoPrefix:
-            return print("<noprefix>");
-        case ThisType(Symbol sym):
+        } else if (type instanceof Type.ThisType) {
+            Symbol sym = ((Type.ThisType)type).sym;
+            if (sym == Symbol.NONE) return print("<local>.this");
             if ((sym.isAnonymousClass() || sym.isCompoundSym()) && !global.debug)
                 return print("this");
             return printSymbolName(sym).print(".this");
-        case TypeRef(Type pre, Symbol sym, Type[] args):
+        } else if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            Type pre = typeRef.pre;
+            Symbol sym = typeRef.sym;
+            Type[] args = typeRef.args;
             if (!global.debug) {
                 if (type.isFunctionType())
                     return printFunctionType(args);
@@ -517,34 +516,37 @@ public class SymbolTablePrinter {
             //print("{" + sym.owner() + "}");//DEBUG
             if (args.length != 0) print('[').printTypes(args, ",").print(']');
             return this;
-        case SingleType(Type pre, Symbol sym):
-            return printPrefix(pre).printSymbolName(sym);
-	case ConstantType(Type base, AConstant value):
-	    return printType(base).printConstantValue(value);
-        case CompoundType(Type[] parts, Scope members):
-            return printTypes(parts," with ").space()
-                .printScope(members,true)
+        } else if (type instanceof Type.SingleType) {
+            Type.SingleType singleType = (Type.SingleType)type;
+            return printPrefix(singleType.pre).printSymbolName(singleType.sym);
+        } else if (type instanceof Type.ConstantType) {
+            Type.ConstantType constantType = (Type.ConstantType)type;
+            return printType(constantType.base)
+                .print("(").print(constantType.value.toString()).print(")");
+        } else if (type instanceof Type.CompoundType) {
+            Type.CompoundType compoundType = (Type.CompoundType)type;
+            return printTypes(compoundType.parts, " with ").space()
+                .printScope(compoundType.members, true)
                 .printSymbolUniqueId(type.symbol());
-        case MethodType(_, _):
+        } else if (type instanceof Type.MethodType) {
             return printType0(type, null);
-        case PolyType(_, _):
+        } else if (type instanceof Type.PolyType) {
             return printType0(type, null);
-        case OverloadedType(Symbol[] alts, Type[] alttypes):
-            return printTypes(alttypes, " <and> ");
-        case TypeVar(Type origin, Constraint constr):
-            return printType(origin).print("?");
-        case UnboxedType(int kind):
-            return print(type.unboxedName(kind).toString());
-        case UnboxedArrayType(Type elemtp):
-            return printType(elemtp).print("[]");
-        case LazyType():
+        } else if (type instanceof Type.OverloadedType) {
+            return printTypes(((Type.OverloadedType)type).alttypes, " <and> ");
+        } else if (type instanceof Type.TypeVar) {
+            return printType(((Type.TypeVar)type).origin).print("?");
+        } else if (type instanceof Type.UnboxedType) {
+            return print(type.unboxedName(((Type.UnboxedType)type).tag).toString());
+        } else if (type instanceof Type.UnboxedArrayType) {
+            return printType(((Type.UnboxedArrayType)type).elemtp).print("[]");
+        } else if (type instanceof Type.LazyType) {
             if (!global.debug) return print("?");
             String classname = type.getClass().getName();
             return print("<lazy type ").print(classname).print(">");
-        default:
-            String classname = type.getClass().getName();
-            return print("<unknown type ").print(classname).print(">");
         }
+        String classname = type.getClass().getName();
+        return print("<unknown type ").print(classname).print(">");
     }
 
     //########################################################################
@@ -575,14 +577,10 @@ public class SymbolTablePrinter {
     }
     public SymbolTablePrinter printPrefix0(Type prefix) {
         printCommonPart(prefix);
-        switch (prefix) {
-        case NoPrefix:
-        case ThisType(_):
-        case SingleType(_,_):
+        if (prefix instanceof Type.ThisType || prefix instanceof Type.SingleType) {
             return print(".");
-        default:
-            return print("#");
         }
+        return print("#");
     }
 
     //########################################################################

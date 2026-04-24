@@ -57,7 +57,7 @@ abstract public class Type {
     public static final TypeBoolean Boolean = new TypeBoolean();
 }
 
-public class ConstructedType extends Type {
+class ConstructedType extends Type {
     private Object outer;
     private Class typeConstr;
     private Type[] args;
@@ -122,7 +122,7 @@ public class ConstructedType extends Type {
     }
 }
 
-public class SingleType extends Type {
+class SingleType extends Type {
     private final Object instance;
 
     public SingleType(Object instance) {

@@ -61,12 +61,16 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
 	case Tree$Apply(_, _) => getVariables(fn, vars);
 	case _ =>
       }
-      for (val i <- Iterator.range(0, args.length))
+      { var i = 0; while (i < args.length) {
 	getVariables(args(i), vars);
+	i = i + 1
+      }}
 
     case Tree$Sequence(elems) =>
-      for (val i <- Iterator.range(0, elems.length))
+      { var i = 0; while (i < elems.length) {
 	getVariables(elems(i), vars);
+	i = i + 1
+      }}
 
     case Tree$Literal( _ ) =>
 
@@ -75,8 +79,10 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
       getVariables(t, vars);
 
     case Tree$Alternative(ts) =>
-      for (val i <- Iterator.range(0, ts.length))
+      { var i = 0; while (i < ts.length) {
 	getVariables(ts(i), vars);
+	i = i + 1
+      }}
   }
 
 // Transform functions -----------------------------------------------------
@@ -133,8 +139,10 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
 	if (vparam.tpe == Tree.Empty && infer.isFullyDefined(pt))
 	  vparam.tpe = gen.mkType(vparam.pos, pt);
 
-      for (val i <- Iterator.range(0, vparams.length))
+      { var i = 0; while (i < vparams.length) {
 	assignType(vparams(i), ptargs(i));
+	i = i + 1
+      }}
 
       ptargs(vparams.length);
 
@@ -157,16 +165,17 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
 		gen.mkBooleanLit(lastCase.body.pos, true))));
 	case _ =>
 	  val cases1 = new Array[Tree$CaseDef](cases.length + 1);
-	  for (val i <- Iterator.range(0, cases.length)) {
+	  { var i = 0; while (i < cases.length) {
 	    cases(i) match {
 	      case Tree$CaseDef(pat, guard, _) =>
 		cases1(i) = make.CaseDef(
 		  cases(i).pos,
 		  pat.duplicate(),
 		  guard.duplicate(),
-		  gen.mkBooleanLit(tree.pos, true));
+		gen.mkBooleanLit(tree.pos, true));
 	    }
-	  }
+	    i = i + 1
+	  }}
 	  cases1(cases.length) = make.CaseDef(
 	    tree.pos,
 	    gen.Ident(tree.pos, global.definitions.PATTERN_WILDCARD),
@@ -278,7 +287,7 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
 	  case Tree$ValDef(_, _, _, _) =>
 	    if (isLocal) ts.append(stats(i))
 	    else ts.append(boxDocDef(this.ValDef(stat), stats(i)));
-	  case _ =>
+	case _ =>
 	    ts.append(stats(i));
 	}
       }
@@ -324,9 +333,10 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
 
       // Tuple_N(x_1, ..., x_N)
       val vtree = new Array[Tree](vars.length);
-      for (val i <- Iterator.range(0, vars.length)) {
+      { var i = 0; while (i < vars.length) {
 	vtree(i) = make.Ident(pos, vars(i));
-      }
+	i = i + 1
+      }}
       val tuple: Tree = if (vars.length == 1) vtree(0)
 			else mkTuple(tree.pos, vtree);
 
@@ -353,12 +363,13 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
 	// private synthetic val t$ = e.match (case p => (x_1, ..., x_N))
 	val res = new Array[Tree](vars.length + 1);
 	res(0) = make.ValDef(pos, PRIVATE | SYNTHETIC, vble, Tree.Empty, match);
-	for (val i <- Iterator.range(0, vars.length)) {
+	{ var i = 0; while (i < vars.length) {
 	  // val x_i = t$._i
 	  res(i + 1) = make.ValDef(
 	    pos, mods, vars(i), Tree.Empty,
 	    make.Select(pos, make.Ident(pos, vble), tupleSelectorName(i + 1)));
-	}
+	  i = i + 1
+	}}
 	print(pat, "patdef", new Tree$Block(res, gen.mkUnitLit(pos)));//debug
 	res
       }
@@ -436,7 +447,7 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
 
     def liftoutList(trees: Array[Tree], defs: TreeList): Array[Tree] = {
       var trees1 = trees;
-      for (val i <- Iterator.range(0, trees.length)) {
+      { var i = 0; while (i < trees.length) {
 	val tree: Tree = trees(i);
 	val tree1: Tree = liftout(tree, defs);
 	if (tree1 != tree && trees1 == trees) {
@@ -444,7 +455,8 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
 	  System.arraycopy(trees, 0, trees1, 0, trees.length);
 	}
 	trees1(i) = tree1;
-      }
+	i = i + 1
+      }}
       trees1;
     }
 
@@ -524,12 +536,13 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
   */
   def toVparams(symbols: Array[Symbol]): Array[Tree$ValDef] = {
     val vpars = new Array[Tree$ValDef](symbols.length);
-    for (val i <- Iterator.range(0, symbols.length)) {
+    { var i = 0; while (i < symbols.length) {
       vpars(i) = make.ValDef(
 	symbols(i).pos, PARAM | SYNTHETIC, symbols(i).name,
 	gen.mkType(symbols(i).pos, symbols(i).getType()),
 	Tree.Empty);
-    }
+      i = i + 1
+    }}
     vpars
   }
 
@@ -538,9 +551,10 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
   */
   def toIdents(symbols: Array[Symbol]): Array[Tree] = {
     val idents = new Array[Tree$Ident](symbols.length);
-    for (val i <- Iterator.range(0, symbols.length)) {
+    { var i = 0; while (i < symbols.length) {
       idents(i) = make.Ident(symbols(i).pos, symbols(i).name);
-    }
+      i = i + 1
+    }}
     idents.asInstanceOf[Array[Tree]];
   }
 
@@ -559,9 +573,10 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
   */
   def addCaseElements(body: Array[Tree], vparams: Array[Tree$ValDef]): Array[Tree] = {
     val stats: TreeList = new TreeList();
-    for (val i <- Iterator.range(0, vparams.length)) {
+    { var i = 0; while (i < vparams.length) {
       addCaseElement(stats, vparams(i));
-    }
+      i = i + 1
+    }}
     stats.append(body);
     stats.toArray();
   }

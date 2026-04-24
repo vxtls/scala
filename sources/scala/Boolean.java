@@ -13,11 +13,8 @@ package scala;
 public abstract class Boolean extends AnyVal {
 
     public final boolean value;
-    public final boolean $bang;
-
     public Boolean(boolean value) {
         this.value = value;
-        this.$bang = !value;
     }
 
     public boolean equals(java.lang.Object other) {

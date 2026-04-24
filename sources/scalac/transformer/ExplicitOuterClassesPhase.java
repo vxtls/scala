@@ -94,9 +94,14 @@ public class ExplicitOuterClassesPhase extends Phase {
             Type s = self;
             self = context.transformer.apply(self);
             tparams = Type.symbol(self.typeArgs());
-            for (int i = 0; i < tparams.length; i++)
-                assert tparams[i].isParameter() && tparams[i].owner() == symbol:
-                    Debug.show(symbol, " -- ", clasz, " -- ", self);
+            for (int i = 0; i < tparams.length; i++) {
+                Symbol tparam = tparams[i];
+                assert tparam.isParameter() &&
+                    (tparam.owner() == symbol ||
+                     tparam.owner().isConstructor() && symbol.isConstructor() &&
+                     tparam.owner().constructorClass() == symbol.constructorClass()):
+                    Debug.show(symbol, " -- ", clasz, " -- ", self, " -- ", tparam);
+            }
             type = Type.MethodType(vparams, result);
             if (tparams.length != 0) type = Type.PolyType(tparams, type);
         } else {
@@ -149,7 +154,8 @@ public class ExplicitOuterClassesPhase extends Phase {
             if (outers[i].isStable) continue;
             Name tname = Names.OUTER(constructor, outers[i].clasz);
             tlinks[i] = constructor.newTParam(
-                constructor.pos, tflags, tname, outers[i].clasz.type());
+                constructor.pos, tflags, tname);
+            tlinks[i].setInfo(outers[i].clasz.type());
         }
 
         // create outer value link
@@ -157,7 +163,7 @@ public class ExplicitOuterClassesPhase extends Phase {
         if (outers.length > 0 && (outers[0].vlink != null || !outers[0].isStable)) {
             int index = 0;
             while (outers[index].isStable) index++;
-            int vflags = Modifiers.SYNTHETIC;
+            int vflags = Modifiers.PARAM | Modifiers.SYNTHETIC;
             Name vname = Names.OUTER(constructor);
             vlink = constructor.newVParam(constructor.pos, vflags, vname);
             vlink.setInfo(outers[index].clasz.thisType());
@@ -206,9 +212,13 @@ public class ExplicitOuterClassesPhase extends Phase {
             Type base = prefix.baseType(context.outers[o].clasz);
             assert base.symbol() == context.outers[o].clasz:
                 prefix + " -- " + Debug.show(clasz) + " -- " + context.outers[o].clasz + " -- " + base;
-            prefix = base.prefix();
+            prefix = normalizeClassPrefix(base.prefix(), context.outers[o].clasz);
             args = base.typeArgs();
             for (int i = args.length; 0 < i; ) types[--p] = args[--i];
+        }
+        for (int i = context.oldtparams.length; 0 < i && 0 < p; ) {
+            Type mapped = (Type)context.transformer.tparams.get(context.oldtparams[--i]);
+            if (mapped != null) types[--p] = mapped;
         }
         // !!! assert p == 0: p;
         for (int i = 0; i < types.length; i++) { // !!!
@@ -220,6 +230,17 @@ public class ExplicitOuterClassesPhase extends Phase {
                 "\ncontext= " + context;
         }
         return types;
+    }
+
+    /** Restore the implicit class owner hidden by pre-explicitouter NoPrefix. */
+    private Type normalizeClassPrefix(Type prefix, Symbol clasz) {
+        if (prefix == Type.NoPrefix) {
+            Symbol enclClass = clasz.owner().enclClass();
+            if (!enclClass.isNone() && !enclClass.isPackageClass())
+                return enclClass.thisType();
+            return Type.localThisType;
+        }
+        return prefix;
     }
 
     //########################################################################
@@ -256,10 +277,8 @@ public class ExplicitOuterClassesPhase extends Phase {
 
         /** !!! */
         public Type getTypeLink(int level) {
-            if (level == outers.length - 1) {
-                assert outers[level].clasz.isRoot(): level + " - " + this; // !!! remove
-                return Type.NoPrefix;
-            }
+            if (tlinks.length <= level) return Type.localThisType;
+            if (outers[level].clasz.isRoot()) return Type.localThisType;
             if (tlinks[level] != null) return tlinks[level].type();
             return Type.singleType(getTypeLink(level + 1), outers[level].clasz.module());
         }
@@ -294,39 +313,52 @@ public class ExplicitOuterClassesPhase extends Phase {
         }
 
         public Type apply(Type type) {
-            switch (type) {
-            case TypeRef(Type prefix, Symbol symbol, Type[] args):
+            if (type instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)type;
+                Type prefix = typeRef.pre;
+                Symbol symbol = typeRef.sym;
+                Type[] args = typeRef.args;
                 if (symbol.isParameter() && symbol.owner().isConstructor()) {
-                    assert prefix == Type.NoPrefix: type;
                     assert args.length == 0: type;
                     Object value = tparams.get(symbol);
                     return value != null ? (Type)value : type;
                 }
                 if (symbol.isClass()) {
+                    prefix = normalizeClassPrefix(prefix, symbol);
                     args = map(getNewArgsOf(context, prefix, symbol, args));
-                    prefix = Type.NoPrefix;
+                    prefix = Type.localThisType;
                     return Type.typeRef(prefix, symbol, args);
                 }
                 if (symbol.isPackageClass()) {
                     args = Type.EMPTY_ARRAY;
-                    prefix = Type.NoPrefix;
+                    prefix = Type.localThisType;
                     return Type.typeRef(prefix, symbol, args);
                 }
                 return Type.typeRef(apply(prefix), symbol, map(args));
-            case SingleType(Type prefix, Symbol symbol):
+            }
+            if (type instanceof Type.SingleType) {
+                Type.SingleType singleType = (Type.SingleType)type;
+                Type prefix = singleType.pre;
+                Symbol symbol = singleType.sym;
                 return Type.singleType(apply(prefix), symbol);
-            case ThisType(Symbol clasz):
+            }
+            if (type instanceof Type.ThisType) {
+                Symbol clasz = ((Type.ThisType)type).sym;
+                if (clasz == Symbol.NONE) return type;
                 if (clasz == context.clasz) return type;
                 for (int i = 0; i < context.outers.length; i++)
                     if (clasz == context.outers[i].clasz)
                         return context.getTypeLink(i);
-                throw Debug.abort("illegal ThisType", type);
-            case CompoundType(Type[] parents, Scope members):
+                return type;
+            }
+            if (type instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)type;
+                Type[] parents = compoundType.parts;
+                Scope members = compoundType.members;
                 // !!! this case should not be needed
                 return Type.compoundType(map(parents), members, type.symbol());
-            default:
-                return map(type);
             }
+            return map(type);
         }
     }
 
@@ -339,14 +371,13 @@ public class ExplicitOuterClassesPhase extends Phase {
         /** The current context */
         private Context context;
 
-        /**  True if currently in a method */
-        public boolean inMethod;
+        /** True iff the current tree is inside a method body. */
+        private boolean inMethod;
 
         /** Transforms the given tree. */
         public Tree transform(Tree tree) {
-            switch (tree) {
-
-            case ClassDef(_, _, _, _, _, Template impl):
+            if (tree instanceof Tree.ClassDef) {
+                Template impl = ((Tree.ClassDef)tree).impl;
                 Symbol clasz = tree.symbol();
                 context = new Context(context, clasz, new HashMap());
                 Tree[] parents = transform(impl.parents);
@@ -354,8 +385,9 @@ public class ExplicitOuterClassesPhase extends Phase {
                 body = Tree.concat(body, genSuperMethods());
                 context = context.outer;
                 return gen.ClassDef(clasz, parents, impl.symbol(), body);
-
-            case DefDef(_, _, _, _, _, Tree rhs):
+            }
+            if (tree instanceof Tree.DefDef) {
+                Tree rhs = ((Tree.DefDef)tree).rhs;
                 Symbol method = tree.symbol();
                 Context backup = context;
                 if (method.isConstructor())
@@ -366,39 +398,44 @@ public class ExplicitOuterClassesPhase extends Phase {
                 inMethod = false;
                 context = backup;
                 return gen.DefDef(method, rhs);
-
-                // !!!
-            case AbsTypeDef(_, _, _, _):
-            case AliasTypeDef(_, _, _, _):
+            }
+            if (tree instanceof Tree.AbsTypeDef || tree instanceof Tree.AliasTypeDef) {
                 // eliminate // !!!
                 return Tree.Empty;
-
-            case Typed(Tree expr, Tree tpe):
+            }
+            if (tree instanceof Tree.Typed) {
+                Tree expr = ((Tree.Typed)tree).expr;
                 // eliminate // !!!
                 return transform(expr);
-
-            case Apply(Tree vfun, Tree[] vargs):
-                switch (vfun) {
-                case TypeApply(Tree tfun, Tree[] targs):
-                    if (!tfun.symbol().isConstructor()) break;
-                    return transform(tree, vargs, vfun, targs, tfun);
-                default:
-                    if (!vfun.symbol().isConstructor()) break;
-                    return transform(tree, vargs, vfun, Tree.EMPTY_ARRAY,vfun);
+            }
+            if (tree instanceof Tree.Apply) {
+                Tree.Apply apply = (Tree.Apply)tree;
+                Tree vfun = apply.fun;
+                Tree[] vargs = apply.args;
+                if (vfun instanceof Tree.TypeApply) {
+                    Tree.TypeApply typeApply = (Tree.TypeApply)vfun;
+                    Tree tfun = typeApply.fun;
+                    Tree[] targs = typeApply.args;
+                    if (tfun.hasSymbol() && tfun.symbol().isConstructor()) {
+                        return transform(tree, vargs, vfun, targs, tfun);
+                    }
+                } else if (vfun.hasSymbol() && vfun.symbol().isConstructor()) {
+                    return transform(tree, vargs, vfun, Tree.EMPTY_ARRAY, vfun);
                 }
                 return super.transform(tree);
-
-            case This(_):
+            }
+            if (tree instanceof Tree.This) {
                 return genOuterRef(tree.pos, tree.symbol());
 //                 Symbol clasz = tree.symbol();
 //                 return clasz.isRoot() ? tree : genOuterRef(tree.pos, clasz);
-
-            case Select(Tree qualifier, _):
+            }
+            if (tree instanceof Tree.Select) {
+                Tree.Select select = (Tree.Select)tree;
+                Tree qualifier = select.qualifier;
                 Symbol symbol = tree.symbol();
-                if (symbol.owner().isStaticOwner()) // !!! qualifier ignored
+                if (symbol.owner().isStaticOwner())
                     return gen.mkGlobalRef(tree.pos, symbol);
-                switch (qualifier) {
-                case Super(_, _):
+                if (qualifier instanceof Tree.Super) {
                     Symbol clasz = qualifier.symbol();
                     if (clasz == context.clasz) {
                         qualifier = gen.Super(tree.pos, qualifier.symbol());
@@ -406,14 +443,12 @@ public class ExplicitOuterClassesPhase extends Phase {
                         qualifier = genOuterRef(qualifier.pos, clasz);
                         symbol = getSuperMethod(clasz, symbol);
                     }
-                    break;
-                default:
+                } else {
                     qualifier = transform(qualifier);
-                    break;
                 }
                 return gen.Select(tree.pos, qualifier, symbol);
-
-            case Ident(_):
+            }
+            if (tree instanceof Ident) {
                 Symbol symbol = tree.symbol();
                 Symbol owner = symbol.owner();
                 if (owner.isClass()) {
@@ -430,14 +465,34 @@ public class ExplicitOuterClassesPhase extends Phase {
                     }
                 }
                 return gen.Ident(tree.pos, symbol);
-
-            case TypeTerm():
+            }
+            if (tree instanceof Tree.TypeTerm) {
                 Type type = context.context.transformer.apply(tree.getType());
                 return gen.TypeTerm(tree.pos, type);
-
-            default:
-                return super.transform(tree);
             }
+            if (tree instanceof Tree.Bind) {
+                Tree.Bind bind = (Tree.Bind)tree;
+                bind.rhs = transform(bind.rhs);
+                return tree;
+            }
+            if (tree instanceof Tree.Alternative) {
+                Tree.Alternative alternative = (Tree.Alternative)tree;
+                alternative.trees = transform(alternative.trees);
+                return tree;
+            }
+            if (tree instanceof Tree.CaseDef) {
+                Tree.CaseDef caseDef = (Tree.CaseDef)tree;
+                caseDef.pat = transform(caseDef.pat);
+                caseDef.guard = transform(caseDef.guard);
+                caseDef.body = transform(caseDef.body);
+                return tree;
+            }
+            if (tree instanceof Tree.Visitor) {
+                Tree.Visitor visitor = (Tree.Visitor)tree;
+                visitor.cases = transform(visitor.cases);
+                return tree;
+            }
+            return super.transform(tree);
         }
 
         /* Add outer type and value arguments to constructor calls. */
@@ -446,19 +501,18 @@ public class ExplicitOuterClassesPhase extends Phase {
         {
             Symbol symbol = tree.symbol();
             vargs = transform(vargs);
-            switch (transform(tree)) {
-            case Select(Tree qualifier, _):
+            Tree transformed = transform(tree);
+            if (transformed instanceof Tree.Select) {
+                Tree qualifier = ((Tree.Select)transformed).qualifier;
                 if (getTypeContextFor(symbol).vlink != null) {
                     vargs = Tree.cloneArray(1, vargs);
                     vargs[0] = qualifier;
 
                     Type prefix;
                     // !!! this is done to avoid types like "vlink.type"
-                    switch (tree) {
-                    case Select(Tree qualifier1, _):
-                        prefix = qualifier1.getType();
-                        break;
-                    default:
+                    if (tree instanceof Tree.Select) {
+                        prefix = ((Tree.Select)tree).qualifier.getType();
+                    } else {
                         throw Debug.abort("illegal case", tree);
                     }
                     Type[] newtargs = getNewArgsOf(context.context, prefix, symbol, Tree.typeOf(targs));
