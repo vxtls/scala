@@ -55,6 +55,7 @@ public class Primitives {
     private static final Name FARRAY_LENGTH_N=Name.fromString("farray_length");
     private static final Name DARRAY_LENGTH_N=Name.fromString("darray_length");
     private static final Name OARRAY_LENGTH_N=Name.fromString("oarray_length");
+    private static final Name ARRAY_LENGTH_N =Name.fromString("array_length");
 
     private static final Name ZARRAY_GET_N = Name.fromString("zarray_get");
     private static final Name BARRAY_GET_N = Name.fromString("barray_get");
@@ -65,6 +66,7 @@ public class Primitives {
     private static final Name FARRAY_GET_N = Name.fromString("farray_get");
     private static final Name DARRAY_GET_N = Name.fromString("darray_get");
     private static final Name OARRAY_GET_N = Name.fromString("oarray_get");
+    private static final Name ARRAY_GET_N  = Name.fromString("array_get");
 
     private static final Name ZARRAY_SET_N = Name.fromString("zarray_set");
     private static final Name BARRAY_SET_N = Name.fromString("barray_set");
@@ -75,6 +77,7 @@ public class Primitives {
     private static final Name FARRAY_SET_N = Name.fromString("farray_set");
     private static final Name DARRAY_SET_N = Name.fromString("darray_set");
     private static final Name OARRAY_SET_N = Name.fromString("oarray_set");
+    private static final Name ARRAY_SET_N  = Name.fromString("array_set");
 
     private static final Name BOX_UVALUE_N = Name.fromString("box_uvalue");
     private static final Name BOX_ZVALUE_N = Name.fromString("box_zvalue");
@@ -198,6 +201,7 @@ public class Primitives {
     public final Symbol FARRAY_LENGTH;
     public final Symbol DARRAY_LENGTH;
     public final Symbol OARRAY_LENGTH;
+    public final Symbol ARRAY_LENGTH;
 
     public final Symbol ZARRAY_GET;
     public final Symbol BARRAY_GET;
@@ -208,6 +212,7 @@ public class Primitives {
     public final Symbol FARRAY_GET;
     public final Symbol DARRAY_GET;
     public final Symbol OARRAY_GET;
+    public final Symbol ARRAY_GET;
 
     public final Symbol ZARRAY_SET;
     public final Symbol BARRAY_SET;
@@ -218,6 +223,7 @@ public class Primitives {
     public final Symbol FARRAY_SET;
     public final Symbol DARRAY_SET;
     public final Symbol OARRAY_SET;
+    public final Symbol ARRAY_SET;
 
     public final Symbol BOX_UVALUE;
     public final Symbol BOX_ZVALUE;
@@ -339,6 +345,7 @@ public class Primitives {
         this.FARRAY_LENGTH = getUniqueTerm(RUNTIME, FARRAY_LENGTH_N);
         this.DARRAY_LENGTH = getUniqueTerm(RUNTIME, DARRAY_LENGTH_N);
         this.OARRAY_LENGTH = getUniqueTerm(RUNTIME, OARRAY_LENGTH_N);
+        this.ARRAY_LENGTH = getUniqueTerm(RUNTIME, ARRAY_LENGTH_N);
         this.ZARRAY_GET = getUniqueTerm(RUNTIME, ZARRAY_GET_N);
         this.BARRAY_GET = getUniqueTerm(RUNTIME, BARRAY_GET_N);
         this.SARRAY_GET = getUniqueTerm(RUNTIME, SARRAY_GET_N);
@@ -348,6 +355,7 @@ public class Primitives {
         this.FARRAY_GET = getUniqueTerm(RUNTIME, FARRAY_GET_N);
         this.DARRAY_GET = getUniqueTerm(RUNTIME, DARRAY_GET_N);
         this.OARRAY_GET = getUniqueTerm(RUNTIME, OARRAY_GET_N);
+        this.ARRAY_GET = getUniqueTerm(RUNTIME, ARRAY_GET_N);
         this.ZARRAY_SET = getUniqueTerm(RUNTIME, ZARRAY_SET_N);
         this.BARRAY_SET = getUniqueTerm(RUNTIME, BARRAY_SET_N);
         this.SARRAY_SET = getUniqueTerm(RUNTIME, SARRAY_SET_N);
@@ -357,6 +365,7 @@ public class Primitives {
         this.FARRAY_SET = getUniqueTerm(RUNTIME, FARRAY_SET_N);
         this.DARRAY_SET = getUniqueTerm(RUNTIME, DARRAY_SET_N);
         this.OARRAY_SET = getUniqueTerm(RUNTIME, OARRAY_SET_N);
+        this.ARRAY_SET = getUniqueTerm(RUNTIME, ARRAY_SET_N);
         this.BOX_UVALUE = getUniqueTerm(RUNTIME, BOX_UVALUE_N);
         this.BOX_ZVALUE = getUniqueTerm(RUNTIME, BOX_ZVALUE_N);
         this.BOX_BVALUE = getUniqueTerm(RUNTIME, BOX_BVALUE_N);

@@ -217,6 +217,22 @@ public class Erasure extends GenTransformer implements Modifiers {
                     }
                 }
             }
+            if (fun instanceof Tree.Select) {
+                Tree qualifier = ((Tree.Select)fun).qualifier;
+                if (qualifier.getType().symbol() == definitions.ARRAY_CLASS) {
+                    switch (primitives.getPrimitive(fun.symbol())) {
+                    case LENGTH:
+                        assert vargs.length == 0: tree;
+                        return genBoxedArrayLength(tree.pos, qualifier);
+                    case APPLY:
+                        assert vargs.length == 1: tree;
+                        return genBoxedArrayGet(tree.pos, qualifier, vargs[0]);
+                    case UPDATE:
+                        assert vargs.length == 2: tree;
+                        return genBoxedArraySet(tree.pos, qualifier, vargs[0], vargs[1]);
+                    }
+                }
+            }
             return genApply(tree.pos, fun, vargs);
         } else if (tree instanceof Tree.Select) {
             Tree qualifier = ((Tree.Select)tree).qualifier;
@@ -225,6 +241,13 @@ public class Erasure extends GenTransformer implements Modifiers {
             assert prefix != Type.NoType: tree + " -- " + Debug.show(symbol);
 	    qualifier = transform(qualifier);
 	    qualifier = coerce(qualifier, prefix);
+
+            if (primitives.getPrimitive(symbol) == Primitive.LENGTH &&
+                isUnboxedArrayType(qualifier.getType()))
+                return genUnboxedArrayLength(tree.pos, qualifier);
+            if (primitives.getPrimitive(symbol) == Primitive.LENGTH &&
+                prefix.symbol() == definitions.ARRAY_CLASS)
+                return genBoxedArrayLength(tree.pos, qualifier);
 
             // Might end up with "box(unbox(...))". That's needed by backend.
             if (isUnboxedType(prefix)) qualifier = box(qualifier, true);
@@ -455,6 +478,36 @@ public class Erasure extends GenTransformer implements Modifiers {
         Tree array =
             gen.mkApply_V(gen.mkGlobalRef(pos, primitives.NEW_OARRAY), args);
         return gen.mkAsInstanceOf(array, Type.UnboxedArrayType(element));
+    }
+
+    private Tree unboxArray(Tree array, Type arrayType) {
+        Type element = arrayElementType(arrayType).erasure();
+        return coerce(array, Type.UnboxedArrayType(element));
+    }
+
+    private Tree genBoxedArrayLength(int pos, Tree array) {
+        Tree fun = gen.mkGlobalRef(pos, primitives.ARRAY_LENGTH);
+        return genApply(pos, fun, new Tree[] { array });
+    }
+
+    private Tree genBoxedArrayGet(int pos, Tree array, Tree index) {
+        Tree fun = gen.mkGlobalRef(pos, primitives.ARRAY_GET);
+        return genApply(pos, fun, new Tree[] { array, index });
+    }
+
+    private Tree genBoxedArraySet(int pos, Tree array, Tree index, Tree value) {
+        Tree fun = gen.mkGlobalRef(pos, primitives.ARRAY_SET);
+        return genApply(pos, fun, new Tree[] { array, index, value });
+    }
+
+    private Type arrayElementType(Type arrayType) {
+        if (arrayType instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)arrayType;
+            if (typeRef.sym == definitions.ARRAY_CLASS &&
+                typeRef.args.length == 0)
+                return definitions.ANYREF_TYPE();
+        }
+        return getArrayElementType(arrayType);
     }
 
     /**
