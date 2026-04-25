@@ -138,7 +138,7 @@ class TransMatch( global:scalac_Global )
       pm.construct( cases.asInstanceOf[ Array[Tree] ] );
       } catch {
         case e:Throwable =>
-          Console.println("failed on pats"+scala.Iterator.fromArray(cases).toList.mkString("","\n","")+", message\n"+e.getMessage())
+          scala.Console.println("failed on pats"+scala.Iterator.fromArray(cases).toList.mkString("","\n","")+", message\n"+e.getMessage())
       }
       if (global.log()) {
         global.log("internal pattern matching structure");

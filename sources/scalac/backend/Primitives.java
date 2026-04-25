@@ -55,6 +55,7 @@ public class Primitives {
     private static final Name FARRAY_LENGTH_N=Name.fromString("farray_length");
     private static final Name DARRAY_LENGTH_N=Name.fromString("darray_length");
     private static final Name OARRAY_LENGTH_N=Name.fromString("oarray_length");
+    private static final Name ARRAY_LENGTH_N =Name.fromString("array_length");
 
     private static final Name ZARRAY_GET_N = Name.fromString("zarray_get");
     private static final Name BARRAY_GET_N = Name.fromString("barray_get");
@@ -65,6 +66,7 @@ public class Primitives {
     private static final Name FARRAY_GET_N = Name.fromString("farray_get");
     private static final Name DARRAY_GET_N = Name.fromString("darray_get");
     private static final Name OARRAY_GET_N = Name.fromString("oarray_get");
+    private static final Name ARRAY_GET_N  = Name.fromString("array_get");
 
     private static final Name ZARRAY_SET_N = Name.fromString("zarray_set");
     private static final Name BARRAY_SET_N = Name.fromString("barray_set");
@@ -75,6 +77,7 @@ public class Primitives {
     private static final Name FARRAY_SET_N = Name.fromString("farray_set");
     private static final Name DARRAY_SET_N = Name.fromString("darray_set");
     private static final Name OARRAY_SET_N = Name.fromString("oarray_set");
+    private static final Name ARRAY_SET_N  = Name.fromString("array_set");
 
     private static final Name BOX_UVALUE_N = Name.fromString("box_uvalue");
     private static final Name BOX_ZVALUE_N = Name.fromString("box_zvalue");
@@ -175,7 +178,6 @@ public class Primitives {
     private final Definitions definitions;
     private final Map/*<Symbol,Primitive>*/ primitives;
     private final SymbolNameWriter jreNameWriter;
-    private final SymbolNameWriter clrNameWriter;
 
     public final Symbol RUNTIME;
 
@@ -198,6 +200,7 @@ public class Primitives {
     public final Symbol FARRAY_LENGTH;
     public final Symbol DARRAY_LENGTH;
     public final Symbol OARRAY_LENGTH;
+    public final Symbol ARRAY_LENGTH;
 
     public final Symbol ZARRAY_GET;
     public final Symbol BARRAY_GET;
@@ -208,6 +211,7 @@ public class Primitives {
     public final Symbol FARRAY_GET;
     public final Symbol DARRAY_GET;
     public final Symbol OARRAY_GET;
+    public final Symbol ARRAY_GET;
 
     public final Symbol ZARRAY_SET;
     public final Symbol BARRAY_SET;
@@ -218,6 +222,7 @@ public class Primitives {
     public final Symbol FARRAY_SET;
     public final Symbol DARRAY_SET;
     public final Symbol OARRAY_SET;
+    public final Symbol ARRAY_SET;
 
     public final Symbol BOX_UVALUE;
     public final Symbol BOX_ZVALUE;
@@ -319,7 +324,6 @@ public class Primitives {
         this.definitions = global.definitions;
         this.primitives = new HashMap();
         this.jreNameWriter = new SymbolNameWriter().setClassSeparator('$');
-        this.clrNameWriter = new SymbolNameWriter();
         this.RUNTIME = definitions.getModule("scala.runtime.RunTime");
         this.NEW_ZARRAY = getUniqueTerm(RUNTIME, ZARRAY_N);
         this.NEW_BARRAY = getUniqueTerm(RUNTIME, BARRAY_N);
@@ -339,6 +343,7 @@ public class Primitives {
         this.FARRAY_LENGTH = getUniqueTerm(RUNTIME, FARRAY_LENGTH_N);
         this.DARRAY_LENGTH = getUniqueTerm(RUNTIME, DARRAY_LENGTH_N);
         this.OARRAY_LENGTH = getUniqueTerm(RUNTIME, OARRAY_LENGTH_N);
+        this.ARRAY_LENGTH = getUniqueTerm(RUNTIME, ARRAY_LENGTH_N);
         this.ZARRAY_GET = getUniqueTerm(RUNTIME, ZARRAY_GET_N);
         this.BARRAY_GET = getUniqueTerm(RUNTIME, BARRAY_GET_N);
         this.SARRAY_GET = getUniqueTerm(RUNTIME, SARRAY_GET_N);
@@ -348,6 +353,7 @@ public class Primitives {
         this.FARRAY_GET = getUniqueTerm(RUNTIME, FARRAY_GET_N);
         this.DARRAY_GET = getUniqueTerm(RUNTIME, DARRAY_GET_N);
         this.OARRAY_GET = getUniqueTerm(RUNTIME, OARRAY_GET_N);
+        this.ARRAY_GET = getUniqueTerm(RUNTIME, ARRAY_GET_N);
         this.ZARRAY_SET = getUniqueTerm(RUNTIME, ZARRAY_SET_N);
         this.BARRAY_SET = getUniqueTerm(RUNTIME, BARRAY_SET_N);
         this.SARRAY_SET = getUniqueTerm(RUNTIME, SARRAY_SET_N);
@@ -357,6 +363,7 @@ public class Primitives {
         this.FARRAY_SET = getUniqueTerm(RUNTIME, FARRAY_SET_N);
         this.DARRAY_SET = getUniqueTerm(RUNTIME, DARRAY_SET_N);
         this.OARRAY_SET = getUniqueTerm(RUNTIME, OARRAY_SET_N);
+        this.ARRAY_SET = getUniqueTerm(RUNTIME, ARRAY_SET_N);
         this.BOX_UVALUE = getUniqueTerm(RUNTIME, BOX_UVALUE_N);
         this.BOX_ZVALUE = getUniqueTerm(RUNTIME, BOX_ZVALUE_N);
         this.BOX_BVALUE = getUniqueTerm(RUNTIME, BOX_BVALUE_N);
@@ -500,7 +507,11 @@ public class Primitives {
         // !!! addAll(defs.BOOLEAN_CLASS, Names.ADD, Primitive.CONCAT, 1);
 
         // scala.Byte
-        addAll(defs.BYTE_CLASS, Names.coerce, Primitive.COERCE, 5);
+        addAll(defs.BYTE_CLASS, Names.coerceToDouble, Primitive.COERCE, 1);
+        addAll(defs.BYTE_CLASS, Names.coerceToFloat, Primitive.COERCE, 1);
+        addAll(defs.BYTE_CLASS, Names.coerceToLong, Primitive.COERCE, 1);
+        addAll(defs.BYTE_CLASS, Names.coerceToInt, Primitive.COERCE, 1);
+        addAll(defs.BYTE_CLASS, Names.coerceToShort, Primitive.COERCE, 1);
         //addAll(defs.BYTE_CLASS, Names.EQ, Primitive.EQ, 5);
         addAllPrimitive(defs.BYTE_CLASS, Names.EQ, Primitive.EQ, 4);
         //addAll(defs.BYTE_CLASS, Names.NE, Primitive.NE, 5);
@@ -526,7 +537,10 @@ public class Primitives {
         addAll(defs.BYTE_CLASS, Names.ASR, Primitive.ASR, 2);
 
         // scala.Short
-        addAll(defs.SHORT_CLASS, Names.coerce, Primitive.COERCE, 4);
+        addAll(defs.SHORT_CLASS, Names.coerceToDouble, Primitive.COERCE, 1);
+        addAll(defs.SHORT_CLASS, Names.coerceToFloat, Primitive.COERCE, 1);
+        addAll(defs.SHORT_CLASS, Names.coerceToLong, Primitive.COERCE, 1);
+        addAll(defs.SHORT_CLASS, Names.coerceToInt, Primitive.COERCE, 1);
         //addAll(defs.SHORT_CLASS, Names.EQ, Primitive.EQ, 5);
         addAllPrimitive(defs.SHORT_CLASS, Names.EQ, Primitive.EQ, 4);
         //addAll(defs.SHORT_CLASS, Names.NE, Primitive.NE, 5);
@@ -552,7 +566,10 @@ public class Primitives {
         addAll(defs.SHORT_CLASS, Names.ASR, Primitive.ASR, 2);
 
         // scala.Char
-        addAll(defs.CHAR_CLASS, Names.coerce, Primitive.COERCE, 4);
+        addAll(defs.CHAR_CLASS, Names.coerceToDouble, Primitive.COERCE, 1);
+        addAll(defs.CHAR_CLASS, Names.coerceToFloat, Primitive.COERCE, 1);
+        addAll(defs.CHAR_CLASS, Names.coerceToLong, Primitive.COERCE, 1);
+        addAll(defs.CHAR_CLASS, Names.coerceToInt, Primitive.COERCE, 1);
         //addAll(defs.CHAR_CLASS, Names.EQ, Primitive.EQ, 5);
         addAllPrimitive(defs.CHAR_CLASS, Names.EQ, Primitive.EQ, 4);
         //addAll(defs.CHAR_CLASS, Names.NE, Primitive.NE, 5);
@@ -578,7 +595,9 @@ public class Primitives {
         addAll(defs.CHAR_CLASS, Names.ASR, Primitive.ASR, 2);
 
         // scala.Int
-        addAll(defs.INT_CLASS, Names.coerce, Primitive.COERCE, 3);
+        addAll(defs.INT_CLASS, Names.coerceToDouble, Primitive.COERCE, 1);
+        addAll(defs.INT_CLASS, Names.coerceToFloat, Primitive.COERCE, 1);
+        addAll(defs.INT_CLASS, Names.coerceToLong, Primitive.COERCE, 1);
         //addAll(defs.INT_CLASS, Names.EQ, Primitive.EQ, 5);
         addAllPrimitive(defs.INT_CLASS, Names.EQ, Primitive.EQ, 4);
         //addAll(defs.INT_CLASS, Names.NE, Primitive.NE, 5);
@@ -604,7 +623,8 @@ public class Primitives {
         addAll(defs.INT_CLASS, Names.ASR, Primitive.ASR, 2);
 
         // scala.Long
-        addAll(defs.LONG_CLASS, Names.coerce, Primitive.COERCE, 2);
+        addAll(defs.LONG_CLASS, Names.coerceToDouble, Primitive.COERCE, 1);
+        addAll(defs.LONG_CLASS, Names.coerceToFloat, Primitive.COERCE, 1);
         //addAll(defs.LONG_CLASS, Names.EQ, Primitive.EQ, 4);
         addAllPrimitive(defs.LONG_CLASS, Names.EQ, Primitive.EQ, 3);
         //addAll(defs.LONG_CLASS, Names.NE, Primitive.NE, 4);
@@ -630,7 +650,7 @@ public class Primitives {
         addAll(defs.LONG_CLASS, Names.ASR, Primitive.ASR, 2);
 
         // scala.Float
-        addAll(defs.FLOAT_CLASS, Names.coerce, Primitive.COERCE, 1);
+        addAll(defs.FLOAT_CLASS, Names.coerceToDouble, Primitive.COERCE, 1);
         //addAll(defs.FLOAT_CLASS, Names.EQ, Primitive.EQ, 3);
         addAllPrimitive(defs.FLOAT_CLASS, Names.EQ, Primitive.EQ, 2);
         //addAll(defs.FLOAT_CLASS, Names.NE, Primitive.NE, 3);
@@ -817,31 +837,33 @@ public class Primitives {
         Symbol symbol = clasz.lookup(name);
         assert !symbol.isNone(): Debug.show(clasz) + "." + name;
         Symbol[] alts = symbol.alternativeSymbols();
-        boolean unary = false;
+        boolean pos = false;
         boolean concat = false;
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].type()) {
-            case MethodType(Symbol[] vparams, _):
-                assert vparams.length == 1: alts[i].type();
+            Type altType = alts[i].type();
+            if (altType instanceof Type.MethodType) {
+                Type.MethodType methodType = (Type.MethodType)altType;
+                Symbol[] vparams = methodType.vparams;
+                if (vparams.length == 0) {
+                    addPrimitive(alts[i], Primitive.POS);
+                    pos = true;
+                    continue;
+                }
                 if (vparams[0].type().isSameAs(definitions.STRING_TYPE())) {
                     addPrimitive(alts[i], Primitive.CONCAT);
-                    assert !concat;
                     concat = true;
                 } else {
                     addPrimitive(alts[i], Primitive.ADD);
                     count--;
                 }
-                break;
-            case PolyType(Symbol[] tparams, _):
+            } else if (altType instanceof Type.PolyType) {
                 addPrimitive(alts[i], Primitive.POS);
-                assert !unary;
-                unary = true;
-                break;
-            default:
+                pos = true;
+            } else {
                 throw Debug.abort("illegal case" , alts[i].type());
             }
         }
-        assert count == 0 && unary && concat: count+" - "+unary+" - "+concat;
+        assert count == 0 && pos && concat: count+" - "+pos+" - "+concat;
     }
 
     private void addSub(Symbol clasz, int count) {
@@ -849,23 +871,26 @@ public class Primitives {
         Symbol symbol = clasz.lookup(name);
         assert !symbol.isNone(): Debug.show(clasz) + "." + name;
         Symbol[] alts = symbol.alternativeSymbols();
-        boolean unary = false;
+        boolean pos = false;
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].type()) {
-            case MethodType(_, _):
+            Type altType = alts[i].type();
+            if (altType instanceof Type.MethodType) {
+                Type.MethodType methodType = (Type.MethodType)altType;
+                if (methodType.vparams.length == 0) {
+                    addPrimitive(alts[i], Primitive.NEG);
+                    pos = true;
+                    continue;
+                }
                 addPrimitive(alts[i], Primitive.SUB);
                 count--;
-                break;
-            case PolyType(_, _):
+            } else if (altType instanceof Type.PolyType) {
                 addPrimitive(alts[i], Primitive.NEG);
-                assert !unary;
-                unary = true;
-                break;
-            default:
+                pos = true;
+            } else {
                 throw Debug.abort("illegal case" , alts[i].type());
             }
         }
-        assert count == 0 && unary: count + " - " + unary;
+        assert count == 0 && pos: count + " - " + pos;
     }
 
     private void addAll(Symbol clasz,Name name,Primitive primitive,int count) {
@@ -883,22 +908,33 @@ public class Primitives {
         int cnt = 0;
         loop:
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].info()) {
-            case MethodType(Symbol[] vparams, _):
+            Type altInfo = alts[i].info();
+            if (altInfo instanceof Type.MethodType) {
+                Symbol[] vparams = ((Type.MethodType)altInfo).vparams;
                 for (int j = 0; j < vparams.length; j++) {
                     if (!isValueType(vparams[j].info()))
                         continue loop;
                 }
                 addPrimitive(alts[i], primitive);
                 cnt++;
-                break;
             }
         }
         assert cnt == count : "" + cnt + " != " + count;
     }
 
     private boolean isValueType(Type t) {
-        return t.isSubType(definitions.ANYVAL_TYPE());
+        if (t instanceof Type.UnboxedType) return true;
+        Symbol symbol = t.symbol();
+        return symbol == definitions.ANYVAL_CLASS ||
+            symbol == definitions.UNIT_CLASS ||
+            symbol == definitions.BOOLEAN_CLASS ||
+            symbol == definitions.BYTE_CLASS ||
+            symbol == definitions.SHORT_CLASS ||
+            symbol == definitions.CHAR_CLASS ||
+            symbol == definitions.INT_CLASS ||
+            symbol == definitions.LONG_CLASS ||
+            symbol == definitions.FLOAT_CLASS ||
+            symbol == definitions.DOUBLE_CLASS;
     }
 
     private void addPrimitive(Symbol symbol, Primitive primitive) {
@@ -943,14 +979,12 @@ public class Primitives {
 
     /** Return box method for values of the given type. */
     public Symbol getBoxValueSymbol(Type type) {
-        switch (type) {
-        case UnboxedType(int kind):
-            return getBoxValueSymbol(kind);
-        case UnboxedArrayType(Type elemtp):
-            return getBoxArraySymbol(elemtp);
-        default:
-            throw Debug.abort("illegal case", type);
+        if (type instanceof Type.UnboxedType) {
+            return getBoxValueSymbol(((Type.UnboxedType)type).tag);
+        } else if (type instanceof Type.UnboxedArrayType) {
+            return getBoxArraySymbol(((Type.UnboxedArrayType)type).elemtp);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return box method for values of the given kind. */
@@ -971,12 +1005,10 @@ public class Primitives {
 
     /** Return box method for arrays of elements of the given type. */
     public Symbol getBoxArraySymbol(Type type) {
-        switch (type) {
-        case UnboxedType(int kind):
-            return getBoxArraySymbol(kind);
-        default:
-            return BOX_OARRAY;
+        if (type instanceof Type.UnboxedType) {
+            return getBoxArraySymbol(((Type.UnboxedType)type).tag);
         }
+        return BOX_OARRAY;
     }
 
     /** Return box method for arrays of elements of the given kind. */
@@ -999,14 +1031,12 @@ public class Primitives {
 
     /** Return unbox method returning values of the given type. */
     public Symbol getUnboxValueSymbol(Type type) {
-        switch (type) {
-        case UnboxedType(int kind):
-            return getUnboxValueSymbol(kind);
-        case UnboxedArrayType(Type elemtp):
-            return getUnboxArraySymbol(elemtp);
-        default:
-            throw Debug.abort("illegal case", type);
+        if (type instanceof Type.UnboxedType) {
+            return getUnboxValueSymbol(((Type.UnboxedType)type).tag);
+        } else if (type instanceof Type.UnboxedArrayType) {
+            return getUnboxArraySymbol(((Type.UnboxedArrayType)type).elemtp);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return unbox method returning values of the given kind. */
@@ -1027,12 +1057,10 @@ public class Primitives {
 
     /** Return unbox method returning arrays of elements of the given type. */
     public Symbol getUnboxArraySymbol(Type type) {
-        switch (type) {
-        case UnboxedType(int kind):
-            return getUnboxArraySymbol(kind);
-        default:
-            return UNBOX_OARRAY;
+        if (type instanceof Type.UnboxedType) {
+            return getUnboxArraySymbol(((Type.UnboxedType)type).tag);
         }
+        return UNBOX_OARRAY;
     }
 
     /** Return unbox method returning arrays of elements of the given kind. */
@@ -1055,32 +1083,26 @@ public class Primitives {
 
     /** Return conversion method for given types. */
     public Symbol getConvertSymbol(Type from, Type to) {
-        switch (from) {
-        case UnboxedType(int kind):
-            return getConvertSymbol(kind, to);
-        default:
-            throw Debug.abort("illegal case", from);
+        if (from instanceof Type.UnboxedType) {
+            return getConvertSymbol(((Type.UnboxedType)from).tag, to);
         }
+        throw Debug.abort("illegal case", from);
     }
 
     /** Return conversion method for given type and type kind. */
     public Symbol getConvertSymbol(Type from, int to) {
-        switch (from) {
-        case UnboxedType(int kind):
-            return getConvertSymbol(kind, to);
-        default:
-            throw Debug.abort("illegal case", from);
+        if (from instanceof Type.UnboxedType) {
+            return getConvertSymbol(((Type.UnboxedType)from).tag, to);
         }
+        throw Debug.abort("illegal case", from);
     }
 
     /** Return conversion method for given type kind and type. */
     public Symbol getConvertSymbol(int from, Type to) {
-        switch (to) {
-        case UnboxedType(int kind):
-            return getConvertSymbol(from, kind);
-        default:
-            throw Debug.abort("illegal case", to);
+        if (to instanceof Type.UnboxedType) {
+            return getConvertSymbol(from, ((Type.UnboxedType)to).tag);
         }
+        throw Debug.abort("illegal case", to);
     }
 
     /** Return conversion method for given kind types. */
@@ -1165,14 +1187,14 @@ public class Primitives {
 
     /** Return length method for arrays of the given type. */
     public Symbol getArrayLengthSymbol(Type type) {
-        switch (type) {
-        case UnboxedArrayType(UnboxedType(int kind)):
-            return getArrayLengthSymbol(kind);
-        case UnboxedArrayType(_):
+        if (type instanceof Type.UnboxedArrayType) {
+            Type elemtp = ((Type.UnboxedArrayType)type).elemtp;
+            if (elemtp instanceof Type.UnboxedType) {
+                return getArrayLengthSymbol(((Type.UnboxedType)elemtp).tag);
+            }
             return OARRAY_LENGTH;
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return length method for arrays of elements of the given kind. */
@@ -1192,14 +1214,14 @@ public class Primitives {
 
     /** Return get method for arrays of the given type. */
     public Symbol getArrayGetSymbol(Type type) {
-        switch (type) {
-        case UnboxedArrayType(UnboxedType(int kind)):
-            return getArrayGetSymbol(kind);
-        case UnboxedArrayType(_):
+        if (type instanceof Type.UnboxedArrayType) {
+            Type elemtp = ((Type.UnboxedArrayType)type).elemtp;
+            if (elemtp instanceof Type.UnboxedType) {
+                return getArrayGetSymbol(((Type.UnboxedType)elemtp).tag);
+            }
             return OARRAY_GET;
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return get method for arrays of elements of the given kind. */
@@ -1219,14 +1241,14 @@ public class Primitives {
 
     /** Return set method for arrays of the given type. */
     public Symbol getArraySetSymbol(Type type) {
-        switch (type) {
-        case UnboxedArrayType(UnboxedType(int kind)):
-            return getArraySetSymbol(kind);
-        case UnboxedArrayType(_):
+        if (type instanceof Type.UnboxedArrayType) {
+            Type elemtp = ((Type.UnboxedArrayType)type).elemtp;
+            if (elemtp instanceof Type.UnboxedType) {
+                return getArraySetSymbol(((Type.UnboxedType)elemtp).tag);
+            }
             return OARRAY_SET;
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return set method for arrays of elements of the given kind. */
@@ -1249,18 +1271,18 @@ public class Primitives {
 
     /* Return name to use in "Class.forName(<name>)" for the given type. */
     public String getNameForClassForName(Type type) {
-        switch (type) {
-        case TypeRef(_, Symbol symbol, _):
-            return getNameForClassForName(symbol);
-        case UnboxedType(int kind):
-            return getNameForClassForName(kind);
-        case UnboxedArrayType(TypeRef(_, Symbol symbol, _)):
-            return "[L" + getNameForClassForName(symbol) + ";";
-        case UnboxedArrayType(Type elemtp):
+        if (type instanceof Type.TypeRef) {
+            return getNameForClassForName(((Type.TypeRef)type).sym);
+        } else if (type instanceof Type.UnboxedType) {
+            return getNameForClassForName(((Type.UnboxedType)type).tag);
+        } else if (type instanceof Type.UnboxedArrayType) {
+            Type elemtp = ((Type.UnboxedArrayType)type).elemtp;
+            if (elemtp instanceof Type.TypeRef) {
+                return "[L" + getNameForClassForName(((Type.TypeRef)elemtp).sym) + ";";
+            }
             return "[" + getNameForClassForName(elemtp);
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /* Return name to use in "Class.forName(<name>)" for the given symbol. */
@@ -1291,12 +1313,6 @@ public class Primitives {
             return getJREClassName(definitions.OBJECT_CLASS);
         String suffix = clasz.isModuleClass() && !clasz.isJava() ? "$" : "";
         return jreNameWriter.toString(clasz, suffix);
-    }
-
-    /** Return the CLR name of given class. */
-    public String getCLRClassName(Symbol clasz) {
-        assert clasz.isClassType(): Debug.show(clasz);
-        return clrNameWriter.toString(clasz);
     }
 
     //########################################################################

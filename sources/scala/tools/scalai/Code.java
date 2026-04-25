@@ -13,117 +13,316 @@ import scalac.symtab.Symbol;
 import scalac.symtab.Type;
 import scalac.util.Debug;
 
-public class Code {
+public abstract class Code {
 
-    //########################################################################
-    // Public Cases
+    public static final class Block extends Code {
+        public final Code[] stats;
+        public final Code value;
 
-    public case Block(Code[] stats, Code value);
-
-    public case Label(Symbol symbol, Variable[] variables, Code expression);
-
-    public case Create(ScalaTemplate template);
-    public case CreateArray(Class component, Code size);
-    public case Invoke(Code target, Function function, Code[] arguments, int pos);
-    public case Load(Code target, Variable variable);
-    public case Store(Code target, Variable variable, Code expression);
-
-    public case Synchronized(Code object, Code expression);
-    public case If(Code cond, Code thenp, Code elsep);
-    public case Or(Code lf, Code rg);
-    public case And(Code lf, Code rg);
-    public case Switch(Code test, int[] tags, Code[] bodies, Code otherwise);
-
-    public case IsAs(Code target, Type type, Class base, boolean cast);
-
-    public case Literal(Object value);
-    public case Self;
-    public case Null;
-
-    //########################################################################
-    // Public Methods
-
-    public String toString() {
-        switch (this) {
-
-        case Block(Code[] stats, Code value):
-            StringBuffer buffer = new StringBuffer();
-            buffer.append("Block([").append('\n');
-            for (int i = 0; i < stats.length; i++) {
-                if (i > 0) buffer.append(",\n");
-                buffer.append(stats[i]);
-            }
-            buffer.append("], ").append(value).append(")");
-            return buffer.toString();
-
-        case Label(Symbol symbol, Variable[] variables, Code expression):
-            StringBuffer buffer = new StringBuffer();
-            buffer.append("Label(").append(symbol).append(",[");
-            for (int i = 0; i < variables.length; i++) {
-                if (i > 0) buffer.append(",\n");
-                buffer.append(variables[i]);
-            }
-            buffer.append("],").append(expression).append(")");
-            return buffer.toString();
-
-        case Create(ScalaTemplate template):
-            return "Create(" + template + ")";
-
-        case CreateArray(Class component, Code size):
-            return "CreateArray(" + component.getName() + "," + size + ")";
-
-        case Invoke(Code target, Function function, Code[] arguments, int pos):
-            StringBuffer buffer = new StringBuffer();
-            buffer.append("Invoke(" + target + "," + function + "," + "[\n");
-            for (int i = 0; i < arguments.length; i++) {
-                if (i > 0) buffer.append(",\n");
-                buffer.append(arguments[i]);
-            }
-            buffer.append("])");
-            return buffer.toString();
-
-        case Load(Code target, Variable variable):
-            return "Load(" +  target + "," + variable + ")";
-
-        case Store(Code target, Variable variable, Code expression):
-            return "Store(" + target + "," + variable + "," + expression + ")";
-
-        case If(Code cond, Code thenp, Code elsep):
-            return "If(" + cond + "," + thenp + "," + elsep + ")";
-
-        case Or(Code lf, Code rg):
-            return "Or(" + lf + "," + rg + ")";
-
-        case And(Code lf, Code rg):
-            return "And(" + lf + "," + rg + ")";
-
-        case Switch(Code test, int[] tags, Code[] bodies, Code otherwise):
-            StringBuffer buffer = new StringBuffer();
-            buffer.append("Switch(" + test + ",\n");
-            for (int i = 0; i < bodies.length; i++) {
-                buffer.append(tags[i]).append(" => ").append(bodies[i]);
-                buffer.append(",\n");
-            }
-            buffer.append("_  => ").append(otherwise);
-            buffer.append(")");
-            return buffer.toString();
-
-        case IsAs(Code target, Type type, Class base, boolean cast):
-            return "IsAs(" + type + "," +  type + "," + base + "," + cast +")";
-
-        case Literal(Object value):
-            return "Literal(" + value + ")";
-
-        case Self:
-            return "Self";
-
-        case Null:
-            return "Null";
-
-        default:
-            throw Debug.abort("illegal code", this);
+        private Block(Code[] stats, Code value) {
+            this.stats = stats;
+            this.value = value;
         }
     }
 
-    //########################################################################
+    public static final class Label extends Code {
+        public final Symbol symbol;
+        public final Variable[] variables;
+        public final Code expression;
+
+        private Label(Symbol symbol, Variable[] variables, Code expression) {
+            this.symbol = symbol;
+            this.variables = variables;
+            this.expression = expression;
+        }
+    }
+
+    public static final class Create extends Code {
+        public final ScalaTemplate template;
+
+        private Create(ScalaTemplate template) {
+            this.template = template;
+        }
+    }
+
+    public static final class CreateArray extends Code {
+        public final Class component;
+        public final Code size;
+
+        private CreateArray(Class component, Code size) {
+            this.component = component;
+            this.size = size;
+        }
+    }
+
+    public static final class Invoke extends Code {
+        public Code target;
+        public final Function function;
+        public final Code[] arguments;
+        public final int pos;
+
+        private Invoke(Code target, Function function, Code[] arguments, int pos) {
+            this.target = target;
+            this.function = function;
+            this.arguments = arguments;
+            this.pos = pos;
+        }
+    }
+
+    public static final class Load extends Code {
+        public final Code target;
+        public final Variable variable;
+
+        private Load(Code target, Variable variable) {
+            this.target = target;
+            this.variable = variable;
+        }
+    }
+
+    public static final class Store extends Code {
+        public final Code target;
+        public final Variable variable;
+        public final Code expression;
+
+        private Store(Code target, Variable variable, Code expression) {
+            this.target = target;
+            this.variable = variable;
+            this.expression = expression;
+        }
+    }
+
+    public static final class Synchronized extends Code {
+        public final Code object;
+        public final Code expression;
+
+        private Synchronized(Code object, Code expression) {
+            this.object = object;
+            this.expression = expression;
+        }
+    }
+
+    public static final class If extends Code {
+        public final Code cond;
+        public final Code thenp;
+        public final Code elsep;
+
+        private If(Code cond, Code thenp, Code elsep) {
+            this.cond = cond;
+            this.thenp = thenp;
+            this.elsep = elsep;
+        }
+    }
+
+    public static final class Or extends Code {
+        public final Code lf;
+        public final Code rg;
+
+        private Or(Code lf, Code rg) {
+            this.lf = lf;
+            this.rg = rg;
+        }
+    }
+
+    public static final class And extends Code {
+        public final Code lf;
+        public final Code rg;
+
+        private And(Code lf, Code rg) {
+            this.lf = lf;
+            this.rg = rg;
+        }
+    }
+
+    public static final class Switch extends Code {
+        public final Code test;
+        public final int[] tags;
+        public final Code[] bodies;
+        public final Code otherwise;
+
+        private Switch(Code test, int[] tags, Code[] bodies, Code otherwise) {
+            this.test = test;
+            this.tags = tags;
+            this.bodies = bodies;
+            this.otherwise = otherwise;
+        }
+    }
+
+    public static final class IsAs extends Code {
+        public final Code target;
+        public final Type type;
+        public final Class base;
+        public final boolean cast;
+
+        private IsAs(Code target, Type type, Class base, boolean cast) {
+            this.target = target;
+            this.type = type;
+            this.base = base;
+            this.cast = cast;
+        }
+    }
+
+    public static final class Literal extends Code {
+        public final Object value;
+
+        private Literal(Object value) {
+            this.value = value;
+        }
+    }
+
+    public static final class Self extends Code {
+        private Self() {
+        }
+    }
+    public static final Self Self = new Self();
+
+    public static final class Null extends Code {
+        private Null() {
+        }
+    }
+    public static final Null Null = new Null();
+
+    public static Block Block(Code[] stats, Code value) {
+        return new Block(stats, value);
+    }
+
+    public static Label Label(Symbol symbol, Variable[] variables, Code expression) {
+        return new Label(symbol, variables, expression);
+    }
+
+    public static Create Create(ScalaTemplate template) {
+        return new Create(template);
+    }
+
+    public static CreateArray CreateArray(Class component, Code size) {
+        return new CreateArray(component, size);
+    }
+
+    public static Invoke Invoke(Code target, Function function, Code[] arguments, int pos) {
+        return new Invoke(target, function, arguments, pos);
+    }
+
+    public static Load Load(Code target, Variable variable) {
+        return new Load(target, variable);
+    }
+
+    public static Store Store(Code target, Variable variable, Code expression) {
+        return new Store(target, variable, expression);
+    }
+
+    public static Synchronized Synchronized(Code object, Code expression) {
+        return new Synchronized(object, expression);
+    }
+
+    public static If If(Code cond, Code thenp, Code elsep) {
+        return new If(cond, thenp, elsep);
+    }
+
+    public static Or Or(Code lf, Code rg) {
+        return new Or(lf, rg);
+    }
+
+    public static And And(Code lf, Code rg) {
+        return new And(lf, rg);
+    }
+
+    public static Switch Switch(Code test, int[] tags, Code[] bodies, Code otherwise) {
+        return new Switch(test, tags, bodies, otherwise);
+    }
+
+    public static IsAs IsAs(Code target, Type type, Class base, boolean cast) {
+        return new IsAs(target, type, base, cast);
+    }
+
+    public static Literal Literal(Object value) {
+        return new Literal(value);
+    }
+
+    public String toString() {
+        if (this instanceof Block) {
+            Block block = (Block)this;
+            StringBuffer buffer = new StringBuffer();
+            buffer.append("Block([").append('\n');
+            for (int i = 0; i < block.stats.length; i++) {
+                if (i > 0) buffer.append(",\n");
+                buffer.append(block.stats[i]);
+            }
+            buffer.append("], ").append(block.value).append(")");
+            return buffer.toString();
+        }
+        if (this instanceof Label) {
+            Label label = (Label)this;
+            StringBuffer buffer = new StringBuffer();
+            buffer.append("Label(").append(label.symbol).append(",[");
+            for (int i = 0; i < label.variables.length; i++) {
+                if (i > 0) buffer.append(",\n");
+                buffer.append(label.variables[i]);
+            }
+            buffer.append("],").append(label.expression).append(")");
+            return buffer.toString();
+        }
+        if (this instanceof Create) {
+            return "Create(" + ((Create)this).template + ")";
+        }
+        if (this instanceof CreateArray) {
+            CreateArray createArray = (CreateArray)this;
+            return "CreateArray(" + createArray.component.getName() + "," + createArray.size + ")";
+        }
+        if (this instanceof Invoke) {
+            Invoke invoke = (Invoke)this;
+            StringBuffer buffer = new StringBuffer();
+            buffer.append("Invoke(").append(invoke.target).append(",").append(invoke.function).append(",").append("[\n");
+            for (int i = 0; i < invoke.arguments.length; i++) {
+                if (i > 0) buffer.append(",\n");
+                buffer.append(invoke.arguments[i]);
+            }
+            buffer.append("])");
+            return buffer.toString();
+        }
+        if (this instanceof Load) {
+            Load load = (Load)this;
+            return "Load(" + load.target + "," + load.variable + ")";
+        }
+        if (this instanceof Store) {
+            Store store = (Store)this;
+            return "Store(" + store.target + "," + store.variable + "," + store.expression + ")";
+        }
+        if (this instanceof If) {
+            If branch = (If)this;
+            return "If(" + branch.cond + "," + branch.thenp + "," + branch.elsep + ")";
+        }
+        if (this instanceof Or) {
+            Or or = (Or)this;
+            return "Or(" + or.lf + "," + or.rg + ")";
+        }
+        if (this instanceof And) {
+            And and = (And)this;
+            return "And(" + and.lf + "," + and.rg + ")";
+        }
+        if (this instanceof Switch) {
+            Switch switch_ = (Switch)this;
+            StringBuffer buffer = new StringBuffer();
+            buffer.append("Switch(").append(switch_.test).append(",\n");
+            for (int i = 0; i < switch_.bodies.length; i++) {
+                buffer.append(switch_.tags[i]).append(" => ").append(switch_.bodies[i]);
+                buffer.append(",\n");
+            }
+            buffer.append("_  => ").append(switch_.otherwise);
+            buffer.append(")");
+            return buffer.toString();
+        }
+        if (this instanceof IsAs) {
+            IsAs isAs = (IsAs)this;
+            return "IsAs(" + isAs.target + "," + isAs.type + "," + isAs.base + "," + isAs.cast + ")";
+        }
+        if (this instanceof Literal) {
+            return "Literal(" + ((Literal)this).value + ")";
+        }
+        if (this == Self) {
+            return "Self";
+        }
+        if (this == Null) {
+            return "Null";
+        }
+        throw Debug.abort("illegal code", this);
+    }
 }

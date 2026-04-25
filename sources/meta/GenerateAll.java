@@ -83,6 +83,11 @@ public class GenerateAll extends AbstractMain {
                 TextExpander expander = new TextExpander(writer, expanders[i]);
                 expander.expandText(source);
                 errors += expander.getErrorCount();
+                if (target.exists()) {
+                    if (!target.setWritable(true, false) && !target.delete()) {
+                        throw new IOException("could not overwrite generated file " + target);
+                    }
+                }
                 FileWriter output = new FileWriter(target);
                 output.write(writer.toString());
                 output.close();

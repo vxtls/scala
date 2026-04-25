@@ -15,8 +15,6 @@ import ch.epfl.lamp.util.Pair;
 import scalac.ast.Tree;
 import scalac.symtab.Symbol;
 
-import scaladoc.*;
-
 /**
  * Documentation tag.
  */
@@ -108,19 +106,63 @@ public class Tag {
     /**
      * Kind of a reference tag.
      */
-    public static class RefKind {
+    public static abstract class RefKind {
 
 	/** Bad reference. */
-	public case Bad(String ref);
+	public static final class Bad extends RefKind {
+	    public final String ref;
+
+	    private Bad(String ref) {
+		this.ref = ref;
+	    }
+	}
 
 	/** Reference to an URL. */
-	public case Url(String ref);
+	public static final class Url extends RefKind {
+	    public final String ref;
+
+	    private Url(String ref) {
+		this.ref = ref;
+	    }
+	}
 
 	/** String literal reference. */
-	public case Literal(String ref);
+	public static final class Literal extends RefKind {
+	    public final String ref;
+
+	    private Literal(String ref) {
+		this.ref = ref;
+	    }
+	}
 
 	/** Reference to a scala entity. */
-	public case Scala(String container, String member, String label);
+	public static final class Scala extends RefKind {
+	    public final String container;
+	    public final String member;
+	    public final String label;
+
+	    private Scala(String container, String member, String label) {
+		this.container = container;
+		this.member = member;
+		this.label = label;
+	    }
+	}
+
+	public static Bad Bad(String ref) {
+	    return new Bad(ref);
+	}
+
+	public static Url Url(String ref) {
+	    return new Url(ref);
+	}
+
+	public static Literal Literal(String ref) {
+	    return new Literal(ref);
+	}
+
+	public static Scala Scala(String container, String member, String label) {
+	    return new Scala(container, member, label);
+	}
     }
 
     /**

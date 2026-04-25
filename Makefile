@@ -19,7 +19,7 @@ prefix			?=
 latest			 = $(LATEST)$(prefix)
 
 # java compilation defaults
-JC_COMPILER		 = PICO
+JC_COMPILER		 = JAVAC
 JC_OUTPUTDIR		 = $(PROJECT_OUTPUTDIR)
 JC_CLASSPATH		 = $(PROJECT_CLASSPATH)
 
@@ -38,7 +38,9 @@ all		: scalai
 all		: scaladoc
 all		: scalap
 all		: dtd2scala
+ifneq ($(wildcard $(ANT_JARFILE)),)
 all		: scala4ant
+endif
 all		: scalatest
 all		: servlet
 
@@ -74,7 +76,6 @@ $(prefix)lamplib	: $(latest)lamplib-jc
 $(prefix)meta		: $(latest)meta-jc
 $(prefix)library	: $(latest)library-jc
 $(prefix)library	: $(latest)library-sc
-$(prefix)library-msil	: $(latest)library-msil-sc
 $(prefix)library-doc	: $(latest)library-sdc
 $(prefix)util		: $(latest)util-jc
 $(prefix)util		: $(latest)util-sc
@@ -99,7 +100,6 @@ $(prefix)servlet	: $(latest)servlet-sc
 .PHONY			: $(prefix)lamplib
 .PHONY			: $(prefix)meta
 .PHONY			: $(prefix)library
-.PHONY			: $(prefix)library-msil
 .PHONY			: $(prefix)library-doc
 .PHONY			: $(prefix)util
 .PHONY			: $(prefix)scalac
@@ -166,7 +166,7 @@ $(LATEST)bootstrap-%	:
 	    SCRIPTS_PREFIX=$(PROJECT_BOOTSTRAPDIR)/bin \
 	    JC_OUTPUTDIR=$(PROJECT_BOOTSTRAPDIR)/classes \
 	    JC_CLASSPATH=$(PROJECT_BOOTSTRAPDIR)/classes \
-	    LIBRARY_SCALAC=$(BOOTSTRAP_SCALAC) \
+	    LIBRARY_SCALAC='$(BOOTSTRAP_SCALAC)' \
 	    prefix="bootstrap-" $@;
 
 boottest-%		\
@@ -187,7 +187,7 @@ endif
 
 SCRIPTS_PREFIX		 = $(PROJECT_BINARYDIR)
 SCRIPTS_TEMPLATE_NAME	 = $(SCRIPTS_WRAPPER_NAME).tmpl
-SCRIPTS_TEMPLATE_FILE	 = $(PROJECT_BINARYDIR)/$(SCRIPTS_TEMPLATE_NAME)
+SCRIPTS_TEMPLATE_FILE	 = $(PROJECT_SOURCEDIR)/bin/$(SCRIPTS_TEMPLATE_NAME)
 SCRIPTS_WRAPPER_NAME	 = .scala_wrapper
 SCRIPTS_WRAPPER_FILE	 = $(SCRIPTS_PREFIX)/$(SCRIPTS_WRAPPER_NAME)
 SCRIPTS_ALIASES_NAMES	+= scala
@@ -226,13 +226,12 @@ $(SCRIPTS_WRAPPER_FILE)	: MACRO_RUNTIME_SOURCES   ?= $(PROJECT_SOURCEDIR)
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_RUNTIME_CLASSES   ?= $(JC_OUTPUTDIR)
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_TOOLS_CLASSES     ?= $(JC_OUTPUTDIR)
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_FJBG_CLASSES      ?= $(FJBG_JARFILE)
-$(SCRIPTS_WRAPPER_FILE)	: MACRO_MSIL_CLASSES      ?= $(MSIL_JARFILE)
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_JAVA_ARGS         ?= -enableassertions
 $(SCRIPTS_WRAPPER_FILE)	: $(VERSION_FILE)
 $(SCRIPTS_WRAPPER_FILE)	: $(PROJECT_ROOT)/Makefile
 $(SCRIPTS_WRAPPER_FILE)	: $(PROJECT_ROOT)/Makefile.config
 $(SCRIPTS_WRAPPER_FILE)	: $(PROJECT_ROOT)/Makefile.import
-$(SCRIPTS_WRAPPER_FILE)	: $(PROJECT_ROOT)/Makefile.private
+$(SCRIPTS_WRAPPER_FILE)	: $(wildcard $(PROJECT_ROOT)/Makefile.private)
 $(SCRIPTS_WRAPPER_FILE)	: $(SCRIPTS_TEMPLATE_FILE)
 	@[ -d $(@D) ] || $(call RUN,$(MKDIR) -p $(@D))
 	@[ -e $@ ] || $(call RUN,$(RM) $@)
@@ -243,7 +242,6 @@ $(SCRIPTS_WRAPPER_FILE)	: $(SCRIPTS_TEMPLATE_FILE)
 	    $(call SCRIPTS_MACRO,RUNTIME_CLASSES) \
 	    $(call SCRIPTS_MACRO,TOOLS_CLASSES) \
 	    $(call SCRIPTS_MACRO,FJBG_CLASSES) \
-	    $(call SCRIPTS_MACRO,MSIL_CLASSES) \
 	    $(call SCRIPTS_MACRO,JAVA_ARGS) \
 	    $(SCRIPTS_TEMPLATE_FILE) > $@
 	@macros=`$(SED) -n -es'@.*{#\(.*\)#}.*@\1@p' < $@`; \
@@ -253,6 +251,24 @@ $(SCRIPTS_WRAPPER_FILE)	: $(SCRIPTS_TEMPLATE_FILE)
 	    exit 1; \
 	fi;
 	$(CHMOD) 555 $@
+
+##############################################################################
+# Targets - fjbg bytecode library
+
+PROJECT_SOURCES		+= $(FJBG_SOURCES)
+FJBG_ROOT		 = $(PROJECT_ROOT)/third_party/fjbg
+FJBG_SRC_ROOT		 = $(FJBG_ROOT)/src
+FJBG_SOURCES		+= $(wildcard $(FJBG_SRC_ROOT)/ch/epfl/lamp/fjbg/*.java)
+FJBG_SOURCES		+= $(wildcard $(FJBG_SRC_ROOT)/ch/epfl/lamp/util/*.java)
+FJBG_JC_FILES		+= $(FJBG_SOURCES)
+FJBG_JC_OUTPUTDIR	 = $(FJBG_HOME)/classes
+FJBG_JAR_ARCHIVE	 = $(FJBG_JARFILE)
+FJBG_JAR_INPUTDIR	 = $(FJBG_JC_OUTPUTDIR)
+FJBG_JAR_FILES		+= ch
+
+$(FJBG_JARFILE)		: $(FJBG_JC_FILES)
+	@$(make) jc target=FJBG FJBG_JC_FILES='$?'
+	@$(make) jar target=FJBG
 
 ##############################################################################
 # Targets - lamp library
@@ -286,14 +302,11 @@ $(latest)meta-jc	: $(META_JC_FILES)
 PROJECT_SOURCES		+= $(LIBRARY_SOURCES)
 LIBRARY_ROOT		 = $(PROJECT_SOURCEDIR)/scala
 LIBRARY_LIST		+= $(call READLIST,$(PROJECT_LISTDIR)/library.lst)
-LIBRARY_MSIL_LIST	+= $(call READLIST,$(PROJECT_LISTDIR)/library-msil.lst)
 LIBRARY_SOURCES		+= $(LIBRARY_LIST:%=$(LIBRARY_ROOT)/%)
-LIBRARY_MSIL_SOURCES	+= $(LIBRARY_MSIL_LIST:%=$(LIBRARY_ROOT)/%)
 LIBRARY_JC_FILES	+= $(filter %.java,$(LIBRARY_SOURCES))
-LIBRARY_JC_FLAGS	+= $(JC_FLAGS) -scala-hack
+LIBRARY_JC_FLAGS	+= $(JC_FLAGS)
 LIBRARY_SC_FILES	+= $(filter %.scala,$(LIBRARY_SOURCES))
-LIBRARY_MSIL_SC_FILES	+= $(filter %.scala,$(LIBRARY_MSIL_SOURCES))
-LIBRARY_SC_BOOTCLASSPATH = $(PROJECT_OUTPUTDIR):$(PROJECT_SOURCEDIR):$(JRE_JARFILE)
+LIBRARY_SC_BOOTCLASSPATH = $(JC_OUTPUTDIR):$(PROJECT_SOURCEDIR):$(JRE_JARFILE)
 LIBRARY_SDC_FLAGS	+= -windowtitle "Scala Library Documentation"
 LIBRARY_SDC_FLAGS	+= -doctitle "Scala<br/>$(PROJECT_VERSION)"
 LIBRARY_SDC_FILES	+= $(LIBRARY_SC_FILES)
@@ -313,13 +326,6 @@ $(latest)library-jc	: $(LIBRARY_JC_FILES)
 
 $(latest)library-sc	: $(LIBRARY_SC_FILES)
 	@$(make) sc target=LIBRARY LIBRARY_SC_FILES='$(subst $$,$$$$,$?)'
-	touch $@
-
-$(latest)library-msil-sc: $(LIBRARY_MSIL_SC_FILES)
-	@$(make) sc target=LIBRARY_MSIL SC_TARGET="msil"\
-	    LIBRARY_SCALAC=$(PROJECT_BINARYDIR)/scalac \
-	    SC_FLAGS="-uniqid -r $(PROJECT_LIBRARYDIR) -o scalalibx -g" \
-	    LIBRARY_MSIL_SC_FILES='$(subst $$,$$$$,$?)'
 	touch $@
 
 $(latest)library-sdc	: $(LIBRARY_SDC_FILES)
@@ -361,14 +367,15 @@ SCALAC_ROOT		 = $(PROJECT_SOURCEDIR)/scala/tools/scalac
 SCALAC_LIST		+= $(call READLIST,$(PROJECT_LISTDIR)/scalac.lst)
 SCALAC_SOURCES		+= $(SCALAC_LIST:%=$(SCALAC_ROOT)/%)
 SCALAC_JC_FILES		+= $(filter %.java,$(SCALAC_SOURCES))
-SCALAC_JC_CLASSPATH	 = $(JC_CLASSPATH):$(MSIL_JARFILE):$(FJBG_JARFILE)
+SCALAC_JC_CLASSPATH	 = $(JC_CLASSPATH):$(FJBG_JARFILE)
 SCALAC_SC_FILES		+= $(filter %.scala,$(SCALAC_SOURCES))
 SCALAC_SC_CLASSPATH	 = $(SCALAC_JC_CLASSPATH)
 SCALAC_SC_BOOTCLASSPATH	 = $(LIBRARY_SC_BOOTCLASSPATH)
 SCALAC_SCALAC		 = $(LIBRARY_SCALAC)
 
+$(latest)scalac-jc	: $(FJBG_JARFILE)
 $(latest)scalac-jc	: $(SCALAC_JC_FILES)
-	@$(make) jc target=SCALAC SCALAC_JC_FILES='$?'
+	@$(make) jc target=SCALAC SCALAC_JC_FILES='$(filter %.java,$?)'
 	touch $@
 
 $(latest)scalac-sc	: $(SCALAC_SC_FILES)
@@ -548,18 +555,18 @@ fastclean.generate	:
 	@if [ -f .generated ]; then $(call RUN,$(RM) `$(CAT) .generated`); fi
 	$(RM) .generated
 
-$(FUNCTION_FILES)	: $(LATEST)meta-jc $(FUNCTION_TEMPLATE)
+$(FUNCTION_FILES)	: $(latest)meta-jc $(FUNCTION_TEMPLATE)
 	@$(make) generate
 
-$(TUPLE_FILES)		: $(LATEST)meta-jc $(TUPLE_TEMPLATE)
+$(TUPLE_FILES)		: $(latest)meta-jc $(TUPLE_TEMPLATE)
 	@$(make) generate
 
-%			: $(LATEST)meta-jc %.tmpl
+%			: $(latest)meta-jc %.tmpl
 	@$(make) generate
 
-generate		: $(LATEST)meta-jc
+generate		: $(latest)meta-jc
 	@if [ -f .generated ]; then $(call RUN,$(RM) `$(CAT) .generated`); fi
-	$(strip $(JAVA) -cp $(PROJECT_CLASSPATH) \
+	$(strip $(JAVA) -cp $(JC_CLASSPATH) \
 	    meta.GenerateAll $(PROJECT_SOURCEDIR) .generated)
 
 .PHONY			: generate

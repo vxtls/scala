@@ -17,7 +17,7 @@ import scalac.symtab.Type;
 import scalac.symtab.Symbol;
 import scalac.symtab.Modifiers; // test
 //import scalac.typechecker.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 import java.util.*;
 
@@ -141,14 +141,12 @@ public class WordAutomInScala extends Autom2Scala {
     Tree code_delta(int i, Label label) {
         Integer target = dfa.delta(i, label);
 
-        if (target == null)
-            switch (label) {
-            case DefaultLabel:
+        if (target == null) {
+            if (label == Label.DefaultLabel) {
                 return code_error(); // this may not happen !
-            default:
-                return null; // not good
             }
-        else if (target.intValue() == dfa.nstates - 1) // that one is a dead state
+            return null; // not good
+        } else if (target.intValue() == dfa.nstates - 1) // that one is a dead state
             return code_fail();
 
         return callFun(new Tree[] { gen.mkIntLit( cf.pos, target.intValue() )} );

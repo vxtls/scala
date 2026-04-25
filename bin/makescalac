@@ -1,2 +1,13 @@
 #needs to be run in scalac directory.
-pico -d $HOME/classes -source 1.4 *.java */*.java ast/printer/*.java symtab/classfile/*.java
+set -eu
+
+if [ -n "${SCALA_JAVA_HOME:-}" ]; then
+    JAVAC="$SCALA_JAVA_HOME/bin/javac"
+elif [ -n "${JAVA_HOME:-}" ]; then
+    JAVAC="$JAVA_HOME/bin/javac"
+else
+    JAVAC=javac
+fi
+
+"$JAVAC" -source 8 -target 8 -d "$HOME/classes" \
+    *.java */*.java ast/printer/*.java symtab/classfile/*.java

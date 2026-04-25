@@ -18,6 +18,34 @@ public class Scope {
         public abstract Symbol next();
     }
 
+    public static class UnloadIterator extends SymbolIterator {
+        private final SymbolIterator iterator;
+        private Symbol[] alternatives = Symbol.EMPTY_ARRAY;
+        private int index = 0;
+
+        public UnloadIterator(SymbolIterator iterator) {
+            this.iterator = iterator;
+        }
+
+        public boolean hasNext() {
+            return index < alternatives.length || iterator.hasNext();
+        }
+
+        public Symbol next() {
+            if (index < alternatives.length) {
+                return alternatives[index++];
+            }
+            Symbol symbol = iterator.next();
+            Type symbolType = symbol.type();
+            if (symbolType instanceof Type.OverloadedType) {
+                alternatives = ((Type.OverloadedType)symbolType).alts;
+                index = 0;
+                return next();
+            }
+            return symbol;
+        }
+    }
+
     public static class Entry {
 
 	/** the absent entry
@@ -221,8 +249,9 @@ public class Scope {
     public boolean contains(Symbol sym) {
         Entry e = lookupEntry(sym.name);
         if (e.sym == sym) return true;
-        switch (e.sym.type()) {
-        case OverloadedType(Symbol[] alts, _):
+        Type entryType = e.sym.type();
+        if (entryType instanceof Type.OverloadedType) {
+            Symbol[] alts = ((Type.OverloadedType)entryType).alts;
             for (int i = 0; i < alts.length; i++)
                 if (alts[i] == sym) return true;
         }
@@ -281,14 +310,13 @@ public class Scope {
                 return alternatives[altindex++];
             else {
                 Symbol sym = elemsCache[elemindex++];
-                switch (sym.type()) {
-                case OverloadedType(Symbol[] alts, _):
-                    alternatives = alts;
+                Type symType = sym.type();
+                if (symType instanceof Type.OverloadedType) {
+                    alternatives = ((Type.OverloadedType)symType).alts;
                     altindex = 0;
                     return next();
-                default:
-                    return sym;
                 }
+                return sym;
             }
         }
     }
@@ -300,6 +328,10 @@ public class Scope {
         return new MySymbolIterator();
     }
 
+    public SymbolIterator iterator(boolean unload) {
+        return iterator();
+    }
+
 
     public String toString() {
         return new SymbolTablePrinter().printScope(this).toString();
@@ -308,7 +340,7 @@ public class Scope {
     public static Scope EMPTY = new Scope();
 }
 
-public class ErrorScope extends Scope {
+class ErrorScope extends Scope {
 
     private final Symbol owner;
 

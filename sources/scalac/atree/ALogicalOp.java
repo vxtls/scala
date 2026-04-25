@@ -8,34 +8,33 @@
 
 package scalac.atree;
 
-import scalac.util.Debug;
-
 /** This class represents a logical operation. */
 public class ALogicalOp {
 
     //########################################################################
     // Public Cases
 
+    private final String name;
+
+    private ALogicalOp(String name) {
+        this.name = name;
+    }
+
     /** A bitwise AND operation */
-    public case AND;
+    public static final ALogicalOp AND = new ALogicalOp("AND");
 
     /** A bitwise OR operation */
-    public case OR;
+    public static final ALogicalOp OR = new ALogicalOp("OR");
 
     /** A bitwise XOR operation */
-    public case XOR;
+    public static final ALogicalOp XOR = new ALogicalOp("XOR");
 
     //########################################################################
     // Public Methods
 
     /** Returns a string representation of this operation. */
     public String toString() {
-        switch (this) {
-        case AND: return "AND";
-        case OR : return "OR";
-        case XOR: return "XOR";
-        default : throw Debug.abort("unknown case", this);
-        }
+        return name;
     }
 
     //########################################################################

@@ -76,6 +76,7 @@ jc_ENCODING		 = $(call JC_LOOKUP,JC_ENCODING)
 jc_SOURCE		 = $(call JC_LOOKUP,JC_SOURCE)
 jc_TARGET		 = $(call JC_LOOKUP,JC_TARGET)
 jc_FILES		 = $(call JC_LOOKUP,JC_FILES)
+jc_PREREQS		 = $(call JC_LOOKUP,JC_PREREQS)
 
 ##############################################################################
 # Command
@@ -102,8 +103,29 @@ JC_LOOKUP		 = $(if $($(target)_$(1)),$($(target)_$(1)),$($(1)))
 # Rules
 
 jc		:
+	@if ! compiler_version=`"$(jc_compiler)" -version 2>&1`; then \
+	    echo "$$compiler_version" >&2; \
+	    exit 1; \
+	fi; \
+	case "$$compiler_version" in \
+	    javac\ 1.8.*|javac\ 8.*) ;; \
+	    *) \
+	        echo "Target $(target) requires JDK 8; found $$compiler_version" >&2; \
+	        echo "Set SCALA_JAVA_HOME or JAVA_HOME to a JDK 8 installation." >&2; \
+	        exit 1; \
+	        ;; \
+	esac
+	@for prereq in $(jc_PREREQS); do \
+	    if [ ! -f "$$prereq" ]; then \
+	        echo "Missing local prerequisite for target $(target): $$prereq" >&2; \
+	        echo "Bootstrap no longer downloads compiler dependencies automatically; provide the jar locally." >&2; \
+	        exit 1; \
+	    fi; \
+	done
 	@[ -d "$(jc_OUTPUTDIR)" ] || $(MKDIR) -p "$(jc_OUTPUTDIR)"
-	$(strip $(jc))
+	@if [ -n "$(strip $(jc_FILES))" ]; then \
+	    $(strip $(jc)); \
+	fi
 
 .PHONY		: jc
 

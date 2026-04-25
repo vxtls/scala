@@ -44,38 +44,38 @@ public class Definitions {
 
     /** The scala.Any class */
     public final Symbol ANY_CLASS;
-    public final Type   ANY_TYPE() {return ANY_CLASS.staticType();}
+    public final Type   ANY_TYPE() {return ANY_CLASS.type();}
 
     /** The scala.AnyVal class */
     public final Symbol ANYVAL_CLASS;
-    public final Type   ANYVAL_TYPE() {return ANYVAL_CLASS.staticType();}
+    public final Type   ANYVAL_TYPE() {return ANYVAL_CLASS.type();}
 
     /** The scala.AnyRef class */
     public final Symbol ANYREF_CLASS;
-    public final Type   ANYREF_TYPE() {return ANYREF_CLASS.staticType();}
+    public final Type   ANYREF_TYPE() {return ANYREF_CLASS.type();}
 
     /** The scala.AllRef class */
     public final Symbol ALLREF_CLASS;
-    public final Type   ALLREF_TYPE() {return ALLREF_CLASS.staticType();}
+    public final Type   ALLREF_TYPE() {return ALLREF_CLASS.type();}
 
     /** The scala.All class */
     public final Symbol ALL_CLASS;
-    public final Type   ALL_TYPE() {return ALL_CLASS.staticType();}
+    public final Type   ALL_TYPE() {return ALL_CLASS.type();}
 
     //########################################################################
     // Public Fields & Methods - Java classes
 
     /** The java.lang.Object class */
     public final Symbol OBJECT_CLASS;
-    public final Type   OBJECT_TYPE() {return OBJECT_CLASS.staticType();}
+    public final Type   OBJECT_TYPE() {return OBJECT_CLASS.type();}
 
     /** The java.lang.String class */
     public final Symbol STRING_CLASS;
-    public final Type   STRING_TYPE() {return STRING_CLASS.staticType();}
+    public final Type   STRING_TYPE() {return STRING_CLASS.type();}
 
     /** The java.lang.Throwable class */
     public final Symbol THROWABLE_CLASS;
-    public final Type   THROWABLE_TYPE() {return THROWABLE_CLASS.staticType();}
+    public final Type   THROWABLE_TYPE() {return THROWABLE_CLASS.type();}
 
     //########################################################################
     // Public Fields & Methods - Scala value classes
@@ -276,14 +276,13 @@ public class Definitions {
     /** Returns the primitive array type of given element type. */
     public final Type array_TYPE(Type element) {
         Type type = array_TYPE.type().resultType();
-        switch (type) {
-        case TypeRef(Type prefix, Symbol clasz, _):
-            return Type.typeRef(prefix, clasz, new Type[]{element});
-        case UnboxedArrayType(_):
+        if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef) type;
+            return Type.typeRef(typeRef.pre, typeRef.sym, new Type[]{element});
+        } else if (type instanceof Type.UnboxedArrayType) {
             return Type.UnboxedArrayType(element);
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     //########################################################################
@@ -647,12 +646,9 @@ public class Definitions {
         ALL_CLASS = newClass(SCALA_CLASS, Names.All, 0);
 
         // the java classes
-        OBJECT_CLASS = getClass(global.target != Global.TARGET_MSIL ?
-				"java.lang.Object" : "System.Object");
+        OBJECT_CLASS = getClass("java.lang.Object");
         THROWABLE_CLASS = getClass("java.lang.Throwable");
-	//STRING_CLASS = getClass("java.lang.String");
-	STRING_CLASS = getClass(global.target != Global.TARGET_MSIL
-				? "java.lang.String": "System.String");
+	STRING_CLASS = getClass("java.lang.String");
 
         // the scala value classes
         UNIT_CLASS = getClass("scala.Unit");
@@ -762,99 +758,9 @@ public class Definitions {
                     new Symbol[] {OBJECT_SYNCHRONIZED_VPARAM},
                     OBJECT_SYNCHRONIZED_TPARAM.type())));
 
-	if (global.target == Global.TARGET_MSIL) {
-	    Symbol WAIT0 = newMethod(OBJECT_CLASS, Names.wait, Modifiers.FINAL);
-	    initMethod(WAIT0, Type.EMPTY_ARRAY, UNIT_TYPE());
-
-	    Symbol WAIT1 = newMethod(OBJECT_CLASS, Names.wait, Modifiers.FINAL);
-	    initMethod(WAIT1, new Type[]{LONG_TYPE()}, UNIT_TYPE());
-
-	    Symbol WAIT2 = newMethod(OBJECT_CLASS, Names.wait, Modifiers.FINAL);
-	    initMethod(WAIT2, new Type[]{LONG_TYPE(), INT_TYPE()}, UNIT_TYPE());
-
-	    Symbol NOTIFY =
-		newMethod(OBJECT_CLASS, Names.notify, Modifiers.FINAL);
-	    initMethod(NOTIFY, Type.EMPTY_ARRAY, UNIT_TYPE());
-
-	    Symbol NOTIFY_ALL =
-		newMethod(OBJECT_CLASS, Names.notifyAll, Modifiers.FINAL);
-	    initMethod(NOTIFY_ALL, Type.EMPTY_ARRAY, UNIT_TYPE());
-
-	    Symbol JLOA = newAlias(JAVALANG, Names.Object, 0);
-	    initAlias(JLOA, OBJECT_TYPE());
-	}
-
         // add members to java.lang.String
         STRING_PLUS = newMethod(STRING_CLASS, Names.PLUS, Modifiers.FINAL);
         initMethod(STRING_PLUS, new Type[]{ANY_TYPE()}, STRING_TYPE());
-
-	if (global.target == Global.TARGET_MSIL) {
-	    Symbol s = newMethod(STRING_CLASS, Name.fromString("length"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("compareTo"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("charAt"), 0);
-	    initMethod(s, new Type[] {INT_TYPE()}, CHAR_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("concat"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE()}, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("indexOf"), 0);
-	    initMethod(s, new Type[] {INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("indexOf"), 0);
-	    initMethod(s, new Type[] {INT_TYPE(), INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("indexOf"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("indexOf"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE(), INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("lastIndexOf"), 0);
-	    initMethod(s, new Type[] {INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("lastIndexOf"), 0);
-	    initMethod(s, new Type[] {INT_TYPE(), INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("lastIndexOf"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("lastIndexOf"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE(), INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("toLowerCase"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("toUpperCase"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("startsWith"), 0);
-	    initMethod(s, new Type[]{STRING_TYPE()}, BOOLEAN_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("endsWith"), 0);
-	    initMethod(s, new Type[]{STRING_TYPE()}, BOOLEAN_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("substring"), 0);
-	    initMethod(s, new Type[]{INT_TYPE()}, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("substring"), 0);
-	    initMethod(s, new Type[]{INT_TYPE(), INT_TYPE()}, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("intern"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("replace"), 0);
-	    initMethod(s, new Type[]{CHAR_TYPE(), CHAR_TYPE()}, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("toCharArray"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, array_TYPE(CHAR_TYPE()));
-
-	    Symbol JLSA = newAlias(JAVALANG, Names.String, 0);
-	    initAlias(JLSA, STRING_TYPE());
-	}
 
         // add members to java.lang.Throwable
         THROWABLE_THROW =
@@ -862,7 +768,7 @@ public class Definitions {
         THROWABLE_THROW.setInfo(Type.PolyType(Symbol.EMPTY_ARRAY, ALL_TYPE()));
 
         // create global values
-        PATTERN_WILDCARD = Symbol.NONE.newTerm(
+        PATTERN_WILDCARD = ((Symbol)Symbol.NONE).newTerm(
             Position.NOPOS, 0, Names.PATTERN_WILDCARD);
         PATTERN_WILDCARD.setInfo(ALL_TYPE());
 
@@ -872,6 +778,14 @@ public class Definitions {
 
     //########################################################################
     // Public Methods
+
+    /** Returns the symbol of the module with the given fullname. */
+    public Symbol getModule(Name fullname) {
+        if (fullname == Names.java_lang) return JAVALANG;
+        if (fullname == Names.scala) return SCALA;
+        if (fullname == Names.scala_Predef) return PREDEF;
+        return getModule(fullname.toString());
+    }
 
     /** Returns the symbol of the module with the given fullname. */
     public Symbol getModule(String fullname) {
@@ -887,8 +801,9 @@ public class Definitions {
         Name name = Name.fromString(fullname.substring(i, fullname.length()));
         Symbol sym = scope.lookup(name);
         if (!sym.isModule()) {
-            switch (sym.type()) {
-            case OverloadedType(Symbol[] alts, Type[] alttypes):
+            Type symType = sym.type();
+            if (symType instanceof Type.OverloadedType) {
+                Symbol[] alts = ((Type.OverloadedType)symType).alts;
                 for (int k = 0; k < alts.length; k++)
                     if ((sym = alts[k]).isModule()) break;
             }
@@ -998,11 +913,15 @@ public class Definitions {
         assert sym.isTerm(): Debug.show(clasz, name, vargs, sym);
         Symbol[] alts = sym.alternativeSymbols();
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].type()) {
-            case PolyType(_, MethodType(Symbol[] vparams, _)):
+            Type altType = alts[i].type();
+            if (altType instanceof Type.PolyType
+                && ((Type.PolyType)altType).result instanceof Type.MethodType) {
+                Symbol[] vparams =
+                    ((Type.MethodType)((Type.PolyType)altType).result).vparams;
                 if (Type.isSameAs(Symbol.type(vparams), vargs)) return alts[i];
                 continue;
-            case MethodType(Symbol[] vparams, _):
+            } else if (altType instanceof Type.MethodType) {
+                Symbol[] vparams = ((Type.MethodType)altType).vparams;
                 if (Type.isSameAs(Symbol.type(vparams), vargs)) return alts[i];
                 continue;
             }

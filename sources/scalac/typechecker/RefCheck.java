@@ -15,7 +15,7 @@ import scalac.util.*;
 import scalac.ast.*;
 import scalac.ast.printer.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 /** Post-attribution checking and transformation.
  *
@@ -43,12 +43,12 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
         super(global);
     }
 
-    private CompilationUnit unit;
+    private Unit unit;
     private Definitions defs = global.definitions;
     private Infer infer = global.newInfer();
     private Symbol enclClass;
 
-    public void apply(CompilationUnit unit) {
+    public void apply(Unit unit) {
 	this.unit = unit;
 	level = 0;
 	scopes[0] = new Scope();
@@ -78,7 +78,7 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	for (int i = 0; i < closure.length; i++) {
 	    Type basetype = closure[i];
 	    Symbol baseclazz = basetype.symbol();
-	    for (Scope.SymbolIterator it = basetype.members().iterator();
+	    for (Scope.SymbolIterator it = basetype.members().iterator(true);
 		 it.hasNext();) {
 		Symbol sym = it.next();
 		if (sym.owner() == baseclazz) checkOverride(pos, clazz, sym);
@@ -86,7 +86,7 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	}
 
 	Type[] parents = clazz.info().parents();
-	for (Scope.SymbolIterator it = clazz.members().iterator();
+	for (Scope.SymbolIterator it = clazz.members().iterator(true);
 	     it.hasNext();) {
 	    Symbol sym = it.next();
 	    if ((sym.flags & OVERRIDE) != 0 && sym.owner() == clazz) {
@@ -116,8 +116,9 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 		if (member1.kind == VAL) {
 		    Type self = clazz.thisType();
 		    Type otherinfo = normalizedInfo(self, other);
-		    switch (member1.info()) {
-		    case OverloadedType(Symbol[] alts, _):
+		    if (member1.info() instanceof Type.OverloadedType) {
+			Type.OverloadedType overloaded = (Type.OverloadedType) member1.info();
+			Symbol[] alts = overloaded.alts;
 			for (int i = 0; i < alts.length; i++) {
 			    if (normalizedInfo(self, alts[i]).overrides(otherinfo)) {
 				if (member == other)
@@ -132,8 +133,7 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 					other.locationString());
 			    }
 			}
-			break;
-		    default:
+		    } else {
 			if (normalizedInfo(self, member1).overrides(otherinfo)) {
 			    member = member1;
 			}
@@ -157,7 +157,7 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 		}
 		abstractClassError(
 		    clazz,
-		    member.toString() + member.locationString() + " is not defined" +
+		    member + member.locationString() + " is not defined" +
 		    (((member.flags & MUTABLE) == 0) ? ""
 		     : "\n(Note that variables need to be initialized to be defined)"));
 	    } else if (member.isAbstractOverride()) {
@@ -174,12 +174,13 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
     }
     //where
         private Type resultToAny(Type tp) {
-	    switch (tp) {
-	    case PolyType(Symbol[] tparams, Type restp):
-		return Type.PolyType(tparams, resultToAny(restp));
-	    case MethodType(Symbol[] tparams, Type restp):
-		return Type.MethodType(tparams, Type.AnyType);
-	    default:
+	    if (tp instanceof Type.PolyType) {
+		Type.PolyType poly = (Type.PolyType) tp;
+		return Type.PolyType(poly.tparams, resultToAny(poly.result));
+	    } else if (tp instanceof Type.MethodType) {
+		Type.MethodType method = (Type.MethodType) tp;
+		return Type.MethodType(method.vparams, Type.AnyType);
+	    } else {
 		return defs.ANY_TYPE();
 	    }
 	}
@@ -210,7 +211,7 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
      *       M must be labelled `abstract override'.
      */
     void checkOverride(int pos, Symbol clazz, Symbol member, Symbol other) {
-	//System.out.println(member + ":" + member.type() + member.locationString() + " overrides " + other + ":" + other.type() + other.locationString() + " in " + clazz);//DEBUG
+	//System.out.println(member + member.locationString() + " overrides " + other + other.locationString() + " in " + clazz);//debug
 	if (member.owner() == clazz)
 	    pos = member.pos;
 	else {
@@ -346,11 +347,11 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 
     /** compensate for renaming during addition of access functions
      */
-    String normalize(Name name) {
+    Name normalize(Name name) {
         String string = name.toString();
-	return (string.endsWith("$"))
-	    ? string.substring(0, string.length() - 1)
-	    : string;
+	return string.endsWith("$")
+	    ? Name.fromString(string.substring(0, string.length() - 1))
+	    : name;
     }
 
 // Basetype Checking --------------------------------------------------------
@@ -448,17 +449,15 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
     }
 
     void validateVariance(Symbol base, Type all, Type tp, int variance) {
-	switch (tp) {
-	case ErrorType:
-	case AnyType:
-	case NoType:
-	case NoPrefix:
-	case ThisType(_):
-	    break;
-	case SingleType(Type pre, Symbol sym):
-	    validateVariance(base, all, pre, variance);
-	    break;
-	case TypeRef(Type pre, Symbol sym, Type[] args):
+	if (tp == Type.ErrorType || tp == Type.AnyType || tp == Type.NoType ||
+	    tp instanceof Type.ThisType) {
+	    return;
+	} else if (tp instanceof Type.SingleType) {
+	    Type.SingleType single = (Type.SingleType) tp;
+	    validateVariance(base, all, single.pre, variance);
+	} else if (tp instanceof Type.TypeRef) {
+	    Type.TypeRef typeRef = (Type.TypeRef) tp;
+	    Symbol sym = typeRef.sym;
 	    if (sym.variance() != 0) {
 		int f = flip(base, sym);
 		if (f != AnyVariance && sym.variance() != f * variance) {
@@ -469,20 +468,20 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 			  " position in type " + all + " of " + base);
 		}
 	    }
-	    validateVariance(base, all, pre, variance);
-	    validateVariance(base, all, args, variance, sym.typeParams());
-	    break;
-	case CompoundType(Type[] parts, Scope members):
-	    validateVariance(base, all, parts, variance);
-	    break;
-	case MethodType(Symbol[] vparams, Type result):
-	    validateVariance(base, all, result, variance);
-	    break;
-	case PolyType(Symbol[] tparams, Type result):
-	    validateVariance(base, all, result, variance);
-	    break;
-	case OverloadedType(Symbol[] alts, Type[] alttypes):
-	    validateVariance(base, all, alttypes, variance);
+	    validateVariance(base, all, typeRef.pre, variance);
+	    validateVariance(base, all, typeRef.args, variance, sym.typeParams());
+	} else if (tp instanceof Type.CompoundType) {
+	    Type.CompoundType compound = (Type.CompoundType) tp;
+	    validateVariance(base, all, compound.parts, variance);
+	} else if (tp instanceof Type.MethodType) {
+	    Type.MethodType method = (Type.MethodType) tp;
+	    validateVariance(base, all, method.result, variance);
+	} else if (tp instanceof Type.PolyType) {
+	    Type.PolyType poly = (Type.PolyType) tp;
+	    validateVariance(base, all, poly.result, variance);
+	} else if (tp instanceof Type.OverloadedType) {
+	    Type.OverloadedType overloaded = (Type.OverloadedType) tp;
+	    validateVariance(base, all, overloaded.alttypes, variance);
 	}
     }
 
@@ -538,13 +537,11 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 
     private void enterSym(Tree stat, int index) {
 	Symbol sym = null;
-	switch (stat) {
-	case ClassDef(_, _, _, _, _, _):
+	if (stat instanceof Tree.ClassDef) {
 	    sym = stat.symbol().primaryConstructor();
-	    break;
-	case DefDef(_, _, _, _, _, _):
-	case ModuleDef(_, _, _, _):
-	case ValDef(_, _, _, _):
+	} else if (stat instanceof Tree.DefDef ||
+		   stat instanceof Tree.ModuleDef ||
+		   stat instanceof Tree.ValDef) {
 	    sym = stat.symbol();
 	}
 	if (sym != null && sym.isLocal()) {
@@ -589,7 +586,8 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
             Name m_eqname = Name.fromString(name.toString() + Names._EQ);
 	    Symbol m_eq = sym.owner().newMethodOrFunction(
 		tree.pos, PRIVATE | SYNTHETIC, m_eqname);
-            Symbol m_eqarg = m_eq.newVParam(tree.pos, SYNTHETIC, name, sym.type());
+            Symbol m_eqarg = m_eq.newVParam(tree.pos, SYNTHETIC, name)
+                .setType(sym.type());
             m_eq.setInfo(
                 Type.MethodType(new Symbol[] {m_eqarg}, defs.void_TYPE()));
             Tree m_eqdef = gen.DefDef(m_eq,
@@ -612,14 +610,16 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 
     private Symbol getMember(Type site, Name name) {
 	Symbol sym = site.lookupNonPrivate(name);
-	assert sym.kind == VAL : Debug.show(sym) + "; " + Debug.show(site) + "::" + name;
+	assert sym.kind == VAL;
 	return sym;
     }
 
     private Symbol getNullaryMemberMethod(Type site, Name name) {
 	Symbol sym = getMember(site, name);
-	switch (sym.type()) {
-	case OverloadedType(Symbol[] alts, Type[] alttypes):
+	if (sym.type() instanceof Type.OverloadedType) {
+	    Type.OverloadedType overloaded = (Type.OverloadedType) sym.type();
+	    Symbol[] alts = overloaded.alts;
+	    Type[] alttypes = overloaded.alttypes;
 	    for (int i = 0; i < alts.length; i++) {
 		if (isNullaryMethod(alttypes[i])) return alts[i];
 	    }
@@ -635,8 +635,10 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 
     private Symbol getUnaryMemberMethod(Type site, Name name, Type paramtype) {
 	Symbol sym = getMember(site, name);
-	switch (sym.type()) {
-	case OverloadedType(Symbol[] alts, Type[] alttypes):
+	if (sym.type() instanceof Type.OverloadedType) {
+	    Type.OverloadedType overloaded = (Type.OverloadedType) sym.type();
+	    Symbol[] alts = overloaded.alts;
+	    Type[] alttypes = overloaded.alttypes;
 	    for (int i = 0; i < alts.length; i++) {
 		if (hasParam(alttypes[i], paramtype)) return alts[i];
 	    }
@@ -651,11 +653,11 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	return params.length == 1 && paramtype.isSubType(params[0].type());
     }
 
-    private Tree[] caseFields(ClassSymbol clazz) {
+    private Tree[] caseFields(Symbol clazz) {
 	Type ct = clazz.primaryConstructor().type();
-	switch (ct) {
-	case Type.PolyType(Symbol[] tparams, Type restp):
-	    ct = infer.skipViewParams(tparams, restp);
+	if (ct instanceof Type.PolyType) {
+	    Type.PolyType poly = (Type.PolyType) ct;
+	    ct = infer.skipViewParams(poly.tparams, poly.result);
 	}
 	Symbol[] vparams = ct.firstParams();
 	Tree[] fields = new Tree[vparams.length];
@@ -665,19 +667,18 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	return fields;
     }
 
-    private Tree toStringMethod(ClassSymbol clazz) {
-	Symbol toStringSym = clazz.newMethod(
-	    clazz.pos, OVERRIDE, Names.toString)
+    private Tree toStringMethod(Symbol clazz) {
+	Symbol toStringSym = clazz.newMethod(clazz.pos, OVERRIDE, Names.toString)
 	    .setInfo(defs.ANY_TOSTRING.type());
 	clazz.info().members().enter(toStringSym);
 	Tree[] fields = caseFields(clazz);
 	Tree body;
 	if (fields.length == 0) {
 	    body = gen.mkStringLit(
-		clazz.pos, NameTransformer.decode(clazz.name));
+		clazz.pos, NameTransformer.decode(clazz.name).toString());
 	} else {
 	    body = gen.mkStringLit(
-		clazz.pos, NameTransformer.decode(clazz.name) + "(");
+		clazz.pos, NameTransformer.decode(clazz.name).toString() + "(");
 	    for (int i = 0; i < fields.length; i++) {
 		String str = (i == fields.length - 1) ? ")" : ",";
 		body = gen.Apply(
@@ -691,7 +692,7 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	return gen.DefDef(toStringSym, body);
     }
 
-    private Tree caseElementMethod( ClassSymbol clazz ) {
+    private Tree caseElementMethod( Symbol clazz ) {
 	Symbol seSym =
             clazz.newMethod( clazz.pos, FINAL|OVERRIDE, Names.caseElement );
 	Symbol seParam =
@@ -715,7 +716,7 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	return gen.DefDef(seSym, body);
     }
 
-    private Tree caseArityMethod( ClassSymbol clazz ) {
+    private Tree caseArityMethod( Symbol clazz ) {
 	Symbol seSym =
             clazz.newMethod( clazz.pos, FINAL|OVERRIDE, Names.caseArity );
         seSym.setInfo(
@@ -726,10 +727,11 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
     }
 
 
-    private Tree equalsMethod(ClassSymbol clazz) {
+    private Tree equalsMethod(Symbol clazz) {
 	Symbol equalsSym = clazz.newMethod(clazz.pos, OVERRIDE, Names.equals);
-	Symbol equalsParam = equalsSym.newVParam(
-            clazz.pos, 0, Names.that, defs.ANY_TYPE());
+	Symbol equalsParam =
+	    equalsSym.newVParam(clazz.pos, 0, Names.that)
+	    .setInfo(defs.ANY_TYPE());
 	equalsSym.setInfo(
 	    Type.MethodType(new Symbol[]{equalsParam}, defs.boolean_TYPE()));
 	clazz.info().members().enter(equalsSym);
@@ -787,14 +789,14 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	    return gen.Apply(gen.Select(l, eqMethod), new Tree[]{r});
 	}
 
-        private Tree qualCaseField(ClassSymbol clazz, Tree qual, int i) {
+        private Tree qualCaseField(Symbol clazz, Tree qual, int i) {
 	    return gen.Select(qual, clazz.caseFieldAccessor(i));
 	}
 
-	private Tree tagMethod(ClassSymbol clazz) {
-            int flags =clazz.isSubClass(defs.SCALAOBJECT_CLASS) ? OVERRIDE : 0;
-	    Symbol tagSym = clazz.newMethod(clazz.pos, flags, Names.tag)
-		.setInfo(Type.MethodType(Symbol.EMPTY_ARRAY, defs.int_TYPE()));
+	private Tree tagMethod(Symbol clazz) {
+	    Symbol tagSym = clazz.newMethod(
+		clazz.pos, clazz.isSubClass(defs.SCALAOBJECT_CLASS) ? OVERRIDE : 0, Names.tag)
+		.setInfo(Type.MethodType(Symbol.EMPTY_ARRAY, defs.INT_TYPE()));
 	    clazz.info().members().enter(tagSym);
 	    return gen.DefDef(
 		tagSym,
@@ -803,15 +805,12 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 		    clazz.isCaseClass() ? clazz.tag() : 0));
 	}
 
-    private Tree hashCodeMethod(ClassSymbol clazz) {
-	Symbol hashCodeSym = clazz.newMethod(
-	    clazz.pos, OVERRIDE, Names.hashCode)
+    private Tree hashCodeMethod(Symbol clazz) {
+	Symbol hashCodeSym = clazz.newMethod(clazz.pos, OVERRIDE, Names.hashCode)
 	    .setInfo(defs.ANY_HASHCODE.type());
 	clazz.info().members().enter(hashCodeSym);
 	Tree[] fields = caseFields(clazz);
-	Name name = global.target == Global.TARGET_MSIL
-	    ? Names.GetType : Names.getClass;
-	Symbol getClassMethod = getNullaryMemberMethod(clazz.type(), name);
+	Symbol getClassMethod = getNullaryMemberMethod(clazz.type(), Names.getClass);
 	Symbol addMethod = getUnaryMemberMethod(
 	    defs.int_TYPE(), Names.ADD, defs.int_TYPE());
 	Symbol mulMethod = getUnaryMemberMethod(
@@ -843,21 +842,19 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
     }
     // where
 
-    private Template addCaseMethods(Template templ, ClassSymbol sym) {
+    private Template addCaseMethods(Template templ, Symbol sym) {
 	Tree[] body1;
 	if (sym.isCaseClass()) {
 	    body1 = addCaseMethods(templ.body, sym);
-	} else if ((sym.flags & ABSTRACT) == 0) {
+	} else {
 	    body1 = new Tree[templ.body.length + 1];
 	    System.arraycopy(templ.body, 0, body1, 0, templ.body.length);
 	    body1[templ.body.length] = tagMethod(sym);
-        } else {
-            body1 = templ.body;
 	}
 	return copy.Template(templ, templ.parents, body1);
     }
 
-    private Tree[] addCaseMethods(Tree[] stats, ClassSymbol clazz) {
+    private Tree[] addCaseMethods(Tree[] stats, Symbol clazz) {
 	TreeList ts = new TreeList();
 	if (!hasImplementation(clazz, Names.toString)) {
 	    ts.append(toStringMethod(clazz));
@@ -897,12 +894,11 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
     }
     //where
 	private int applyNesting(Tree tree) {
-	    switch (tree) {
-	    case Apply(Tree fn, Tree[] args):
-		return applyNesting(fn) + 1;
-	    default:
-		return 0;
+	    if (tree instanceof Tree.Apply) {
+		Tree.Apply apply = (Tree.Apply) tree;
+		return applyNesting(apply.fun) + 1;
 	    }
+	    return 0;
 	}
 
 	private Tree toConstructor1(Tree tree, Symbol constr, boolean addEmpty) {
@@ -915,29 +911,32 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	}
 
         private Tree toConstructor2(Tree tree, Symbol constr, boolean addEmpty) {
-	    switch (tree) {
-	    case Apply(Tree fn, Tree[] args):
+	    if (tree instanceof Tree.Apply) {
+		Tree.Apply apply = (Tree.Apply) tree;
 		return copy.Apply(
-		    tree, toConstructor1(fn, constr, addEmpty), args);
-	    case TypeApply(Tree fn, Tree[] args):
+		    tree, toConstructor1(apply.fun, constr, addEmpty), apply.args);
+	    } else if (tree instanceof Tree.TypeApply) {
+		Tree.TypeApply typeApply = (Tree.TypeApply) tree;
 		return copy.TypeApply(
-		    tree, toConstructor1(fn, constr, addEmpty), args);
-	    case Ident(_):
+		    tree, toConstructor1(typeApply.fun, constr, addEmpty), typeApply.args);
+	    } else if (tree instanceof Tree.Ident) {
 		return copy.Ident(tree, constr);
-	    case Select(Tree qual, _):
-		return copy.Select(tree, constr, qual);
-	    default:
+	    } else if (tree instanceof Tree.Select) {
+		Tree.Select select = (Tree.Select) tree;
+		return copy.Select(tree, constr, select.qualifier);
+	    } else {
 		throw new ApplicationError();
 	    }
 	}
 
 	private Type addEmptyParams(Type tp) {
-	    switch (tp) {
-	    case MethodType(Symbol[] vparams, Type restp):
-		return Type.MethodType(vparams, addEmptyParams(restp));
-	    case PolyType(Symbol[] tparams, Type restp):
-		return Type.PolyType(tparams, addEmptyParams(restp));
-	    default:
+	    if (tp instanceof Type.MethodType) {
+		Type.MethodType method = (Type.MethodType) tp;
+		return Type.MethodType(method.vparams, addEmptyParams(method.result));
+	    } else if (tp instanceof Type.PolyType) {
+		Type.PolyType poly = (Type.PolyType) tp;
+		return Type.PolyType(poly.tparams, addEmptyParams(poly.result));
+	    } else {
 		return Type.MethodType(Symbol.EMPTY_ARRAY, tp);
 	    }
 	}
@@ -990,11 +989,12 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
     }
 
     public Object transformStat(Tree tree, int index) {
-	switch (tree) {
-	case ModuleDef(int mods, Name name, Tree tpe, Tree.Template templ):
-	    return transform(transformModule(tree, mods, name, tpe, templ));
+	if (tree instanceof Tree.ModuleDef) {
+	    Tree.ModuleDef moduleDef = (Tree.ModuleDef) tree;
+	    return transform(transformModule(tree, moduleDef.mods, moduleDef.name, moduleDef.tpe, moduleDef.impl));
 
-	case ValDef(int mods, Name name, Tree tpe, Tree rhs):
+	} else if (tree instanceof Tree.ValDef) {
+	    Tree.ValDef valDef = (Tree.ValDef) tree;
 	    Symbol sym = tree.symbol();
 	    validateVariance(
 		sym, sym.type(),
@@ -1008,54 +1008,54 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 		unit.error(
 		    refpos[level],
 		    "forward reference extends over definition of " + kind + " " +
-		    normalize(name));
+		    normalize(valDef.name));
 	    }
 	    return tree1;
-
-	default:
+	} else {
 	    return transform(tree);
 	}
     }
 
     public Tree transform(Tree tree) {
 	Symbol sym = tree.symbol();
-	switch (tree) {
-        case Empty:
+        if (tree == Tree.Empty) {
             return tree;
-
-	case ClassDef(_, _, Tree.AbsTypeDef[] tparams, Tree.ValDef[][] vparams, Tree tpe, Tree.Template templ):
+        }
+	if (tree instanceof Tree.ClassDef) {
+	    Tree.ClassDef classDef = (Tree.ClassDef) tree;
 	    Symbol enclClassPrev = enclClass;
 	    enclClass = sym;
 	    validateVariance(sym, sym.info(), CoVariance);
 	    validateVariance(sym, sym.typeOfThis(), CoVariance);
 	    Tree tree1 = super.transform(
-		copy.ClassDef(tree, tree.symbol(), tparams, vparams, tpe, addCaseMethods(templ, (ClassSymbol) tree.symbol())));
+		copy.ClassDef(tree, tree.symbol(), classDef.tparams, classDef.vparams, classDef.tpe, addCaseMethods(classDef.impl, tree.symbol())));
 	    enclClass = enclClassPrev;
 	    return tree1;
 
-	case DefDef(_, _, _, _, _, _):
+	} else if (tree instanceof Tree.DefDef) {
 	    validateVariance(sym, sym.type(), CoVariance);
 	    return super.transform(tree);
 
-	case ValDef(_, _, _, _):
+	} else if (tree instanceof Tree.ValDef) {
 	    validateVariance(
 		sym, sym.type(),
 		((sym.flags & MUTABLE) != 0) ? NoVariance : CoVariance);
 	    return super.transform(tree);
 
-	case AbsTypeDef(_, _, _, _):
+	} else if (tree instanceof Tree.AbsTypeDef) {
 	    validateVariance(sym, sym.info(), CoVariance);
 	    validateVariance(sym, sym.loBound(), ContraVariance);
 	    validateVariance(sym, sym.vuBound(), CoVariance);
 	    return super.transform(tree);
 
-	case AliasTypeDef(_, _, _, _):
+	} else if (tree instanceof Tree.AliasTypeDef) {
 	    validateVariance(sym, sym.info(), CoVariance);
 	    return super.transform(tree);
 
-	case Template(Tree[] bases, Tree[] body):
-	    Tree[] bases1 = transform(bases);
-	    Tree[] body1 = transformStats(body);
+	} else if (tree instanceof Tree.Template) {
+	    Tree.Template template = (Tree.Template) tree;
+	    Tree[] bases1 = transform(template.parents);
+	    Tree[] body1 = transformStats(template.body);
 	    if (sym.kind == VAL) {
 		Symbol owner = tree.symbol().owner();
 		validateBaseTypes(owner);
@@ -1063,27 +1063,31 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	    }
 	    return copy.Template(tree, bases1, body1);
 
-	case Block(Tree[] stats, Tree value):
-	    Tree[] stats1 = transformStats(stats);
-            Tree value1 = transform(value);
+	} else if (tree instanceof Tree.Block) {
+	    Tree.Block block = (Tree.Block) tree;
+	    Tree[] stats1 = transformStats(block.stats);
+            Tree value1 = transform(block.expr);
 	    return copy.Block(tree, stats1, value1);
 
-	case This(_):
+	} else if (tree instanceof Tree.This) {
 	    return tree;
 
-	case PackageDef(Tree pkg, Template packaged):
-	    return copy.PackageDef(tree, pkg, super.transform(packaged));
+	} else if (tree instanceof Tree.PackageDef) {
+	    Tree.PackageDef packageDef = (Tree.PackageDef) tree;
+	    return copy.PackageDef(tree, packageDef.packaged, super.transform(packageDef.impl));
 
-	case TypeApply(Tree fn, Tree[] args):
-	    switch (fn.type) {
-	    case PolyType(Symbol[] tparams, Type restp):
-		checkBounds(tree.pos, tparams, Tree.typeOf(args));
+	} else if (tree instanceof Tree.TypeApply) {
+	    Tree.TypeApply typeApply = (Tree.TypeApply) tree;
+	    if (typeApply.fun.type instanceof Type.PolyType) {
+		Type.PolyType poly = (Type.PolyType) typeApply.fun.type;
+		checkBounds(tree.pos, poly.tparams, Tree.typeOf(typeApply.args));
 	    }
 	    return super.transform(tree);
 
-	case Apply(Tree fn, Tree[] args):
+	} else if (tree instanceof Tree.Apply) {
+	    Tree.Apply apply = (Tree.Apply) tree;
 	    // convert case methods to new's
-	    Symbol fsym = TreeInfo.methSymbol(fn);
+	    Symbol fsym = TreeInfo.methSymbol(apply.fun);
 	    assert fsym != Symbol.NONE : tree;
 	    if (fsym != null && fsym.isMethod() && !fsym.isConstructor() &&
 		(fsym.flags & CASE) != 0) {
@@ -1093,18 +1097,21 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 
 	    return super.transform(tree);
 
-	case AppliedType(Tree tpe, Tree[] args):
-	    Symbol[] tparams = tpe.type.symbol().typeParams();
-	    checkBounds(tree.pos, tparams, Tree.typeOf(args));
+	} else if (tree instanceof Tree.AppliedType) {
+	    Tree.AppliedType appliedType = (Tree.AppliedType) tree;
+	    Symbol[] tparams = appliedType.tpe.type.symbol().typeParams();
+	    checkBounds(tree.pos, tparams, Tree.typeOf(appliedType.args));
 	    return elimTypeNode(super.transform(tree));
 
-	case CompoundType(_, _):
+	} else if (tree instanceof Tree.CompoundType) {
 	    Symbol clazz = tree.type.symbol();
 	    validateBaseTypes(clazz);
 	    checkAllOverrides(tree.pos, clazz);
 	    return elimTypeNode(super.transform(tree));
 
-	case Ident(Name name):
+	} else if (tree instanceof Tree.Ident) {
+	    Tree.Ident ident = (Tree.Ident) tree;
+	    Name name = ident.name;
 	    if (name == TypeNames.WILDCARD_STAR)
 		return tree;
 
@@ -1127,13 +1134,16 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	    sym.flags |= ACCESSED;
 	    return elimTypeNode(tree);
 
-	case Select(Tree qual, Name name):
+	} else if (tree instanceof Tree.Select) {
+	    Tree.Select select = (Tree.Select) tree;
+	    Tree qual = select.qualifier;
 	    sym.flags |= ACCESSED;
 	    if (!TreeInfo.isSelf(qual, enclClass))
 		sym.flags |= SELECTOR;
 	    if ((sym.flags & DEFERRED) != 0) {
-		switch (qual) {
-		case Super(Name qualifier, Name mixin):
+		if (qual instanceof Tree.Super) {
+		    Tree.Super superTree = (Tree.Super) qual;
+		    Name mixin = superTree.mixin;
 		    Symbol sym1 = enclClass.thisSym().info().lookup(sym.name);
 		    if (mixin != TypeNames.EMPTY || !isIncomplete(sym1))
 			unit.error(
@@ -1143,7 +1153,7 @@ public class RefCheck extends Transformer implements Modifiers, Kinds {
 	    }
 	    return elimTypeNode(super.transform(tree));
 
-	default:
+	} else {
 	    return elimTypeNode(super.transform(tree));
 	}
     }
