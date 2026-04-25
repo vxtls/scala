@@ -8,7 +8,9 @@
 
 package scala.tools.scalap;
 
-import java.io._;
+import java.io.File;
+import java.io.OutputStreamWriter;
+import scala.Console;
 
 import scala.tools.util.ClassPath;
 
@@ -60,7 +62,7 @@ object Main {
             // parse the classfile
             val clazz = new Classfile(reader);
             // check if there is a Scala signature attribute
-            val attrib = clazz.attribs.find(a => a.toString() == "ScalaSignature");
+            val attrib = clazz.attribs.find((a: clazz.Attribute) => a.toString() == "ScalaSignature");
             attrib match {
                 // if the attribute is found, we have to extract the scope
                 // from the attribute

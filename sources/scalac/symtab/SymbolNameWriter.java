@@ -226,7 +226,7 @@ public class SymbolNameWriter {
         String name = getSymbolName(symbol);
         this.pending += name.length();
         char separator = getSymbolSeparator(symbol);
-        return appendPrefix(symbol.owner(), separator).append(name);;
+        return appendPrefix(symbol.owner(), separator).append(name);
     }
 
     /** Appends given prefix and symbol. */

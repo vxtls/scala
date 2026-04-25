@@ -3,7 +3,7 @@ package scalac.transformer.matching ;
 import scalac.ApplicationError ;
 import scalac.ast.Tree ;
 import scalac.util.Name ;
-import Tree.* ;
+import scalac.ast.Tree.* ;
 
 import java.util.* ;
 

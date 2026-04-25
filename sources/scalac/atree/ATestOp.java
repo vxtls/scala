@@ -16,51 +16,47 @@ public class ATestOp {
     //########################################################################
     // Public Cases
 
+    private final String name;
+
+    private ATestOp(String name) {
+        this.name = name;
+    }
+
     /** An equality test */
-    public case EQ;
+    public static final ATestOp EQ = new ATestOp("EQ");
 
     /** A non-equality test */
-    public case NE;
+    public static final ATestOp NE = new ATestOp("NE");
 
     /** A less-than test */
-    public case LT;
+    public static final ATestOp LT = new ATestOp("LT");
 
     /** A greater-than-or-equal test */
-    public case GE;
+    public static final ATestOp GE = new ATestOp("GE");
 
     /** A less-than-or-equal test */
-    public case LE;
+    public static final ATestOp LE = new ATestOp("LE");
 
     /** A greater-than test */
-    public case GT;
+    public static final ATestOp GT = new ATestOp("GT");
 
     //########################################################################
     // Public Methods
 
     /** Returns the negation of this operation. */
     public ATestOp negate() {
-        switch (this) {
-        case EQ: return NE;
-        case NE: return EQ;
-        case LT: return GE;
-        case GE: return LT;
-        case LE: return GT;
-        case GT: return LE;
-        default: throw Debug.abort("unknown case", this);
-        }
+        if (this == EQ) return NE;
+        if (this == NE) return EQ;
+        if (this == LT) return GE;
+        if (this == GE) return LT;
+        if (this == LE) return GT;
+        if (this == GT) return LE;
+        throw Debug.abort("unknown case", this);
     }
 
     /** Returns a string representation of this operation. */
     public String toString() {
-        switch (this) {
-        case EQ: return "EQ";
-        case NE: return "NE";
-        case LT: return "LT";
-        case GE: return "GE";
-        case LE: return "LE";
-        case GT: return "GT";
-        default: throw Debug.abort("unknown case", this);
-        }
+        return name;
     }
 
     //########################################################################

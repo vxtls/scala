@@ -167,19 +167,21 @@ public class AttributeParser implements ClassfileConstants {
             return;
         case CONSTANT_VALUE_ATTR:
             AConstant constant = pool.getConstantValue(in.nextChar());
-            switch (constant) {
-            case INT(int value):
+            if (constant instanceof AConstant.INT) {
+                int value = ((AConstant.INT)constant).value;
                 Definitions definitions = parser.global.definitions;
                 Symbol base = sym.getType().symbol();
-                if (base == definitions.INT_CLASS) break;
-                if (base == definitions.CHAR_CLASS)
+                if (base == definitions.INT_CLASS) {
+                    // keep the constant unchanged
+                } else if (base == definitions.CHAR_CLASS) {
                     constant = AConstant.CHAR((char)value);
-                else if (base == definitions.SHORT_CLASS)
+                } else if (base == definitions.SHORT_CLASS) {
                     constant = AConstant.SHORT((short)value);
-                else if (base == definitions.BYTE_CLASS)
+                } else if (base == definitions.BYTE_CLASS) {
                     constant = AConstant.BYTE((byte)value);
-                else
+                } else {
                     constant = AConstant.BOOLEAN(value != 0);
+                }
             }
             sym.setInfo(parser.make.constantType(constant));
             return;

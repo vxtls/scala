@@ -44,6 +44,9 @@ public interface ClassfileConstants {
     int CONSTANT_METHODREF = 10;
     int CONSTANT_INTFMETHODREF = 11;
     int CONSTANT_NAMEANDTYPE = 12;
+    int CONSTANT_METHODHANDLE = 15;
+    int CONSTANT_METHODTYPE = 16;
+    int CONSTANT_INVOKEDYNAMIC = 18;
 
     int BAD_ATTR = 0x00000;
     int SOURCEFILE_ATTR = 0x00001;

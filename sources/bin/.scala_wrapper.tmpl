@@ -171,8 +171,7 @@ compute_value() {
         LIBRARY_SOURCES | \
         LIBRARY_CLASSES | \
         TOOLS_CLASSES   | \
-        FJBG_CLASSES    | \
-        MSIL_CLASSES    )
+        FJBG_CLASSES    )
             if eval [ -n \"\$SCALA_$1\" ]; then
                 if eval [ -f \"\$SCALA_$1\" -o -d \"\$SCALA_$1\" ]; then
                     eval current_$1=\"\$SCALA_$1\";
@@ -186,6 +185,21 @@ compute_value() {
                 eval abort \""File referred by default_$1 (\$default_$1)" \
                     "does not exist. Please, fix definition of default_$1 in" \
                     "file $SOURCE or define environment variable SCALA_$1."\";
+            fi;
+            ;;
+
+        MSIL_CLASSES )
+            if eval [ -n \"\$SCALA_$1\" ]; then
+                if eval [ -f \"\$SCALA_$1\" -o -d \"\$SCALA_$1\" ]; then
+                    eval current_$1=\"\$SCALA_$1\";
+                else
+                    eval warning \""File referred by SCALA_$1 (\$SCALA_$1)" \
+                        "does not exist, ignoring it."\";
+                    unset SCALA_$1;
+                    eval current_$1="";
+                fi;
+            elif ! eval [ -f \"\$current_$1\" -o -d \"\$current_$1\" ]; then
+                eval current_$1="";
             fi;
             ;;
 
@@ -381,9 +395,11 @@ compiler_start() {
     compute_value FJBG_CLASSES;
     compute_value MSIL_CLASSES;
 
-    # append FJBG and MSIL libraries to classpath
+    # append FJBG and, when available, MSIL libraries to classpath
     classpath=`append_pathlists "$classpath" "$current_FJBG_CLASSES"`;
-    classpath=`append_pathlists "$classpath" "$current_MSIL_CLASSES"`;
+    if [ -n "$current_MSIL_CLASSES" ]; then
+        classpath=`append_pathlists "$classpath" "$current_MSIL_CLASSES"`;
+    fi;
 
     # start tool
     tool_start "$classpath" "$@";

@@ -98,12 +98,12 @@ class TransMatch( global:scalac_Global )
     if( global.newMatch ) {
       val fm = new FullRegularTranslator( global );
       val gram = fm.MakeGrammar( scala.Iterator.fromArray( cases ) );
-      Console.println("writing out the grammar to /tmp/encodedGrammar.bin");
+      scala.Console.println("writing out the grammar to /tmp/encodedGrammar.bin");
       //val f = new FileOutputStream(new File("/tmp/encodedGrammar.bin"));
       //f.write( gram.encode );
       //f.close();
       // val gram = Predef.decode( Predef.Array[] );
-      Console.println( gram.encode);
+      scala.Console.println( gram.encode);
 
       throw new ApplicationError("not impl.");
     };
@@ -137,7 +137,7 @@ class TransMatch( global:scalac_Global )
       pm.construct( cases.asInstanceOf[ Array[Tree] ] );
       } catch {
         case e:Throwable =>
-          Console.println("failed on pats"+scala.Iterator.fromArray(cases).toList.mkString("","\n","")+", message\n"+e.getMessage())
+          scala.Console.println("failed on pats"+scala.Iterator.fromArray(cases).toList.mkString("","\n","")+", message\n"+e.getMessage())
       }
       if (global.log()) {
         global.log("internal pattern matching structure");

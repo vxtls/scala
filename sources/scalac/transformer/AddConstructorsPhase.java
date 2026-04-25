@@ -41,15 +41,17 @@ public class AddConstructorsPhase extends Phase {
     /** Applies this phase to the given type for the given symbol. */
     public Type transformInfo(Symbol symbol, Type type) {
         if (symbol.isConstructor()) {
-            switch (type) {
-            case PolyType(Symbol[] tparams, MethodType(_, Type result)):
-                result = Type.MethodType(Symbol.EMPTY_ARRAY, result);
-                return Type.PolyType(tparams, result);
-            case MethodType(_, Type result):
-                return Type.MethodType(Symbol.EMPTY_ARRAY, result);
-            default:
-                throw Debug.abort("illegal case", type);
+            if (type instanceof Type.PolyType) {
+                Type.PolyType polyType = (Type.PolyType)type;
+                if (polyType.result instanceof Type.MethodType) {
+                    Type.MethodType methodType = (Type.MethodType)polyType.result;
+                    Type result = Type.MethodType(Symbol.EMPTY_ARRAY, methodType.result);
+                    return Type.PolyType(polyType.tparams, result);
+                }
+            } else if (type instanceof Type.MethodType) {
+                return Type.MethodType(Symbol.EMPTY_ARRAY, ((Type.MethodType)type).result);
             }
+            throw Debug.abort("illegal case", type);
         }
         return type;
     }

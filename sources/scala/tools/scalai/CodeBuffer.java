@@ -29,19 +29,16 @@ public class CodeBuffer {
     // Public Methods
 
     public CodeBuffer append(Code code) {
-        switch (code) {
-
-        case Block(Code[] stats, Code value):
-            insure(stats.length + 1);
-            for (int i = 0; i < stats.length; i++) buffer[size++] = stats[i];
-            buffer[size++] = value;
-            return this;
-
-        default:
-            insure(1);
-            buffer[size++] = code;
+        if (code instanceof Code.Block) {
+            Code.Block block = (Code.Block)code;
+            insure(block.stats.length + 1);
+            for (int i = 0; i < block.stats.length; i++) buffer[size++] = block.stats[i];
+            buffer[size++] = block.value;
             return this;
         }
+        insure(1);
+        buffer[size++] = code;
+        return this;
     }
 
     public Code code(Code value) {

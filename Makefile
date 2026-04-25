@@ -31,7 +31,7 @@ boot_LIBRARY_CLASSDIR	 = $(boot_OBJECTDIR)/library
 boot_TOOLS_CLASSDIR	 = $(boot_OBJECTDIR)/tools
 boot_JC_OUTPUTDIR	 = $(boot_TOOLS_CLASSDIR)
 boot_JC_CLASSPATH	 = $(boot_JC_OUTPUTDIR):$(boot_LIBRARY_CLASSDIR)
-boot_SCALAC		 = $(SCALAC)
+boot_SCALAC		 = $(BOOTSTRAP_SCALAC)
 boot_SCALADOC		 = $(SCALADOC)
 
 main_PREFIX		 = main
@@ -60,7 +60,7 @@ test_SCALADOC		 = $(test_BINARYDIR)/scaladoc
 # Variables
 
 # java compilation defaults
-JC_COMPILER		 = PICO
+JC_COMPILER		 = JAVAC
 JC_OUTPUTDIR		 = $($(prefix)_JC_OUTPUTDIR)
 JC_CLASSPATH		 = $($(prefix)_JC_CLASSPATH)
 
@@ -270,7 +270,7 @@ $(LATEST_PREFIX)-test-%	: ; @$(make) prefix="test" $@
 
 SCRIPTS_PREFIX		 = $($(prefix)_BINARYDIR)
 SCRIPTS_TEMPLATE_NAME	 = $(SCRIPTS_WRAPPER_NAME).tmpl
-SCRIPTS_TEMPLATE_FILE	 = $(PROJECT_BINARYDIR)/$(SCRIPTS_TEMPLATE_NAME)
+SCRIPTS_TEMPLATE_FILE	 = $(PROJECT_SOURCEDIR)/bin/$(SCRIPTS_TEMPLATE_NAME)
 SCRIPTS_WRAPPER_NAME	 = .scala_wrapper
 SCRIPTS_WRAPPER_FILE	 = $(SCRIPTS_PREFIX)/$(SCRIPTS_WRAPPER_NAME)
 SCRIPTS_ALIASES_NAMES	+= scala
@@ -310,7 +310,7 @@ $(SCRIPTS_WRAPPER_FILE)	: MACRO_LIBRARY_CLASSES   ?= $(LIBRARY_CLASSDIR)
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_TOOLS_CLASSES     ?= $(TOOLS_CLASSDIR)
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_FJBG_CLASSES      ?= $(FJBG_JARFILE)
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_MSIL_CLASSES      ?= $(MSIL_JARFILE)
-$(SCRIPTS_WRAPPER_FILE)	: MACRO_JAVA_CMD          ?= java
+$(SCRIPTS_WRAPPER_FILE)	: MACRO_JAVA_CMD          ?= $(JAVA)
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_JAVA_ARGS         ?= -enableassertions
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_SCALA_CMD         ?= $$PREFIX/bin/scala
 $(SCRIPTS_WRAPPER_FILE)	: MACRO_SCALA_ARGS        ?=
@@ -318,7 +318,7 @@ $(SCRIPTS_WRAPPER_FILE)	: $(VERSION_FILE)
 $(SCRIPTS_WRAPPER_FILE)	: $(PROJECT_ROOT)/Makefile
 $(SCRIPTS_WRAPPER_FILE)	: $(PROJECT_ROOT)/Makefile.config
 $(SCRIPTS_WRAPPER_FILE)	: $(PROJECT_ROOT)/Makefile.import
-$(SCRIPTS_WRAPPER_FILE)	: $(PROJECT_ROOT)/Makefile.private
+$(SCRIPTS_WRAPPER_FILE)	: $(wildcard $(PROJECT_ROOT)/Makefile.private)
 $(SCRIPTS_WRAPPER_FILE)	: $(SCRIPTS_TEMPLATE_FILE)
 	@[ -d $(@D) ] || $(call RUN,$(MKDIR) -p $(@D))
 	@[ -e $@ ] || $(call RUN,$(RM) $@)
@@ -342,6 +342,24 @@ $(SCRIPTS_WRAPPER_FILE)	: $(SCRIPTS_TEMPLATE_FILE)
 	    exit 1; \
 	fi;
 	$(CHMOD) 555 $@
+
+##############################################################################
+# Targets - fjbg bytecode library
+
+PROJECT_SOURCES		+= $(FJBG_SOURCES)
+FJBG_ROOT		 = $(PROJECT_ROOT)/third_party/fjbg
+FJBG_SRC_ROOT		 = $(FJBG_ROOT)/src
+FJBG_SOURCES		+= $(wildcard $(FJBG_SRC_ROOT)/ch/epfl/lamp/fjbg/*.java)
+FJBG_SOURCES		+= $(wildcard $(FJBG_SRC_ROOT)/ch/epfl/lamp/util/*.java)
+FJBG_JC_FILES		+= $(FJBG_SOURCES)
+FJBG_JC_OUTPUTDIR	 = $(FJBG_HOME)/classes
+FJBG_JAR_ARCHIVE	 = $(FJBG_JARFILE)
+FJBG_JAR_INPUTDIR	 = $(FJBG_JC_OUTPUTDIR)
+FJBG_JAR_FILES		+= ch
+
+$(FJBG_JARFILE)		: $(FJBG_JC_FILES)
+	@$(make) jc target=FJBG FJBG_JC_FILES='$?'
+	@$(make) jar target=FJBG
 
 ##############################################################################
 # Targets - lamp library
@@ -386,12 +404,13 @@ LIBRARY_LIST		+= $(call READLIST,$(PROJECT_LISTDIR)/library.lst)
 LIBRARY_SOURCES		+= $(LIBRARY_LIST:%=$(LIBRARY_ROOT)/%)
 LIBRARY_CLASSDIR	 = $($(prefix)_LIBRARY_CLASSDIR)
 LIBRARY_JC_FILES	+= $(filter %.java,$(LIBRARY_SOURCES))
-LIBRARY_JC_FLAGS	+= $(JC_FLAGS) -scala-hack
+LIBRARY_JC_FLAGS	+= $(JC_FLAGS)
 LIBRARY_JC_OUTPUTDIR	 = $(LIBRARY_CLASSDIR)
 LIBRARY_JC_CLASSPATH	 = $(LIBRARY_JC_OUTPUTDIR)
 LIBRARY_SC_FILES	+= $(filter %.scala,$(LIBRARY_SOURCES))
 LIBRARY_SC_OUTPUTDIR	 = $(LIBRARY_JC_OUTPUTDIR)
 LIBRARY_SC_CLASSPATH	 = $(LIBRARY_JC_OUTPUTDIR):$(PROJECT_SOURCEDIR)
+LIBRARY_SC_BOOTCLASSPATH = $(LIBRARY_JC_OUTPUTDIR):$(PROJECT_SOURCEDIR):$(JRE_JARFILE)
 LIBRARY_SDC_FLAGS	+= -windowtitle "Scala Library Documentation"
 LIBRARY_SDC_FLAGS	+= -doctitle "Scala<br/>$(PROJECT_VERSION)"
 LIBRARY_SDC_FILES	+= $(LIBRARY_SC_FILES)
@@ -480,13 +499,14 @@ SCALAC_JC_CLASSPATH	 = $(JC_CLASSPATH):$(MSIL_JARFILE):$(FJBG_JARFILE)
 SCALAC_SC_FILES		+= $(filter %.scala,$(SCALAC_SOURCES))
 SCALAC_SC_CLASSPATH	 = $(SCALAC_JC_CLASSPATH):$(PROJECT_SOURCEDIR)
 
+$(latest)scalac-jc	: $(FJBG_JARFILE)
 $(latest)scalac		: $(latest)scalac-jc
 $(latest)scalac		: $(latest)scalac-sc
 $(latest)scalac		:
 	$(TOUCH) $@
 
 $(latest)scalac-jc	: $(SCALAC_JC_FILES)
-	@$(make) jc target=SCALAC SCALAC_JC_FILES='$?'
+	@$(make) jc target=SCALAC SCALAC_JC_FILES='$(filter %.java,$?)'
 	$(TOUCH) $@
 
 $(latest)scalac-sc	: $(SCALAC_SC_FILES)
@@ -651,7 +671,6 @@ TOOLS_JAR_ARCHIVE	 = $(PROJECT_LIBRARYDIR)/$(TOOLS_NAME).jar
 TOOLS_JAR_INPUTDIR	 = $(TOOLS_CLASSDIR)
 TOOLS_JAR_FILES		+= ch
 TOOLS_JAR_FILES		+= scala/tools/dtd2scala
-TOOLS_JAR_FILES		+= scala/tools/scala4ant
 TOOLS_JAR_FILES		+= scala/tools/scalac
 TOOLS_JAR_FILES		+= scala/tools/scaladoc
 TOOLS_JAR_FILES		+= scala/tools/scalai
@@ -659,6 +678,9 @@ TOOLS_JAR_FILES		+= scala/tools/scalap
 TOOLS_JAR_FILES		+= scala/tools/scalatest
 TOOLS_JAR_FILES		+= scala/tools/util
 TOOLS_JAR_FILES		+= scalac
+ifneq ($(wildcard $(ANT_JARFILE)),)
+TOOLS_JAR_FILES		+= scala/tools/scala4ant
+endif
 
 distclean		: distclean.tools
 distclean.tools	:
@@ -671,9 +693,11 @@ $(latest)tools		: $(latest)scalai
 $(latest)tools		: $(latest)scaladoc
 $(latest)tools		: $(latest)scalap
 $(latest)tools		: $(latest)dtd2scala
-$(latest)tools		: $(latest)scala4ant
 $(latest)tools		: $(latest)scalatest
 $(latest)tools		: $(latest)servlet
+ifneq ($(wildcard $(ANT_JARFILE)),)
+$(latest)tools		: $(latest)scala4ant
+endif
 $(latest)tools		:
 	$(TOUCH) $@
 
