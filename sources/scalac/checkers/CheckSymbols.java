@@ -34,13 +34,11 @@ public class CheckSymbols extends Checker {
                "symbol not NONE",
                "hasSymbol => symbol not NONE");
 
-	switch (tree) {
-	case ValDef(_, _, _, _):
-	case DefDef(_, _, _, _, _, _):
+	if (tree instanceof Tree.ValDef || tree instanceof Tree.DefDef) {
 	    Symbol s1 = tree.symbol();
 	    Symbol owner = s1.owner();
 	    if (!owner.isClass())
-		break;
+		return;
 	    Symbol[] ss = owner.nextInfo()
 		.members().lookup(s1.name).alternativeSymbols();
 	    int i;
@@ -50,7 +48,6 @@ public class CheckSymbols extends Checker {
 	    verify(tree, i < ss.length, "symbol " + Debug.show(s1)
 		   + " should be in its owner scope",
 		   Debug.show(owner.members()));
-	    break;
 	}
     }
 }

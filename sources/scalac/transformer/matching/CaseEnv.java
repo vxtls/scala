@@ -12,7 +12,7 @@ import scalac.*;
 import scalac.ast.*;
 import scalac.util.*;
 import scalac.symtab.*;
-import Tree.ValDef;
+import scalac.ast.Tree.ValDef;
 
 /** the environment for a body of a case
  */

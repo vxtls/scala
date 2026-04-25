@@ -60,9 +60,6 @@ configure() {
     # Location of the FJBG library.
     default_FJBG_CLASSES={#FJBG_CLASSES#};
 
-    # Location of the MSIL library.
-    default_MSIL_CLASSES={#MSIL_CLASSES#};
-
     # Command to start the Java VM.
     default_JAVA_CMD={#JAVA_CMD#};
 
@@ -232,8 +229,7 @@ compute_value() {
         LIBRARY_SOURCES | \
         LIBRARY_CLASSES | \
         TOOLS_CLASSES   | \
-        FJBG_CLASSES    | \
-        MSIL_CLASSES    )
+        FJBG_CLASSES    )
             if eval [ -n \"\$SCALA_$1\" ]; then
                 if eval [ -f \"\$SCALA_$1\" -o -d \"\$SCALA_$1\" ]; then
                     eval current_$1=\"\$SCALA_$1\";
@@ -442,11 +438,8 @@ compiler_start() {
 
     # compute values
     compute_value FJBG_CLASSES;
-    compute_value MSIL_CLASSES;
-
-    # append FJBG and MSIL libraries to classpath
+    # append FJBG to classpath
     classpath=`append_pathlists "$classpath" "$current_FJBG_CLASSES"`;
-    classpath=`append_pathlists "$classpath" "$current_MSIL_CLASSES"`;
 
     # start tool
     tool_start "$classpath" "$@";
@@ -502,7 +495,6 @@ info_option_x_value() {
         LIBRARY_CLASSES     ) value=$2;;
         TOOLS_CLASSES       ) value=$2;;
         FJBG_CLASSES        ) value=$2;;
-        MSIL_CLASSES        ) value=$2;;
         JAVA_CMD            ) value=$2;;
         JAVA_ARGS           ) value=$2;;
         SCALA_CMD           ) value=$2;;
@@ -528,7 +520,6 @@ info_option_help() {
     echo "  LIBRARY_CLASSES   Location of the Scala library";
     echo "  TOOLS_CLASSES     Location of the Scala tools";
     echo "  FJBG_CLASSES      Location of the fjbg library";
-    echo "  MSIL_CLASSES      Location of the msil library";
     echo "  JAVA_CMD          Command to start the Java VM";
     echo "  JAVA_ARGS         Additional arguments to pass to the Java VM";
     echo "  SCALA_CMD         Command to start the Scala VM";
@@ -574,7 +565,6 @@ test_print_help() {
     echo "--dis           next files test the disassembler";
     echo "--pos           next files test a compilation success";
     echo "--neg           next files test a compilation failure";
-    echo "--msil          next files test the .NET backend";
     echo "--no-run        run no test, use results of last run";
     echo "--show-log      show output of failed tests";
     echo "--show-diff     show differences between actual and expected output";
@@ -687,27 +677,6 @@ test_run_xml() {
     $SCALA -classpath "$os_dstbase".obj Test "$os_srcbase".xml &&
     rm -rf "$dstbase".obj;
 }
-
-# Tests the .NET backend.
-test_run_msil() {
-    assemblies={#TEST_ASSEMBLIES#};
-    rm -f "$dstbase".il &&
-    rm -f "$dstbase".EXE &&
-    $SOCOS -nowarn -target:msil -o "$os_dstbase" $assemblies "$@" \
-        "$os_srcbase".scala &&
-    case "$UNAME" in
-        CYGWIN* )
-            ilasm /qui /nol /out="$os_dstbase".EXE "$os_dstbase".il \
-                > /dev/null &&
-#             peverify /il "$os_dstbase".EXE > /dev/null &&
-            "$dstbase".EXE "msil";;
-        * )
-            cat "$checkfile";;
-    esac &&
-    rm -f "$dstbase".EXE &&
-    rm -f "$dstbase".il;
-}
-
 
 # Checks the specified test.
 test_check_test() {
@@ -828,8 +797,6 @@ test_check_all() {
         "pos" $FILES_POS;
     test_check_kind "Testing compiler (on files whose compilation should fail)" \
         "neg" $FILES_NEG;
-    test_check_kind "Testing .NET backend" \
-	"msil" $FILES_MSIL;
     test_check_kind "Testing interpreter" \
         "int" $FILES_RUN $FILES_INT;
 }
@@ -858,7 +825,6 @@ test_add_file() {
         dis  ) FILES_DIS="$FILES_DIS $1"; return;;
         pos  ) FILES_POS="$FILES_POS $1"; return;;
         neg  ) FILES_NEG="$FILES_NEG $1"; return;;
-	msil ) FILES_MSIL="$FILES_MSIL $1"; return;;
         *    ) abort "unknown test type \`$TEST_TYPE'";;
     esac;
     case "$1" in
@@ -870,7 +836,6 @@ test_add_file() {
         dis  | */dis  | */dis/*  | dis/*  ) FILES_DIS="$FILES_DIS $1";;
         pos  | */pos  | */pos/*  | pos/*  ) FILES_POS="$FILES_POS $1";;
         neg  | */neg  | */neg/*  | neg/*  ) FILES_NEG="$FILES_NEG $1";;
-        msil | */msil | */msil/* | msil/* ) FILES_MSIL="$FILES_MSIL $1";;
         * ) abort "don't known what to do with \`$1'";;
     esac;
     TEST_ALL="false";
@@ -904,8 +869,6 @@ test_main() {
     FILES_DIS="";
     FILES_POS="";
     FILES_NEG="";
-    FILES_MSIL="";
-
     SCALA="$PREFIX/bin/scala";
     SOCOS="$PREFIX/bin/scalac";
     SURUS="$PREFIX/bin/scalarun";
@@ -930,7 +893,6 @@ test_main() {
             --dis        ) TEST_TYPE="dis"; shift 1;;
             --pos        ) TEST_TYPE="pos"; shift 1;;
             --neg        ) TEST_TYPE="neg"; shift 1;;
-            --msil       ) TEST_TYPE="msil"; shift 1;;
             --no-run     ) NORUN="true"; shift 1;;
             --show-log   ) SHOWLOG="true"; shift 1;;
             --show-diff  ) SHOWDIFF="true"; shift 1;;
@@ -982,9 +944,6 @@ test_main() {
         esac;
         case "$TEST_TYPE" in
             auto | neg ) FILES_NEG="$FILES_NEG $SRCDIR/neg";;
-        esac;
-        case "$TEST_TYPE" in
-                   msil ) FILES_MSIL="$FILES_MSIL $SRCDIR/run";;
         esac;
     fi;
 

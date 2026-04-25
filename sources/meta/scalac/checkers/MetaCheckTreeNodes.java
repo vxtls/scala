@@ -64,42 +64,40 @@ public class MetaCheckTreeNodes extends AbstractTreeCaseExpander {
         writer.println("assert " + name + " != null :").indent();
         printNullValue(node, name);
         writer.println(";").undent();
-        switch (type) {
-        case Reference(_, _):
-            break;
-
-        case Array(Type item):
+        if (type instanceof Type.Reference) {
+            return;
+        }
+        if (type instanceof Type.Array) {
+            Type item = ((Type.Array)type).item;
             writer.print(
                 "for (int "+i+" = 0; "+i+" < "+name+".length; "+i+"++)");
             writer.lbrace();
             printCheckField(node, item, name+"["+i+"]", i+"i");
             writer.rbrace();
-            break;
-
-        case TreeType.Name(TreeKind kind):
+            return;
+        }
+        if (type instanceof TreeType.Name) {
+            TreeKind kind = ((TreeType.Name)type).kind;
             if (kind != TreeKind.Any && kind != TreeKind.Test) {
                 writer.println("assert " + name + ".is" + kind + "Name() :")
                     .indent();
                 printWrongKind(node, name, kind);
                 writer.println(";").undent();
             }
-            break;
-
-        case TreeType.Tree(TreeKind kind):
+            return;
+        }
+        if (type instanceof TreeType.Tree) {
+            TreeKind kind = ((TreeType.Tree)type).kind;
             if (kind != TreeKind.Any) {
                 writer.println("assert " +
                     name + ".is" + kind + "() :").indent();
                 printWrongKind(node, name, kind);
                 writer.println(";").undent();
             }
-            break;
-
-        case TreeType.Node(_):
-            break;
-
-        default:
-            throw new Error(type.getClass().getName());
+            return;
         }
+        if (type instanceof TreeType.Node) return;
+        throw new Error(type.getClass().getName());
     }
 
     private void printCheckFieldLink(TreeField field) {

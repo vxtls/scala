@@ -133,14 +133,12 @@ public class ScalaSearch {
                 if (isLazy(sym))
 		    return sym;
                 else {
-                    switch (sym.type()) {
-                    case OverloadedType(Symbol[] alts, _):
-                        alternatives = alts;
+                    if (sym.type() instanceof Type.OverloadedType) {
+                        alternatives = ((Type.OverloadedType)sym.type()).alts;
                         altindex = 0;
                         return next();
-                    default:
-                        return sym;
                     }
+                    return sym;
                 }
             }
         }
@@ -569,7 +567,7 @@ public class ScalaSearch {
 //////////////////////////// DOCUMENTED SYMBOLS //////////////////////////////
 
 /** Compute documented symbols. */
-public class DocSyms {
+class DocSyms {
 
     Set syms;
 
@@ -600,6 +598,6 @@ public class DocSyms {
     }
 }
 
-public abstract class SymbolBooleanFunction {
+abstract class SymbolBooleanFunction {
     public abstract boolean apply(Symbol sym);
 }

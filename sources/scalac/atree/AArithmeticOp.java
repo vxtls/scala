@@ -8,42 +8,39 @@
 
 package scalac.atree;
 
-import scalac.util.Debug;
-
 /** This class represents an arithmetic operation. */
 public class AArithmeticOp {
 
     //########################################################################
     // Public Cases
 
+    private final String name;
+
+    private AArithmeticOp(String name) {
+        this.name = name;
+    }
+
     /** An arithmetic addition operation */
-    public case ADD;
+    public static final AArithmeticOp ADD = new AArithmeticOp("ADD");
 
     /** An arithmetic subtraction operation */
-    public case SUB;
+    public static final AArithmeticOp SUB = new AArithmeticOp("SUB");
 
     /** An arithmetic multiplication operation */
-    public case MUL;
+    public static final AArithmeticOp MUL = new AArithmeticOp("MUL");
 
     /** An arithmetic division operation */
-    public case DIV;
+    public static final AArithmeticOp DIV = new AArithmeticOp("DIV");
 
     /** An arithmetic remainder operation */
-    public case REM;
+    public static final AArithmeticOp REM = new AArithmeticOp("REM");
 
     //########################################################################
     // Public Methods
 
     /** Returns a string representation of this operation. */
     public String toString() {
-        switch (this) {
-        case ADD: return "ADD";
-        case SUB: return "SUB";
-        case MUL: return "MUL";
-        case DIV: return "DIV";
-        case REM: return "REM";
-        default : throw Debug.abort("unknown case", this);
-        }
+        return name;
     }
 
     //########################################################################
