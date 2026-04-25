@@ -187,7 +187,9 @@ public class Pickle implements Kinds, Modifiers, EntryTags {
 		putTypes(typeRef.args);
 	    } else if (tp instanceof Type.CompoundType) {
                 Type.CompoundType compoundType = (Type.CompoundType)tp;
-                putSymbol(tp.symbol());
+                Symbol clazz = tp.symbol();
+                if (clazz.isCompoundSym()) putSymbol(clazz.owner());
+                putSymbol(clazz);
 		putTypes(compoundType.parts);
 	    } else if (tp instanceof Type.MethodType) {
                 Type.MethodType methodType = (Type.MethodType)tp;
@@ -421,7 +423,10 @@ public class Pickle implements Kinds, Modifiers, EntryTags {
             Type.CompoundType compoundType = (Type.CompoundType)tp;
 	    writeByte(COMPOUNDtpe);
 	    writeByte(0); // space for length
-            writeRef(tp.symbol());
+            Symbol clazz = tp.symbol();
+            writeByte(clazz.isCompoundSym() ? 1 : 0);
+            if (clazz.isCompoundSym()) writeRef(clazz.owner());
+            writeRef(clazz);
 	    writeRefs(compoundType.parts);
 	} else if (tp instanceof Type.MethodType) {
             Type.MethodType methodType = (Type.MethodType)tp;

@@ -433,6 +433,34 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 		    readTypeRef(owner), readSymbolRef(), readTypeRefs(end, owner));
 		break;
 	    case COMPOUNDtpe:
+                int compoundBp = bp;
+                int marker = readByte() & 0xff;
+                if (marker == 0 || marker == 1) {
+                    boolean isCompoundSym = marker != 0;
+                    try {
+                        Symbol ctOwner = isCompoundSym ? readSymbolRef() : null;
+                        int ctClassRef = readNat();
+                        if (!isSymbolEntry(ctClassRef)) throw new BadSignature(this);
+                        Symbol ctClass = isCompoundSym
+                            ? (Symbol)entries[ctClassRef]
+                            : getSymbol(ctClassRef);
+                        Type[] parents = readTypeRefs(end, owner);
+                        if (bp != end) throw new BadSignature(this);
+                        if (ctClass == null) {
+                            tpe = Type.compoundTypeWithOwner(ctOwner, parents, new Scope());
+                            entries[ctClassRef] = tpe.symbol();
+                        } else {
+                            tpe = Type.compoundType(parents, new Scope(), ctClass);
+                        }
+                        break;
+                    } catch (BadSignature exception) {
+                        bp = compoundBp;
+                    } catch (AssertionError exception) {
+                        bp = compoundBp;
+                    }
+                } else {
+                    bp = compoundBp;
+                }
 		Symbol clazz = readSymbolRef();
 		Type[] parents = readTypeRefs(end, owner);
                 tpe = Type.compoundType(parents, new Scope(), clazz);
