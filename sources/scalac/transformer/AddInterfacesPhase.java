@@ -85,13 +85,12 @@ public class AddInterfacesPhase extends Phase {
                 // class symbols instead of interface symbols.
                 newParents = new Type[oldParents.length];
                 for (int i = 0; i < oldParents.length; ++i) {
-                    switch (oldParents[i]) {
-                    case TypeRef(Type pre, Symbol oldSym, Type[] args):
-                        newParents[i] = !needInterface(oldSym)
+                    if (oldParents[i] instanceof Type.TypeRef) {
+                        Type.TypeRef typeRef = (Type.TypeRef)oldParents[i];
+                        newParents[i] = !needInterface(typeRef.sym)
                             ? oldParents[i]
-                            : Type.typeRef(pre, getClassSymbol(oldSym), args);
-                        break;
-                    default:
+                            : Type.typeRef(typeRef.pre, getClassSymbol(typeRef.sym), typeRef.args);
+                    } else {
                         throw Debug.abort("illegal case", oldParents[i]);
                     }
                 }
@@ -195,7 +194,7 @@ public class AddInterfacesPhase extends Phase {
                 if (memberGoesInInterface(ifaceMemberSym)) {
                     if (ifaceMemberSym.isPrivate()) {
                         ifaceMemberSym.name = uniqueName(ifaceMemberSym);
-			ifaceMemberSym.flags |= Modifiers.FINAL;
+                        ifaceMemberSym.flags |= Modifiers.FINAL;
                         ifaceMemberSym.flags ^= Modifiers.PRIVATE;
                     } else if (ifaceMemberSym.isProtected())
                         ifaceMemberSym.flags ^= Modifiers.PROTECTED;
@@ -214,10 +213,7 @@ public class AddInterfacesPhase extends Phase {
                     // owned by the class.
                     classMemberSym = ifaceMemberSym;
 
-                    // [HACK] the following forces the evaluation of
-                    // the type of all value parameters, which might
-                    // otherwise become invalid once the owner is
-                    // changed.
+                    // Force parameter types before changing ownership.
                     classMemberSym.info();
                     if (classMemberSym.isMethod()) {
                         Symbol[] vp = classMemberSym.valueParams();
@@ -243,12 +239,11 @@ public class AddInterfacesPhase extends Phase {
             int oldParentsCount = oldClassParents.length;
             Type[] newClassParents = new Type[oldParentsCount + 1];
             for (int i = 0; i < oldParentsCount; ++i) {
-                switch (oldClassParents[i]) {
-                case TypeRef(Type pre, Symbol sym, Type[] args):
-                    Type newTp = Type.typeRef(pre, getClassSymbol(sym), args);
+                if (oldClassParents[i] instanceof Type.TypeRef) {
+                    Type.TypeRef typeRef = (Type.TypeRef)oldClassParents[i];
+                    Type newTp = Type.typeRef(typeRef.pre, getClassSymbol(typeRef.sym), typeRef.args);
                     newClassParents[i] = classSubst.apply(newTp);
-                    break;
-                default:
+                } else {
                     throw Debug.abort("unexpected type for parent", oldClassParents[i]);
                 }
             }
@@ -262,7 +257,8 @@ public class AddInterfacesPhase extends Phase {
             ifaceToClass.put(ifaceSym, classSym);
             classToIFace.put(classSym, ifaceSym);
 
-            // move attributes to the implementing class
+            // Move attributes to the implementing class so later phases
+            // observe the same metadata after interface erasure.
             AttributeInfo attr = global.removeAttributes(ifaceSym);
             if (attr != null) {
                 global.setAttribute(classSym, attr);

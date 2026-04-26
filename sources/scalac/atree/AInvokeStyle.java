@@ -16,75 +16,54 @@ public class AInvokeStyle {
     //########################################################################
     // Public Cases
 
-    public case New;
-    public case Dynamic;
-    public case Static(boolean onInstance);
+    private final String name;
+    private final Boolean onInstance;
 
-    //########################################################################
-    // Public Constants
+    private AInvokeStyle(String name, Boolean onInstance) {
+        this.name = name;
+        this.onInstance = onInstance;
+    }
 
-    public static final AInvokeStyle StaticClass    = Static(false);
-    public static final AInvokeStyle StaticInstance = Static(true);
+    public static final AInvokeStyle New = new AInvokeStyle("new", null);
+    public static final AInvokeStyle Dynamic = new AInvokeStyle("dynamic", null);
+    public static final AInvokeStyle StaticClass = new AInvokeStyle("static-class", Boolean.FALSE);
+    public static final AInvokeStyle StaticInstance = new AInvokeStyle("static-instance", Boolean.TRUE);
+
+    public static AInvokeStyle Static(boolean onInstance) {
+        return onInstance ? StaticInstance : StaticClass;
+    }
 
     //########################################################################
     // Public Methods
 
     /** Is this a new object creation? */
     public boolean isNew() {
-        switch (this) {
-        case New:
-            return true;
-        default:
-            return false;
-        }
+        return this == New;
     }
 
     /** Is this a dynamic method call? */
     public boolean isDynamic() {
-        switch (this) {
-        case Dynamic:
-            return true;
-        default:
-            return false;
-        }
+        return this == Dynamic;
     }
 
     /** Is this a static method call? */
     public boolean isStatic() {
-        switch (this) {
-        case Static(_):
-            return true;
-        default:
-            return false;
-        }
+        return onInstance != null;
     }
 
     /** Is this an instance method call? */
     public boolean hasInstance() {
-        switch (this) {
-        case Dynamic:
-            return true;
-        case Static(boolean onInstance):
-            return onInstance;
-        default:
-            return false;
-        }
+        if (this == Dynamic) return true;
+        if (onInstance != null) return onInstance.booleanValue();
+        return false;
     }
 
     /** Returns a string representation of this style. */
     public String toString() {
-        switch (this) {
-        case New:
-            return "new";
-        case Dynamic:
-            return "dynamic";
-        case Static(false):
-            return "static-class";
-        case Static(true):
-            return "static-instance";
-        default:
-            throw Debug.abort("unknown case", this);
+        if (this == New || this == Dynamic || this == StaticClass || this == StaticInstance) {
+            return name;
         }
+        throw Debug.abort("unknown case", this);
     }
 
     //########################################################################

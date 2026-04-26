@@ -14,7 +14,7 @@ import scala.runtime.RunTime;
 import scala.Type;
 import scala.Array;
 
-public public class TypeDouble extends ValueType {
+public class TypeDouble extends ValueType {
     private final scala.Double ZERO = RunTime.box_dvalue(0.0);
     public Object cast(Object o) {
         assert scala.runtime.types.Statistics.incTypeCast();
