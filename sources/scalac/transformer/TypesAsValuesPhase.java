@@ -118,7 +118,7 @@ public class TypesAsValuesPhase extends Phase {
         super(global, descriptor);
         // If RTT are disabled, use a minimal transformer which simply
         // replaces [ia]sInstanceOf with their erased counterpart.
-        if (global.runTimeTypes && global.target != Global.TARGET_MSIL) {
+        if (global.runTimeTypes) {
             transformer = new TV_Transformer(global);
             typeAccessorType =
                 new Type.MethodType(new Symbol[]{}, defs.TYPE_TYPE());
@@ -346,9 +346,13 @@ public class TypesAsValuesPhase extends Phase {
         } else if (type.typeParams().length > 0 && !monoPrimitive(symbol)) {
             // Polymorphic method/constructor:
             // - add a value parameter for every type parameter.
-            switch (type) {
-            case PolyType(Symbol[] tparams, // :
-                          Type.MethodType(Symbol[] vparams, Type result)):
+            if (type instanceof Type.PolyType) {
+                Type.PolyType polyType = (Type.PolyType)type;
+                Symbol[] tparams = polyType.tparams;
+                if (polyType.result instanceof Type.MethodType) {
+                    Type.MethodType methodType = (Type.MethodType)polyType.result;
+                    Symbol[] vparams = methodType.vparams;
+                    Type result = methodType.result;
                 List newVParams =
                     new LinkedList(Arrays.asList(paramsToAdd(symbol)));
                 newVParams.addAll(Arrays.asList(vparams));
@@ -358,10 +362,9 @@ public class TypesAsValuesPhase extends Phase {
                 return new Type.PolyType(tparams,
                                          new Type.MethodType(newVParamsA,
                                                              result));
-
-            default:
-                throw Debug.abort("unexpected type: ", type);
+                }
             }
+            throw Debug.abort("unexpected type: ", type);
         } else
             return type;
     }
@@ -371,19 +374,21 @@ public class TypesAsValuesPhase extends Phase {
      * has neither a prefix, nor type parameters.
      */
     private boolean isTrivial(Type tp) {
-        switch (tp) {
-        case TypeRef(_, Symbol sym, Type[] args):
+        if (tp instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)tp;
+            Symbol sym = typeRef.sym;
+            Type[] args = typeRef.args;
             if (sym == defs.ARRAY_CLASS)
                 return isTrivial(args[0]);
             else
                 return sym.isStatic() && args.length == 0;
-        case SingleType(_, _):
-        case ThisType(_):
-        case CompoundType(_, _):
-            return false;
-        default:
-            throw Debug.abort("unexpected type", tp);
         }
+        if (tp instanceof Type.SingleType
+            || tp instanceof Type.ThisType
+            || tp instanceof Type.CompoundType) {
+            return false;
+        }
+        throw Debug.abort("unexpected type", tp);
     }
 
     /**
@@ -432,8 +437,9 @@ public class TypesAsValuesPhase extends Phase {
         }
 
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case ClassDef(_, _, _, _, _, Tree.Template impl):
+            if (tree instanceof Tree.ClassDef) {
+                Tree.ClassDef classDef = (Tree.ClassDef)tree;
+                Tree.Template impl = classDef.impl;
                 Symbol clsSym = tree.symbol();
 
                 TreeList newBody = new TreeList();
@@ -460,8 +466,9 @@ public class TypesAsValuesPhase extends Phase {
                                               clsSym.primaryConstructor()),
                                     impl.symbol(),
                                     newBody.toArray());
-
-            case DefDef(_, _, _, _, _, Tree rhs):
+            }
+            if (tree instanceof Tree.DefDef) {
+                Tree rhs = ((Tree.DefDef)tree).rhs;
                 Symbol symbol = getSymbolFor(tree);
 
                 if (symbol.name == Names.getScalaType && symbol.isSynthetic()) {
@@ -475,13 +482,17 @@ public class TypesAsValuesPhase extends Phase {
                                                      EENV));
                 } else
                     return gen.DefDef(symbol, transform(rhs, symbol));
-
-            case Block(Tree[] stats, Tree value):
+            }
+            if (tree instanceof Tree.Block) {
+                Tree.Block block = (Tree.Block)tree;
                 return gen.Block(tree.pos,
-                                 transformStatements(stats),
-                                 transform(value));
-
-            case ValDef(_, _, Tree tpe, Literal(AConstant.ZERO)):
+                                 transformStatements(block.stats),
+                                 transform(block.expr));
+            }
+            if (tree instanceof Tree.ValDef) {
+                Tree.ValDef valDef = (Tree.ValDef)tree;
+                if (valDef.rhs instanceof Tree.Literal
+                    && ((Tree.Literal)valDef.rhs).value == AConstant.ZERO) {
                 // transform default values:
                 //   val x: T = _
                 // becomes
@@ -490,18 +501,25 @@ public class TypesAsValuesPhase extends Phase {
                 Tree defaultValue =
                     gen.mkRef(tree.pos,
                               typeAsValue(tree.pos,
-                                          tpe.type,
+                                          valDef.tpe.type,
                                           currentOwner,
                                           EENV),
                               defs.TYPE_DEFAULTVALUE());
                 Tree rhs = gen.mkApply__(tree.pos, defaultValue);
                 return gen.ValDef(symbol, rhs);
-
-            case ValDef(_, _, _, Tree rhs):
+                }
                 Symbol symbol = getSymbolFor(tree);
-                return gen.ValDef(symbol, transform(rhs, symbol));
-
-            case New(Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs)):
+                return gen.ValDef(symbol, transform(valDef.rhs, symbol));
+            }
+            if (tree instanceof Tree.New) {
+                Tree init = ((Tree.New)tree).init;
+                if (init instanceof Tree.Apply) {
+                    Tree.Apply apply = (Tree.Apply)init;
+                    if (apply.fun instanceof Tree.TypeApply) {
+                        Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+                        Tree fun = typeApply.fun;
+                        Tree[] targs = typeApply.args;
+                        Tree[] vargs = apply.args;
                 if (fun.symbol() == ARRAY_CONSTRUCTOR
                     && targs[0].type().symbol().isParameter()) {
                     // Transform array creations:
@@ -517,10 +535,19 @@ public class TypesAsValuesPhase extends Phase {
                                                              EENV),
                                                  defs.TYPE_NEWARRAY());
                     return gen.mkApplyTV(newArrayfun, targs, vargs);
-                } else
+                        }
+                    }
+                }
+                return super.transform(tree);
+            }
+            if (tree instanceof Tree.Apply) {
+                Tree.Apply apply = (Tree.Apply)tree;
+                if (!(apply.fun instanceof Tree.TypeApply))
                     return super.transform(tree);
-
-            case Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs):
+                Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+                Tree fun = typeApply.fun;
+                Tree[] targs = typeApply.args;
+                Tree[] vargs = apply.args;
                 Symbol funSym = fun.symbol();
 
                 if (funSym == defs.ANY_IS) {
@@ -566,10 +593,8 @@ public class TypesAsValuesPhase extends Phase {
                                          finalVArgs);
                 } else
                     return super.transform(tree);
-
-            default:
-                return super.transform(tree);
             }
+            return super.transform(tree);
         }
 
         private Tree[] transformStatements(Tree[] stats) {
@@ -577,8 +602,7 @@ public class TypesAsValuesPhase extends Phase {
             int beginIdx = 0;
             for (int i = 0; i < stats.length; ++i) {
                 Tree stat = stats[i];
-                switch (stat) {
-                case ClassDef(_, _, _, _, _, Tree.Template impl):
+                if (stat instanceof Tree.ClassDef) {
                     Symbol clsSym = stat.symbol();
                     boolean lazy = isCyclic(clsSym);
                     Symbol tcSym = getTConstructorSym(clsSym);
@@ -589,14 +613,11 @@ public class TypesAsValuesPhase extends Phase {
                         Symbol lpcSym = getLazyParentClassSym(clsSym);
                         newStats.add(lazyParentsClass(clsSym, lpcSym));
                     }
-                    break;
-
-                case AbsTypeDef(_, _, _, _):
-                case AliasTypeDef(_, _, _, _):
+                } else if (stat instanceof Tree.AbsTypeDef
+                           || stat instanceof Tree.AliasTypeDef) {
                     Symbol tpSym = stat.symbol();
                     Symbol insSym = getInstMethSym(tpSym);
                     newStats.add(typeAccessorBody(tpSym, insSym));
-                    break;
                 }
                 newStats.add(transform(stat));
             }
@@ -943,43 +964,43 @@ public class TypesAsValuesPhase extends Phase {
         }
 
         private boolean isSpecial(Type tp) {
-            switch (tp) {
-            case TypeRef(_, Symbol sym, _):
+            if (tp instanceof Type.TypeRef) {
+                Symbol sym = ((Type.TypeRef)tp).sym;
                 return (sym == defs.ANY_CLASS)
                     || (sym == defs.ANYVAL_CLASS)
                     || (sym == defs.ALLREF_CLASS)
                     || (sym == defs.ALL_CLASS);
-            default:
-                return false;
             }
+            return false;
         }
 
         private boolean isKnowClassType(Type tp) {
-            switch (tp) {
-            case TypeRef(_, Symbol sym, _):
+            if (tp instanceof Type.TypeRef) {
+                Symbol sym = ((Type.TypeRef)tp).sym;
                 return (sym != defs.ARRAY_CLASS) && !sym.isParameter();
-            default:
-                return false;
             }
+            return false;
         }
 
         private void addConstructorsNeededBy(HashSet roots,
                                              Type tp,
                                              HashSet set){
-            switch (tp) {
-            case TypeRef(_, Symbol pSym, Type[] args):
+            if (tp instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tp;
+                Symbol pSym = typeRef.sym;
+                Type[] args = typeRef.args;
                 if (!pSym.isParameter()) {
                     set.add(pSym);
                     set.addAll(constructorsNeededBy(roots, pSym));
                     for (int i = 0; i < args.length; ++i)
                         addConstructorsNeededBy(roots, args[i], set);
                 }
-                break;
-            case CompoundType(Type[] parts, _):
+                return;
+            }
+            if (tp instanceof Type.CompoundType) {
+                Type[] parts = ((Type.CompoundType)tp).parts;
                 for (int i = 0; i < parts.length; ++i)
                     addConstructorsNeededBy(roots, parts[i], set);
-            default:
-                ;               // nothing to do
             }
         }
 
@@ -1019,11 +1040,17 @@ public class TypesAsValuesPhase extends Phase {
          * Transform a type into a tree representing it.
          */
         private Tree typeAsValue(int pos, Type tp, Symbol owner, TEnv env) {
-            switch (tp) {
-            case ConstantType(Type base, _):
-                return typeAsValue(pos, base, owner, env);
-
-            case TypeRef(Type pre, Symbol sym, Type[] args):
+            if (tp instanceof Type.ConstantType) {
+                return typeAsValue(pos,
+                                   ((Type.ConstantType)tp).base,
+                                   owner,
+                                   env);
+            }
+            if (tp instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tp;
+                Type pre = typeRef.pre;
+                Symbol sym = typeRef.sym;
+                Type[] args = typeRef.args;
                 if (env.definesVar(sym)) {
                     assert args.length == 0;
                     return env.treeForVar(sym);
@@ -1043,19 +1070,22 @@ public class TypesAsValuesPhase extends Phase {
                     assert !isValuePrefix(pre) : tp;
                     return gen.mkLocalRef(pos, getAccessorSym(sym));
                 }
-
-            case SingleType(Type pre, Symbol sym):
-                return singleType(pos, (Type.SingleType)tp);
-
-            case ThisType(Symbol sym):
-                return thisType(pos, sym);
-
-            case CompoundType(Type[] parts, Scope members):
-                return compoundType(pos, parts, members, owner, env);
-
-            default:
-                throw Debug.abortIllegalCase(tp);
             }
+            if (tp instanceof Type.SingleType) {
+                return singleType(pos, (Type.SingleType)tp);
+            }
+            if (tp instanceof Type.ThisType) {
+                return thisType(pos, ((Type.ThisType)tp).sym);
+            }
+            if (tp instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)tp;
+                return compoundType(pos,
+                                    compoundType.parts,
+                                    compoundType.members,
+                                    owner,
+                                    env);
+            }
+            throw Debug.abortIllegalCase(tp);
         }
 
         private Tree arrayType(int pos,
@@ -1141,8 +1171,11 @@ public class TypesAsValuesPhase extends Phase {
             if (isStronglyTrivial(tp))
                 return javaClassType(pos, tp.symbol());
 
-            switch (tp) {
-            case TypeRef(Type pre, Symbol sym, Type[] args):
+            if (tp instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tp;
+                Type pre = typeRef.pre;
+                Symbol sym = typeRef.sym;
+                Type[] args = typeRef.args;
                 Symbol insSym = getInstMethSym(sym);
                 Tree preFun = (isNestedClass(sym) && sym.owner().isClass())
                     ? gen.Select(pos, gen.mkQualifier(pos, pre), insSym)
@@ -1164,10 +1197,8 @@ public class TypesAsValuesPhase extends Phase {
                 }
 
                 return gen.mkApply_V(pos, preFun, new Tree[] { insArg });
-
-            default:
-                throw Debug.abort("unexpected type: ", tp);
             }
+            throw Debug.abort("unexpected type: ", tp);
         }
 
         private final int VARIANT =
@@ -1198,14 +1229,14 @@ public class TypesAsValuesPhase extends Phase {
         }
 
         private boolean isValuePrefix(Type pre) {
-            switch (pre) {
-            case ThisType(Symbol clazz):
+            if (pre instanceof Type.ThisType) {
+                Symbol clazz = ((Type.ThisType)pre).sym;
                 return !(clazz.isPackage() || clazz.isNone());
-            case NoPrefix:
-                return false;
-            default:
-                return true;
             }
+            if (pre == Type.NoPrefix) {
+                return false;
+            }
+            return true;
         }
 
         private Ancestor[][] computeAncestors0(Symbol classSym) {
@@ -1332,8 +1363,14 @@ public class TypesAsValuesPhase extends Phase {
         }
 
         public Tree transform(Tree tree) {
-            switch (tree) {
-            case Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs):
+            if (tree instanceof Tree.Apply) {
+                Tree.Apply apply = (Tree.Apply)tree;
+                if (!(apply.fun instanceof Tree.TypeApply))
+                    return super.transform(tree);
+                Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+                Tree fun = typeApply.fun;
+                Tree[] targs = typeApply.args;
+                Tree[] vargs = apply.args;
                 Symbol funSym = fun.symbol();
                 if (funSym == defs.ANY_IS || funSym == defs.ANY_AS) {
                     assert vargs.length == 0;
@@ -1348,10 +1385,8 @@ public class TypesAsValuesPhase extends Phase {
                                          vargs);
                 } else
                     return super.transform(tree);
-
-            default:
-                return super.transform(tree);
             }
+            return super.transform(tree);
         }
     }
 
@@ -1359,10 +1394,10 @@ public class TypesAsValuesPhase extends Phase {
      * Extract qualifier from a tree, which must be a Select node.
      */
     private Tree qualifierOf(Tree tree) {
-        switch (tree) {
-        case Select(Tree qualifier, _): return qualifier;
-        default: throw Debug.abort("cannot extract qualifier from ", tree);
+        if (tree instanceof Tree.Select) {
+            return ((Tree.Select)tree).qualifier;
         }
+        throw Debug.abort("cannot extract qualifier from ", tree);
     }
 
     // Debugging function

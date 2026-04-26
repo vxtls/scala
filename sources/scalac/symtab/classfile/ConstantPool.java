@@ -52,11 +52,16 @@ public class ConstantPool implements ClassfileConstants {
                 continue;
             case CONSTANT_CLASS:
             case CONSTANT_STRING:
+            case CONSTANT_METHODTYPE:
                 in.skip(2);
+                continue;
+            case CONSTANT_METHODHANDLE:
+                in.skip(3);
                 continue;
             case CONSTANT_FIELDREF:
             case CONSTANT_METHODREF:
             case CONSTANT_INTFMETHODREF:
+            case CONSTANT_INVOKEDYNAMIC:
             case CONSTANT_NAMEANDTYPE:
             case CONSTANT_INTEGER:
             case CONSTANT_FLOAT:
@@ -187,17 +192,18 @@ public class ConstantPool implements ClassfileConstants {
 
     /** Returns the type with all its parameters symbols cloned. */
     private Type clone(Type type) {
-        switch (type) {
-        case MethodType(Symbol[] params, Type result):
+        if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            Symbol[] params = methodType.vparams;
+            Type result = methodType.result;
             Symbol[] clones = new Symbol[params.length];
             for (int i = 0; i < clones.length; i++)
                 clones[i] = params[i].cloneSymbol(Symbol.NONE);
             return Type.MethodType(clones, result);
-        case ErrorType:
+        } else if (type == Type.ErrorType) {
             return type;
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Throws an exception signaling a bad constant index. */

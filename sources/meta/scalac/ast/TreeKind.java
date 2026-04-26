@@ -9,54 +9,59 @@
 package meta.scalac.ast;
 
 /** This class enumerates the different kinds of tree nodes. */
-public class TreeKind {
+public final class TreeKind {
 
     //########################################################################
     // Public Cases
 
     /** Designates a type, a term or anything else. */
-    public case Any;
+    public static final TreeKind Any = new TreeKind("Any");
 
     /** Designates a type. */
-    public case Type;
+    public static final TreeKind Type = new TreeKind("Type");
 
     /** Designates a term. */
-    public case Term;
+    public static final TreeKind Term = new TreeKind("Term");
 
     /** Designates either a type or a term. */
-    public case Dual;
+    public static final TreeKind Dual = new TreeKind("Dual");
 
     /** Designates either a type or a term (a test may indicate which one). */
-    public case Test;
+    public static final TreeKind Test = new TreeKind("Test");
 
     /** Designates neither a type nor a term. */
-    public case None;
+    public static final TreeKind None = new TreeKind("None");
+
+    private final String name;
+
+    private TreeKind(String name) {
+        this.name = name;
+    }
 
     //########################################################################
     // Public Method
 
     public boolean isA(TreeKind that) {
-        switch (this) {
-        case Any : return true;
-        case Type: return that == Type;
-        case Term: return that == Term;
-        case Dual: return that == Type || that == Term || that == Dual;
-        case Test: return that == Type || that == Term || that == Dual;
-        case None: return that == None;
-        default  : throw new Error();
+        if (this == Any) {
+            return true;
         }
+        if (this == Type) {
+            return that == Type;
+        }
+        if (this == Term) {
+            return that == Term;
+        }
+        if (this == Dual || this == Test) {
+            return that == Type || that == Term || that == Dual;
+        }
+        if (this == None) {
+            return that == None;
+        }
+        throw new Error();
     }
 
     public String toString() {
-        switch(this) {
-        case Any : return "Any";
-        case Type: return "Type";
-        case Term: return "Term";
-        case Dual: return "Dual";
-        case Test: return "Test";
-        case None: return "None";
-        default  : throw new Error();
-        }
+        return name;
     }
 
     //########################################################################
