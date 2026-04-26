@@ -402,7 +402,8 @@ class Scanner(_unit: CompilationUnit) extends TokenData {
 	      return;
 	    case '.' =>
 	      nextch();
-	      if (('0' <= ch) && (ch <= '9')) {
+	      if (('0'.coerceToInt <= ch.coerceToInt) &&
+                  (ch.coerceToInt <= '9'.coerceToInt)) {
                 putChar( '.' );
                 getFraction;
               } else token = DOT;
@@ -717,14 +718,18 @@ class Scanner(_unit: CompilationUnit) extends TokenData {
       } else {
         */
         nextch();
-        if ('0' <= ch && ch <= '7') {
+        if ('0'.coerceToInt <= ch.coerceToInt &&
+            ch.coerceToInt <= '7'.coerceToInt) {
           val leadch: Char = ch;
           var oct: Int = SourceRepresentation.digit2int(ch, 8);
           nextch();
-          if ('0' <= ch && ch <= '7') {
+          if ('0'.coerceToInt <= ch.coerceToInt &&
+              ch.coerceToInt <= '7'.coerceToInt) {
             oct = oct * 8 + SourceRepresentation.digit2int(ch, 8);
             nextch();
-            if (leadch <= '3' && '0' <= ch && ch <= '7') {
+            if (leadch.coerceToInt <= '3'.coerceToInt &&
+                '0'.coerceToInt <= ch.coerceToInt &&
+                ch.coerceToInt <= '7'.coerceToInt) {
               oct = oct * 8 + SourceRepresentation.digit2int(ch, 8);
               nextch();
             }
@@ -765,7 +770,9 @@ class Scanner(_unit: CompilationUnit) extends TokenData {
       putChar( ch );
       val c1 = srcIterator.lookahead1;
       val c2 = srcIterator.lookahead2;
-      if ((c1 == '+') || (c1 == '-')  && ('0' >= c2) || (c2 <= '9')) {
+      if ((c1 == '+') || (c1 == '-')  &&
+          ('0'.coerceToInt >= c2.coerceToInt) ||
+          (c2.coerceToInt <= '9'.coerceToInt)) {
         nextch();
         putChar( ch );
         nextch();
@@ -796,30 +803,31 @@ class Scanner(_unit: CompilationUnit) extends TokenData {
 
     if (token == CHARLIT && !negated) {
       if (name.length() > 0)
-        name.charAt( 0 )
+        name.charAt(0).coerceToLong
       else
-	0
+	0.coerceToLong
     } else {
 
-      var value: long = 0;
-      val divider = if (base == 10) 1 else 2;
-      val limit: long = if (token == LONGLIT) Long.MAX_VALUE else Integer.MAX_VALUE;
+      var value: long = 0.coerceToLong;
+      val divider: long = if (base == 10) 1.coerceToLong else 2.coerceToLong;
+      val base1: long = base.coerceToLong;
+      val limit: long = if (token == LONGLIT) Long.MAX_VALUE else Integer.MAX_VALUE.coerceToLong;
       var i = 0;
       val len = name.length();
       while (i < len) {
-	val d = digit2int( name.charAt(i), base );
-	if (d < 0) {
+	val d: long = digit2int(name.charAt(i), base).coerceToLong;
+	if (d < 0.coerceToLong) {
           syntaxError("malformed integer number");
-          return 0;
+          return 0.coerceToLong;
 	}
-	if (value < 0 ||
-            limit / (base / divider) < value ||
-            limit - (d / divider) < value * (base / divider) &&
-	    !(negated && limit == value * base - 1 + d)) {
+	if (value < 0.coerceToLong ||
+            limit / (base1 / divider) < value ||
+            limit - (d / divider) < value * (base1 / divider) &&
+	    !(negated && limit == value * base1 - 1.coerceToLong + d)) {
               syntaxError("integer number too large");
-              return 0;
+              return 0.coerceToLong;
 	    }
-	value = value * base + d;
+	value = value * base1 + d;
 	i = i + 1;
       }
       if (negated) -value else value
@@ -832,7 +840,7 @@ class Scanner(_unit: CompilationUnit) extends TokenData {
   */
   def floatVal(negated: boolean): double = {
     val limit: double =
-      if (token == DOUBLELIT) Double.MAX_VALUE else Float.MAX_VALUE;
+      if (token == DOUBLELIT) Double.MAX_VALUE else Float.MAX_VALUE.coerceToDouble;
     try {
       val value = Double.valueOf(name.toString()).doubleValue();
       if (value > limit)
@@ -851,7 +859,7 @@ class Scanner(_unit: CompilationUnit) extends TokenData {
   /** see Java spec 3.10.2 */
   def exponentPart(c1: Char,c2: Char) =
     (c1 == 'e' || c1 == 'E') &&
-  ((c2 >= '0' && c2 <= '9') || (c2 == '+' || c2 == '-')) ;
+  ((c2.coerceToInt >= '0'.coerceToInt && c2.coerceToInt <= '9'.coerceToInt) || (c2 == '+' || c2 == '-')) ;
 
   /** see Java spec 3.10.2 */
   def floatTypeSuffix(c1: Char) =
@@ -868,7 +876,8 @@ class Scanner(_unit: CompilationUnit) extends TokenData {
     }
     if (base <= 10 && ch == '.') { // '.' c1 c2
       val c1 = srcIterator.lookahead1;
-      if (c1 >= '0' && c1 <= '9') {
+      if (c1.coerceToInt >= '0'.coerceToInt &&
+          c1.coerceToInt <= '9'.coerceToInt) {
         putChar(ch);
         nextch();
         getFraction;

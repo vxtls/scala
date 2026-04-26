@@ -131,21 +131,29 @@ public class Interpreter {
         Symbol module = global.definitions.ROOT_CLASS;
         for (int i = 0, j; (j = names.indexOf('.', i)) >= 0; i = j + 1) {
             Name name = Name.fromString(names.substring(i, j));
-            Symbol symbol = module.lookup(name);
-            if (symbol.isNone()) {
+            module = getModule(module, name);
+            if (module == null) {
                 error("could not find module '" + main.substring(0, j) + "'");
                 return null;
             }
-            if (symbol.isModule()) { module = symbol; continue; }
-            switch (symbol.type()) {
-            case OverloadedType(Symbol[] alts, _):
-                for (int k = 0; k < alts.length; k++)
-                    if (alts[k].isModule()) { module = alts[k]; continue; }
+            if (module == Symbol.NONE) {
+                error("term '" + main.substring(0, j) + "' is not a module");
+                return null;
             }
-            error("term '" + main.substring(0, j) + "' is not a module");
-            return null;
         }
         return module;
+    }
+
+    private Symbol getModule(Symbol owner, Name name) {
+        Symbol symbol = owner.lookup(name);
+        if (symbol == Symbol.NONE) return null;
+        if (symbol.isModule()) return symbol;
+        if (symbol.type() instanceof Type.OverloadedType) {
+            Symbol[] alts = ((Type.OverloadedType)symbol.type()).alts;
+            for (int k = 0; k < alts.length; k++)
+                if (alts[k].isModule()) return alts[k];
+        }
+        return Symbol.NONE;
     }
 
     //########################################################################
@@ -165,21 +173,45 @@ public class Interpreter {
     }
 
     private Symbol getMainMethod(String main, Symbol module) {
-        Symbol symbol = module.moduleClass().lookup(MAIN_N);
-        if (symbol.isNone()) {
+        Symbol method = getMethod(module, MAIN_N, getMainMethodType(true));
+        if (method == null) {
             error("module '" + main + "' has no method '" + MAIN_N + "'");
             return null;
         }
-        Type type = getMainMethodType(true);
-        if (symbol.type().equals(type)) return symbol;
-        switch (symbol.type()) {
-        case OverloadedType(Symbol[] alts, _):
-            for (int k = 0; k < alts.length; k++)
-                if (alts[k].type().equals(type)) return alts[k];
+        if (method == Symbol.NONE) {
+            error("module '" + main + "' has no method '" + MAIN_N +
+                "' with type '" + getMainMethodType(false) + "'");
+            return null;
         }
-        error("module '" + main + "' has no method '" + MAIN_N +
-            "' with type '" + getMainMethodType(false) + "'");
-        return null;
+        return method;
+    }
+
+    private Symbol getMethod(Symbol module, Name name, Type type) {
+        Symbol symbol = module.moduleClass().lookup(name);
+        if (symbol == Symbol.NONE) return null;
+        if (isMethod(symbol, type)) return symbol;
+        if (symbol.type() instanceof Type.OverloadedType) {
+            Symbol[] alts = ((Type.OverloadedType)symbol.type()).alts;
+            for (int k = 0; k < alts.length; k++)
+                if (isMethod(alts[k], type)) return alts[k];
+        }
+        return Symbol.NONE;
+    }
+
+    private boolean isMethod(Symbol symbol, Type type) {
+        return symbol.isMethod() && isSameMethodType(symbol.type(), type);
+    }
+
+    private boolean isSameMethodType(Type actual, Type expected) {
+        return unwrapParameterlessType(actual).isSameAs(unwrapParameterlessType(expected));
+    }
+
+    private Type unwrapParameterlessType(Type type) {
+        while (type instanceof Type.PolyType
+            && ((Type.PolyType)type).tparams.length == 0) {
+            type = ((Type.PolyType)type).result;
+        }
+        return type;
     }
 
     //########################################################################

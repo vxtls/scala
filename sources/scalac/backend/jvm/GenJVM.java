@@ -19,6 +19,7 @@ import scala.tools.util.Position;
 
 import scalac.*;
 import scalac.ast.Tree;
+import scalac.ast.TreeInfo;
 import scalac.atree.AConstant;
 import scalac.backend.*;
 import scalac.symtab.*;
@@ -26,7 +27,6 @@ import scalac.symtab.classfile.ClassfileConstants;
 import scalac.symtab.classfile.Pickle;
 import scalac.transformer.*;
 import scalac.util.*;
-
 
 /* Several things which are done here should in fact be done in
  * previous phases, namely:
@@ -67,6 +67,7 @@ public class GenJVM {
 
     protected final static String SCALA_RUNTIME_RUNTIME =
         "scala.runtime.RunTime";
+    protected final static String SCALA_UNIT = "scala.Unit";
 
     protected final static String SCALA_ATTR =
         ClassfileConstants.SCALA_N.toString();
@@ -84,19 +85,20 @@ public class GenJVM {
         new JObjectType (JAVA_LANG_STRINGBUFFER);
     protected final JObjectType JAVA_LANG_THROWABLE_T =
         new JObjectType("java.lang.Throwable");
+    protected final JObjectType SCALA_UNIT_T =
+        new JObjectType(SCALA_UNIT);
 
     protected final Symbol JAVA_RMI_REMOTE_CLASS;
 
     protected final Global global;
     protected final Definitions defs;
     protected final Primitives prims;
+    protected final ArrayList pickles = new ArrayList();
 
     protected final Phase refCheckPhase;
     protected final AddInterfacesPhase addInterfacesPhase;
 
     protected final FJBGContext fjbgContext;
-
-    protected final ArrayList pickles = new ArrayList();
 
     public GenJVM(Global global) {
         this.global = global;
@@ -136,7 +138,6 @@ public class GenJVM {
             if (global.debug) e.printStackTrace();
             global.error(e.getMessage());
         }
-        // write .symbl files (must be generated after .class files)
         for (int i = 0; i < pickles.size() / 2; i++) {
             JClass clazz = (JClass)pickles.get(2 * i + 0);
             Pickle pickle = (Pickle)pickles.get(2 * i + 1);
@@ -155,18 +156,14 @@ public class GenJVM {
 
         Symbol sym = tree.symbol();
 
-        switch (tree) {
-        case PackageDef(_, Tree.Template impl):
-            gen(ctx, impl);
-            break;
-
-        case ClassDef(_, _, _, _, _, Tree.Template impl) : {
+        if (tree instanceof Tree.PackageDef) {
+            gen(ctx, ((Tree.PackageDef)tree).impl);
+        } else if (tree instanceof Tree.ClassDef) {
             Tree.ClassDef classDef = (Tree.ClassDef)tree;
-
             Context ctx1 = enterClass(ctx, sym);
 
             addValueClassMembers(ctx1, classDef);
-            gen(ctx1, impl);
+            gen(ctx1, classDef.impl);
 
             JMethod clinit = getClassConstructorMethod(ctx1);
             if (clinit.getCode().getSize() == 0) {
@@ -176,29 +173,22 @@ public class GenJVM {
                 ctx2.code.emitRETURN();
                 genLocalVariableTable(ctx2);
             }
-
             leaveClass(ctx1, sym);
-        } break;
+        } else if (tree instanceof Tree.Template) {
+            gen(ctx, ((Tree.Template)tree).body);
+        } else if (tree instanceof Tree.ValDef) {
+            Tree.ValDef valDef = (Tree.ValDef)tree;
+            if (ctx.method != null) {
+                JType valType = typeStoJ(sym.info());
+                JLocalVariable var =
+                    ctx.method.addNewLocalVariable(valType, valDef.name.toString());
+                ctx.locals.put(sym, new Integer(var.getIndex()));
 
-        case Template(_, Tree[] body):
-            gen(ctx, body);
-            break;
-
-        case ValDef(_, Name name, _, Tree rhs): {
-            if (ctx.method == null)
-                break;          // ignore ValDefs in classes, handled elsewhere
-
-            JType valType = typeStoJ(sym.info());
-            JLocalVariable var =
-                ctx.method.addNewLocalVariable(valType, name.toString());
-            ctx.locals.put(sym, new Integer(var.getIndex()));
-
-            assert (rhs != Tree.Empty) : Debug.show(sym);
-            genLoad(ctx, rhs, valType);
-            ctx.code.emitSTORE(var);
-        } break;
-
-        case DefDef(_, _, _, _, _, Tree rhs): {
+                assert (valDef.rhs != Tree.Empty) : Debug.show(sym);
+                genLoad(ctx, valDef.rhs, valType);
+                ctx.code.emitSTORE(var);
+            }
+        } else if (tree instanceof Tree.DefDef) {
             Tree.DefDef defDef = (Tree.DefDef)tree;
             boolean retry = false;
             do {
@@ -206,7 +196,7 @@ public class GenJVM {
                 try {
                     if (! Modifiers.Helper.isAbstract(sym.flags)) {
                         JType retType = ctx1.method.getReturnType();
-                        genLoad(ctx1, rhs, retType);
+                        genLoad(ctx1, defDef.rhs, retType);
                         if (sym.name == Names.CLASS_CONSTRUCTOR)
                             completeClassConstructor(ctx1, sym.owner());
                         ctx1.code.emitRETURN(retType);
@@ -220,28 +210,22 @@ public class GenJVM {
                     retry = true;
                 }
             } while (retry);
-        } break;
-
-        case Return(Tree expr): {
+        } else if (tree instanceof Tree.Return) {
+            Tree.Return ret = (Tree.Return)tree;
             JType retType = ctx.method.getReturnType();
-            genLoad(ctx, expr, retType);
+            genLoad(ctx, ret.expr, retType);
             ctx.code.emitRETURN(retType);
-        } break;
-
-        case Typed(Tree expr, _):
-            gen(ctx, expr);
-            break;
-
-        case Empty:
-        case AbsTypeDef(_, _, _, _):
-        case AliasTypeDef(_, _, _, _):
-        case TypeApply(_, _):
-        case FunType(_, _):
-        case CompoundType(_, _):
-        case AppliedType(_,_):
-            break;
-
-        default:
+        } else if (tree instanceof Tree.Typed) {
+            gen(ctx, ((Tree.Typed)tree).expr);
+        } else if (tree == Tree.Empty
+                   || tree instanceof Tree.AbsTypeDef
+                   || tree instanceof Tree.AliasTypeDef
+                   || tree instanceof Tree.TypeApply
+                   || tree instanceof Tree.FunType
+                   || tree instanceof Tree.CompoundType
+                   || tree instanceof Tree.AppliedType) {
+            // no-op
+        } else {
             genLoad(ctx, tree, JType.VOID);
         }
 
@@ -265,38 +249,39 @@ public class GenJVM {
         JType generatedType = null;
         Symbol sym = tree.symbol();
 
-        switch (tree) {
-        case LabelDef(_, Tree.Ident[] params, Tree rhs): {
+        if (tree instanceof Tree.LabelDef) {
+            Tree.LabelDef labelDef = (Tree.LabelDef)tree;
             JCode.Label label = ctx.code.newLabel();
             label.anchorToNext();
-            ctx.labels.put(sym, new Pair(label, params));
-            generatedType = genLoad(ctx, rhs, expectedType);
+            ctx.labels.put(sym, new Pair(label, labelDef.params));
+            generatedType = genLoad(ctx, labelDef.rhs, expectedType);
             ctx.labels.remove(sym);
-        } break;
-
-        case Block(Tree[] stats, Tree value): {
-            int statsNum = stats.length;
-            for (int i = 0; i < stats.length; ++i)
-                gen(ctx, stats[i]);
-            genLoad(ctx, value, expectedType);
+        } else if (tree instanceof Tree.Block) {
+            Tree.Block block = (Tree.Block)tree;
+            for (int i = 0; i < block.stats.length; ++i)
+                gen(ctx, block.stats[i]);
+            genLoad(ctx, block.expr, expectedType);
             generatedType = expectedType;
-        } break;
-
-        case Typed(Tree expr, _):
-            genLoad(ctx, expr, expectedType);
+        } else if (tree instanceof Tree.Typed) {
+            genLoad(ctx, ((Tree.Typed)tree).expr, expectedType);
             generatedType = expectedType;
-            break;
-
-        case New(Tree init):
-            String className = javaName(tree.type.symbol());
+        } else if (tree instanceof Tree.New) {
+            Tree init = ((Tree.New)tree).init;
+            String className = javaName(newClassSymbol((Tree.New)tree));
             ctx.code.emitNEW(className);
             ctx.code.emitDUP();
-            gen(ctx, init);
+            genLoad(ctx, init, JType.VOID);
             generatedType = new JObjectType(className);
-            break;
+        } else if (tree instanceof Tree.Apply
+                   && ((Tree.Apply)tree).fun instanceof Tree.TypeApply
+                   && (((Tree.TypeApply)((Tree.Apply)tree).fun).fun.symbol() == defs.ANY_IS
+                       || ((Tree.TypeApply)((Tree.Apply)tree).fun).fun.symbol() == defs.ANY_AS)) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+            Tree fun = typeApply.fun;
+            Tree[] args = typeApply.args;
 
-        case Apply(TypeApply(Tree fun, Tree[] args), _): {
-            genLoadQualifier(ctx, fun);
+            genLoadQualifier(ctx, fun, true);
 
             JType type = typeStoJ(args[0].type);
             if (fun.symbol() == defs.ANY_IS) {
@@ -305,11 +290,14 @@ public class GenJVM {
             } else if (fun.symbol() == defs.ANY_AS) {
                 ctx.code.emitCHECKCAST((JReferenceType)type);
                 generatedType = type;
-            } else
+            } else {
                 throw Debug.abort("unexpected type application", tree);
-        } break;
-
-        case Apply(Tree fun, Tree[] args): {
+            }
+        } else if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree fun = apply.fun;
+            if (fun instanceof Tree.TypeApply) fun = ((Tree.TypeApply)fun).fun;
+            Tree[] args = apply.args;
             Symbol funSym = fun.symbol();
 
             if (funSym.isLabel()) {
@@ -325,7 +313,7 @@ public class GenJVM {
                 for (int i = 0; i < args.length; ++i)
                     genLoad(ctx, args[i], typeStoJ(args[i].type));
                 for (int i = idents.length; i > 0; --i)
-                    genStoreEpilogue(ctx, idents[i-1]);
+                    genStoreEpilogue(ctx, idents[i - 1]);
                 ctx.code.emitGOTO_maybe_W(label, ctx.useWideJumps);
                 generatedType = funType.getReturnType();
             } else if (isKnownPrimitive(funSym)) {
@@ -341,7 +329,7 @@ public class GenJVM {
                 case ADD: case SUB: case MUL: case DIV: case MOD:
                 case NOT: case OR : case XOR: case AND:
                 case LSL: case LSR: case ASR:
-                    Tree[] allArgs = extractPrimitiveArgs((Tree.Apply)tree);
+                    Tree[] allArgs = extractPrimitiveArgs(apply);
                     allArgs[0] = unbox(allArgs[0]);
                     JType resType = typeStoJ(tree.type);
                     genArithPrim(ctx, prim, allArgs, resType, expectedType);
@@ -365,24 +353,21 @@ public class GenJVM {
                 case THROW:
                     assert args.length == 0;
                     genThrow(ctx, ((Tree.Select)fun).qualifier);
-                    // We pretend that we generated something of the
-                    // expected type, to avoid trying to generate
-                    // bogus conversions.
+                    genUnreachableValue(ctx, expectedType);
                     generatedType = expectedType;
                     break;
 
-                case SYNCHRONIZED: {
+                case SYNCHRONIZED:
                     assert args.length == 1;
-                    Tree qual = ((Tree.Select)fun).qualifier;
-                    genSynchronized(ctx, qual, args[0], expectedType);
+                    genSynchronized(ctx, ((Tree.Select)fun).qualifier, args[0], expectedType);
                     generatedType = expectedType;
-                } break;
+                    break;
 
-                case NEW_OARRAY: {
+                case NEW_OARRAY:
                     assert args.length == 2;
                     genRefArrayCreate(ctx, args[0], args[1]);
                     generatedType = expectedType;
-                } break;
+                    break;
 
                 case NEW_ZARRAY : case NEW_BARRAY : case NEW_SARRAY :
                 case NEW_CARRAY : case NEW_IARRAY : case NEW_LARRAY :
@@ -431,17 +416,15 @@ public class GenJVM {
                     break;
 
                 default:
-                    throw Debug.abort("unknown primitive", prim);
+                    throw Debug.abort("unknown primitive ", prim);
                 }
             } else {
                 JMethodType funType = (JMethodType)typeStoJ(funSym.info());
                 JType[] argTypes = funType.getArgumentTypes();
 
-                boolean isConstrCall = funSym.isInitializer();
-                boolean isSuperCall = false;
-                switch (fun) {
-                case Select(Super(_, _), _): isSuperCall = true;
-                }
+                boolean isConstrCall = funSym.isInitializer() || funSym.isConstructor();
+                boolean isSuperCall = fun instanceof Tree.Select
+                    && ((Tree.Select)fun).qualifier instanceof Tree.Super;
 
                 boolean isStatic = isStaticMember(funSym);
                 if (!isStatic)
@@ -452,33 +435,36 @@ public class GenJVM {
                 String clsName = isSuperCall
                     ? ctx.clazz.getSuperclassName()
                     : javaName(funSym.owner());
-                String mthName = funSym.name.toString();
+                boolean isModuleInstanceCall = !isStatic
+                    && fun instanceof Tree.Select
+                    && moduleInstanceClassName(((Tree.Select)fun).qualifier) != null;
+                if (isModuleInstanceCall)
+                    clsName = moduleInstanceClassName(((Tree.Select)fun).qualifier);
+                String mthName = jvmName(funSym.name);
 
                 funSym.owner().info(); // [HACK] ensure that flags are
                                        // transformed.
 
-                if (funSym.owner().isInterface())
+                if (!isModuleInstanceCall && funSym.owner().isInterface()) {
                     ctx.code.emitINVOKEINTERFACE(clsName, mthName, funType);
-                else {
+                } else {
                     if (isConstrCall || isSuperCall) {
                         ctx.code.emitINVOKESPECIAL(clsName, mthName, funType);
                         if (isConstrCall && isSuperCall && ctx.isModuleClass) {
-                            // Initialise module instance field ASAP
                             ctx.code.emitALOAD_0();
                             ctx.code.emitPUTSTATIC(ctx.clazz.getName(),
                                                    MODULE_INSTANCE_FIELD_NAME,
                                                    ctx.clazz.getType());
                         }
-                    } else if (isStatic)
+                    } else if (isStatic) {
                         ctx.code.emitINVOKESTATIC(clsName, mthName, funType);
-                    else
+                    } else {
                         ctx.code.emitINVOKEVIRTUAL(clsName, mthName, funType);
+                    }
                 }
-                generatedType = funType.getReturnType();
+                generatedType = isConstrCall ? JType.VOID : funType.getReturnType();
             }
-        } break;
-
-        case Ident(_):
+        } else if (tree instanceof Tree.Ident) {
             JType type = typeStoJ(sym.info());
             if (sym.isModule()) {
                 String javaSymName = javaName(sym.moduleClass());
@@ -499,89 +485,127 @@ public class GenJVM {
                 ctx.code.emitLOAD(index, type);
                 generatedType = type;
             }
-            break;
-
-        case Select(Tree qualifier, _):
-            JType fieldType = typeStoJ(sym.info());
-            String className = javaName(sym.owner());
-            String fieldName = sym.name.toString();
-            if (sym.isStatic()) {
-                ctx.code.emitGETSTATIC(className, fieldName, fieldType);
+        } else if (tree instanceof Tree.Select) {
+            Tree.Select select = (Tree.Select)tree;
+            sym.info();
+            if (sym.isModule()) {
+                String javaSymName = javaName(sym.moduleClass());
+                JType moduleType = typeStoJ(sym.info());
+                ctx.code.emitGETSTATIC(javaSymName,
+                                       MODULE_INSTANCE_FIELD_NAME,
+                                       moduleType);
+                generatedType = moduleType;
             } else {
-                genLoadQualifier(ctx, tree);
-                ctx.code.emitGETFIELD(className, fieldName, fieldType);
+                JType fieldType = typeStoJ(sym.info());
+                String className = javaName(sym.owner());
+                String fieldName = sym.name.toString();
+                if (sym.isStatic()) {
+                    ctx.code.emitGETSTATIC(className, fieldName, fieldType);
+                } else {
+                    genLoadQualifier(ctx, tree);
+                    ctx.code.emitGETFIELD(className, fieldName, fieldType);
+                }
+                generatedType = fieldType;
             }
-            generatedType = fieldType;
-            break;
-
-        case Assign(Tree lhs, Tree rhs): {
-            genStorePrologue(ctx, lhs);
-            genLoad(ctx, rhs, typeStoJ(lhs.symbol().info()));
-            genStoreEpilogue(ctx, lhs);
+        } else if (tree instanceof Tree.Assign) {
+            Tree.Assign assign = (Tree.Assign)tree;
+            genStorePrologue(ctx, assign.lhs);
+            genLoad(ctx, assign.rhs, typeStoJ(assign.lhs.symbol().info()));
+            genStoreEpilogue(ctx, assign.lhs);
             generatedType = JType.VOID;
-        } break;
-
-        case If(Tree cond, Tree thenp, Tree elsep): {
+        } else if (tree instanceof Tree.If) {
+            Tree.If ifTree = (Tree.If)tree;
             JType finalType = typeStoJ(tree.type);
 
             JCode.Label elseLabel = ctx.code.newLabel();
-            genCond(ctx, cond, elseLabel, false);
-            genLoad(ctx, thenp, finalType);
+            genCond(ctx, ifTree.cond, elseLabel, false);
+            genLoad(ctx, ifTree.thenp, finalType);
             JCode.Label afterLabel = ctx.code.newLabel();
-            ctx.code.emitGOTO_maybe_W(afterLabel, ctx.useWideJumps);
+            if (!isThrowingTree(ifTree.thenp))
+                ctx.code.emitGOTO_maybe_W(afterLabel, ctx.useWideJumps);
             elseLabel.anchorToNext();
-            genLoad(ctx, elsep, finalType);
+            if (ifTree.elsep == Tree.Empty)
+                maybeGenLoadUnit(ctx, finalType);
+            else
+                genLoad(ctx, ifTree.elsep, finalType);
             afterLabel.anchorToNext();
             generatedType = finalType;
-        } break;
-
-        case Switch(Tree test, int[] tags, Tree[] bodies, Tree otherwise): {
-            JCode.Label[] labels = ctx.code.newLabels(bodies.length);
+        } else if (tree instanceof Tree.Switch) {
+            Tree.Switch switchTree = (Tree.Switch)tree;
+            JCode.Label[] labels = ctx.code.newLabels(switchTree.bodies.length);
             JCode.Label defaultLabel = ctx.code.newLabel();
             JCode.Label afterLabel = ctx.code.newLabel();
 
-            genLoad(ctx, test, JType.INT);
-            ctx.code.emitSWITCH(tags, labels, defaultLabel, 0.9);
-            for (int i = 0; i < bodies.length; ++i) {
+            genLoad(ctx, switchTree.test, JType.INT);
+            ctx.code.emitSWITCH(switchTree.tags, labels, defaultLabel, 0.9);
+            for (int i = 0; i < switchTree.bodies.length; ++i) {
                 labels[i].anchorToNext();
-                genLoad(ctx, bodies[i], expectedType);
+                genLoad(ctx, switchTree.bodies[i], expectedType);
                 ctx.code.emitGOTO_maybe_W(afterLabel, ctx.useWideJumps);
             }
             defaultLabel.anchorToNext();
-            genLoad(ctx, otherwise, expectedType);
+            genLoad(ctx, switchTree.otherwise, expectedType);
             afterLabel.anchorToNext();
             generatedType = expectedType;
-        } break;
-
-        case This(_):
-        case Super(_, _):
+        } else if (tree instanceof Tree.This || tree instanceof Tree.Super) {
             ctx.code.emitALOAD_0();
             generatedType = JAVA_LANG_OBJECT_T;
-            break;
-
-        case Literal(AConstant value):
-            generatedType = genLoadLiteral(ctx, value, expectedType);
-            break;
-
-        case Empty:
-        case AbsTypeDef(_, _, _, _):
-        case AliasTypeDef(_, _, _, _):
-        case TypeApply(_, _):
-        case FunType(_, _):
-        case CompoundType(_, _):
-        case AppliedType(_,_):
+        } else if (tree instanceof Tree.Literal) {
+            AConstant value = ((Tree.Literal)tree).value;
+            if (value == AConstant.UNIT) {
+                maybeGenLoadUnit(ctx, expectedType);
+                generatedType = expectedType;
+            } else if (value instanceof AConstant.BooleanValue) {
+                ctx.code.emitPUSH(((AConstant.BooleanValue)value).value);
+                generatedType = JType.BOOLEAN;
+            } else if (value instanceof AConstant.ByteValue) {
+                ctx.code.emitPUSH(((AConstant.ByteValue)value).value);
+                generatedType = JType.BYTE;
+            } else if (value instanceof AConstant.ShortValue) {
+                ctx.code.emitPUSH(((AConstant.ShortValue)value).value);
+                generatedType = JType.SHORT;
+            } else if (value instanceof AConstant.CharValue) {
+                ctx.code.emitPUSH(((AConstant.CharValue)value).value);
+                generatedType = JType.CHAR;
+            } else if (value instanceof AConstant.IntValue) {
+                ctx.code.emitPUSH(((AConstant.IntValue)value).value);
+                generatedType = JType.INT;
+            } else if (value instanceof AConstant.LongValue) {
+                ctx.code.emitPUSH(((AConstant.LongValue)value).value);
+                generatedType = JType.LONG;
+            } else if (value instanceof AConstant.FloatValue) {
+                ctx.code.emitPUSH(((AConstant.FloatValue)value).value);
+                generatedType = JType.FLOAT;
+            } else if (value instanceof AConstant.DoubleValue) {
+                ctx.code.emitPUSH(((AConstant.DoubleValue)value).value);
+                generatedType = JType.DOUBLE;
+            } else if (value instanceof AConstant.StringValue) {
+                ctx.code.emitPUSH(((AConstant.StringValue)value).value);
+                generatedType = JAVA_LANG_STRING_T;
+            } else if (value == AConstant.NULL) {
+                if (expectedType != JType.VOID)
+                    ctx.code.emitACONST_NULL();
+                generatedType = expectedType;
+            } else {
+                throw Debug.abort("unknown literal", value);
+            }
+        } else if (tree == Tree.Empty
+                   || tree instanceof Tree.AbsTypeDef
+                   || tree instanceof Tree.AliasTypeDef
+                   || tree instanceof Tree.TypeApply
+                   || tree instanceof Tree.FunType
+                   || tree instanceof Tree.CompoundType
+                   || tree instanceof Tree.AppliedType) {
             generatedType = JType.VOID;
-            break;
-
-        case Sequence(_):
-        case ModuleDef(_,_,_,_):
-        case PatDef(_,_,_):
-        case Import(_, _):
-        case CaseDef(_, _, _):
-        case Visitor(_):
-        case Function(_, _):
+        } else if (tree instanceof Tree.Sequence
+                   || tree instanceof Tree.ModuleDef
+                   || tree instanceof Tree.PatDef
+                   || tree instanceof Tree.Import
+                   || tree instanceof Tree.CaseDef
+                   || tree instanceof Tree.Visitor
+                   || tree instanceof Tree.Function) {
             throw Debug.abort("unexpected node", tree);
-        default:
+        } else {
             throw Debug.abort("unknown node", tree);
         }
 
@@ -591,6 +615,10 @@ public class GenJVM {
                 ctx.code.emitPOP2();
             else
                 ctx.code.emitPOP();
+        } else if (generatedType == JType.VOID && expectedType.isReferenceType()) {
+            maybeGenLoadUnit(ctx, expectedType);
+        } else if (expectedType.isReferenceType() && !generatedType.isReferenceType()) {
+            genBoxValue(ctx, generatedType);
         } else if (! (expectedType == JType.VOID
                       || generatedType == expectedType
                       || generatedType.isReferenceType()))
@@ -600,64 +628,219 @@ public class GenJVM {
         return expectedType;
     }
 
+    private boolean isThrowingTree(Tree tree) {
+        if (tree.getType().symbol() == defs.ALL_CLASS)
+            return true;
+        if (tree instanceof Tree.Block) {
+            Tree.Block block = (Tree.Block)tree;
+            if (isThrowingTree(block.expr))
+                return true;
+            return block.stats.length != 0 &&
+                isThrowingTree(block.stats[block.stats.length - 1]);
+        }
+        if (tree instanceof Tree.Typed)
+            return isThrowingTree(((Tree.Typed)tree).expr);
+        Symbol symbol = TreeInfo.methSymbol(tree);
+        if (isKnownPrimitive(symbol) && prims.getPrimitive(symbol) == Primitive.THROW)
+            return true;
+        return false;
+    }
+
+    /**
+     * Generate code to load the module represented by the given symbol.
+     */
+    protected JType genLoadModule(Context ctx, Symbol sym) {
+        scalac.symtab.Type info = sym.info();
+        Symbol moduleClass = info.symbol();
+        if (!moduleClass.isModuleClass())
+            moduleClass = sym.isModule() ? sym.moduleClass() : sym;
+        String javaSymName = javaName(moduleClass);
+        if ((moduleClass.isModuleClass() || sym.isModule()) && !javaSymName.endsWith("$"))
+            javaSymName = javaSymName + "$";
+        JType type = new JObjectType(javaSymName);
+        if (javaSymName.equals(ctx.clazz.getName()))
+            ctx.code.emitALOAD_0();
+        else
+            ctx.code.emitGETSTATIC(javaSymName,
+                                   MODULE_INSTANCE_FIELD_NAME,
+                                   type);
+
+        return type;
+    }
+
     /**
      * Generate code to load the qualifier of the given tree, which
      * can be implicitely "this".
      */
     protected void genLoadQualifier(Context ctx, Tree tree)
         throws JCode.OffsetTooBigException {
-        switch (tree) {
-        case Ident(_):
-            break;
-        case Select(Create(_, _), _):
-            break;
-        case Select(Tree qualifier, _):
-            genLoad(ctx, qualifier, JAVA_LANG_OBJECT_T);
-            break;
-        default:
+        genLoadQualifier(ctx, tree, false);
+    }
+
+    protected void genLoadQualifier(Context ctx, Tree tree, boolean implicitThis)
+        throws JCode.OffsetTooBigException {
+        if (tree instanceof Tree.Ident) {
+            if (implicitThis)
+                ctx.code.emitALOAD_0();
+        } else if (tree instanceof Tree.Select) {
+            Tree qualifier = ((Tree.Select)tree).qualifier;
+            if (!(stripTypedAndErasedCast(qualifier) instanceof Tree.Create))
+                genLoad(ctx, qualifier, JAVA_LANG_OBJECT_T);
+        } else {
             throw Debug.abort("unknown qualifier", tree);
         }
     }
 
+    private Symbol newClassSymbol(Tree.New tree) {
+        Symbol symbol = tree.type.symbol();
+        if (symbol.isClassType()) return symbol;
+        Tree init = stripTypedAndErasedCast(tree.init);
+        if (init instanceof Tree.Apply) init = ((Tree.Apply)init).fun;
+        if (init instanceof Tree.TypeApply) init = ((Tree.TypeApply)init).fun;
+        init = stripTypedAndErasedCast(init);
+        if (init instanceof Tree.Select) {
+            Symbol initSymbol = init.symbol();
+            if (!initSymbol.isNone() && initSymbol.owner().isClassType())
+                return initSymbol.owner();
+            Tree qualifier = stripTypedAndErasedCast(((Tree.Select)init).qualifier);
+            if (qualifier instanceof Tree.Create) return qualifier.symbol();
+            Symbol qualifierSymbol = qualifier.type.symbol();
+            if (qualifierSymbol.isClassType()) return qualifierSymbol;
+        }
+        throw Debug.abort("cannot find class for new", tree);
+    }
+
+    private String moduleInstanceClassName(Tree tree) {
+        tree = stripTypedAndErasedCast(tree);
+        Symbol sym = tree.symbol();
+        if (sym == null)
+            return null;
+        if (sym.isModule())
+            return ensureModuleSuffix(javaName(sym.moduleClass()));
+        if (tree instanceof Tree.Select
+            && MODULE_INSTANCE_FIELD_NAME.equals(((Tree.Select)tree).selector.toString())) {
+            return ensureModuleSuffix(javaName(sym.owner()));
+        }
+        return null;
+    }
+
+    private String ensureModuleSuffix(String className) {
+        return className.endsWith("$") ? className : className + "$";
+    }
+
+    private Tree stripTyped(Tree tree) {
+        while (tree instanceof Tree.Typed)
+            tree = ((Tree.Typed)tree).expr;
+        return tree;
+    }
+
+    private Tree stripTypedAndErasedCast(Tree tree) {
+        while (true) {
+            tree = stripTyped(tree);
+            if (tree instanceof Tree.Apply) {
+                Tree.Apply apply = (Tree.Apply)tree;
+                if (apply.args.length == 0 && apply.fun instanceof Tree.TypeApply) {
+                    Tree fun = ((Tree.TypeApply)apply.fun).fun;
+                    if (fun instanceof Tree.Select
+                        && fun.symbol() == defs.ANY_AS) {
+                        tree = ((Tree.Select)fun).qualifier;
+                        continue;
+                    }
+                }
+            }
+            return tree;
+        }
+    }
+
     protected JType genLoadLiteral(Context ctx, AConstant lit, JType type) {
-        switch (lit) {
-        case UNIT:
-            return JType.VOID;
-        case BOOLEAN(boolean value):
-            ctx.code.emitPUSH(value);
+        if (lit == AConstant.UNIT) {
+            maybeGenLoadUnit(ctx, type);
+            return type;
+        } else if (lit instanceof AConstant.BOOLEAN) {
+            ctx.code.emitPUSH(((AConstant.BOOLEAN)lit).value);
             return JType.BOOLEAN;
-        case BYTE(byte value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.BYTE) {
+            ctx.code.emitPUSH(((AConstant.BYTE)lit).value);
             return JType.BYTE;
-        case SHORT(short value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.SHORT) {
+            ctx.code.emitPUSH(((AConstant.SHORT)lit).value);
             return JType.SHORT;
-        case CHAR(char value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.CHAR) {
+            ctx.code.emitPUSH(((AConstant.CHAR)lit).value);
             return JType.CHAR;
-        case INT(int value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.INT) {
+            ctx.code.emitPUSH(((AConstant.INT)lit).value);
             return JType.INT;
-        case LONG(long value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.LONG) {
+            ctx.code.emitPUSH(((AConstant.LONG)lit).value);
             return JType.LONG;
-        case FLOAT(float value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.FLOAT) {
+            ctx.code.emitPUSH(((AConstant.FLOAT)lit).value);
             return JType.FLOAT;
-        case DOUBLE(double value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.DOUBLE) {
+            ctx.code.emitPUSH(((AConstant.DOUBLE)lit).value);
             return JType.DOUBLE;
-        case STRING(String value):
-            ctx.code.emitPUSH(value);
+        } else if (lit instanceof AConstant.STRING) {
+            ctx.code.emitPUSH(((AConstant.STRING)lit).value);
             return JAVA_LANG_STRING_T;
-        case SYMBOL_NAME(Symbol value):
-            ctx.code.emitPUSH(javaName(value));
+        } else if (lit instanceof AConstant.SYMBOL_NAME) {
+            ctx.code.emitPUSH(javaName(((AConstant.SYMBOL_NAME)lit).value));
             return JAVA_LANG_STRING_T;
-        case NULL:
+        } else if (lit == AConstant.NULL) {
             if (type != JType.VOID) ctx.code.emitACONST_NULL();
             return type;
+        }
+        throw Debug.abort("unknown literal", lit);
+    }
+
+    /**
+     * Generate code to load the Unit value, iff the given type is an
+     * object type (i.e. something really has to be loaded on stack).
+     */
+    protected void maybeGenLoadUnit(Context ctx, JType type) {
+        if (type != JType.VOID)
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME,
+                                      "box_uvalue",
+                                      new JMethodType(SCALA_UNIT_T,
+                                                      JType.EMPTY_ARRAY));
+    }
+
+    protected void genBoxValue(Context ctx, JType type) {
+        switch (type.getTag()) {
+        case JType.T_BOOLEAN:
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME, "box_zvalue",
+                                      new JMethodType(new JObjectType("scala.Boolean"), new JType[] {JType.BOOLEAN}));
+            break;
+        case JType.T_BYTE:
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME, "box_bvalue",
+                                      new JMethodType(new JObjectType("scala.Byte"), new JType[] {JType.BYTE}));
+            break;
+        case JType.T_SHORT:
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME, "box_svalue",
+                                      new JMethodType(new JObjectType("scala.Short"), new JType[] {JType.SHORT}));
+            break;
+        case JType.T_CHAR:
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME, "box_cvalue",
+                                      new JMethodType(new JObjectType("scala.Char"), new JType[] {JType.CHAR}));
+            break;
+        case JType.T_INT:
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME, "box_ivalue",
+                                      new JMethodType(new JObjectType("scala.Int"), new JType[] {JType.INT}));
+            break;
+        case JType.T_LONG:
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME, "box_lvalue",
+                                      new JMethodType(new JObjectType("scala.Long"), new JType[] {JType.LONG}));
+            break;
+        case JType.T_FLOAT:
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME, "box_fvalue",
+                                      new JMethodType(new JObjectType("scala.Float"), new JType[] {JType.FLOAT}));
+            break;
+        case JType.T_DOUBLE:
+            ctx.code.emitINVOKESTATIC(SCALA_RUNTIME_RUNTIME, "box_dvalue",
+                                      new JMethodType(new JObjectType("scala.Double"), new JType[] {JType.DOUBLE}));
+            break;
         default:
-            throw Debug.abort("unknown literal", lit);
+            throw Debug.abort("cannot box JVM type " + type);
         }
     }
 
@@ -667,7 +850,16 @@ public class GenJVM {
      */
     protected void genStorePrologue(Context ctx, Tree tree)
         throws JCode.OffsetTooBigException {
-        genLoadQualifier(ctx, tree);
+        Symbol sym = tree.symbol();
+        if (tree instanceof Tree.Ident) {
+            if (sym.owner().isClass() && !isStaticMember(sym))
+                ctx.code.emitALOAD_0();
+        } else if (tree instanceof Tree.Select) {
+            if (!isStaticMember(sym))
+                genLoadQualifier(ctx, tree, true);
+        } else {
+            throw Debug.abort("unexpected left-hand side", tree);
+        }
     }
 
     /**
@@ -680,11 +872,11 @@ public class GenJVM {
             String ownerName = javaName(sym.owner());
             if (isStaticMember(sym))
                 ctx.code.emitPUTSTATIC(ownerName,
-                                       sym.name.toString(),
+                                       jvmName(sym.name),
                                        typeStoJ(sym.info()));
             else
                 ctx.code.emitPUTFIELD(ownerName,
-                                      sym.name.toString(),
+                                      jvmName(sym.name),
                                       typeStoJ(sym.info()));
         } else {
             assert ctx.locals.containsKey(sym)
@@ -704,11 +896,12 @@ public class GenJVM {
                            JCode.Label target,
                            boolean when)
         throws JCode.OffsetTooBigException {
-        switch (tree) {
-        case Apply(Tree fun, Tree[] args):
-            if (isJumpingPrimitive(fun.symbol())) {
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree fun = apply.fun;
+            if (isKnownPrimitive(fun.symbol())) {
                 Primitive prim = prims.getPrimitive(fun.symbol());
-                Tree[] allArgs = extractPrimitiveArgs((Tree.Apply)tree);
+                Tree[] allArgs = extractPrimitiveArgs(apply);
 
                 switch (prim) {
                 case ID: case EQ: case NE:
@@ -925,28 +1118,21 @@ public class GenJVM {
         for (int i = 0; i < args.length; ++i) {
             boolean isIntZero = false;
             if (maxTypeIdx <= intTypeIdx) {
-                switch (args[i]) {
-                case Literal(AConstant constant):
+                if (args[i] instanceof Tree.Literal) {
+                    AConstant constant = ((Tree.Literal)args[i]).value;
                     int intVal;
-                    switch (constant) {
-                    case BOOLEAN(boolean value):
-                        intVal = value ? 1 : 0;
-                        break;
-                    case BYTE(byte value):
-                        intVal = value;
-                        break;
-                    case SHORT(short value):
-                        intVal = value;
-                        break;
-                    case CHAR(char value):
-                        intVal = value;
-                        break;
-                    case INT(int value):
-                        intVal = value;
-                        break;
-                    default:
+                    if (constant instanceof AConstant.BooleanValue)
+                        intVal = ((AConstant.BooleanValue)constant).value ? 1 : 0;
+                    else if (constant instanceof AConstant.ByteValue)
+                        intVal = ((AConstant.ByteValue)constant).value;
+                    else if (constant instanceof AConstant.ShortValue)
+                        intVal = ((AConstant.ShortValue)constant).value;
+                    else if (constant instanceof AConstant.CharValue)
+                        intVal = ((AConstant.CharValue)constant).value;
+                    else if (constant instanceof AConstant.IntValue)
+                        intVal = ((AConstant.IntValue)constant).value;
+                    else
                         throw Debug.abort("unknown literal", constant);
-                    }
                     if (intVal == 0) {
                         isIntZero = true;
                         if (i == 0) prim = prim.swap();
@@ -999,6 +1185,21 @@ public class GenJVM {
         genLoad(ctx, arg, JAVA_LANG_OBJECT_T);
         ctx.code.emitCHECKCAST(JAVA_LANG_THROWABLE_T);
         ctx.code.emitATHROW();
+    }
+
+    protected void genUnreachableValue(Context ctx, JType type) {
+        if (type == JType.VOID)
+            return;
+        if (type == JType.LONG)
+            ctx.code.emitPUSH(0L);
+        else if (type == JType.FLOAT)
+            ctx.code.emitPUSH(0.0f);
+        else if (type == JType.DOUBLE)
+            ctx.code.emitPUSH(0.0d);
+        else if (type.isReferenceType())
+            ctx.code.emitACONST_NULL();
+        else
+            ctx.code.emitICONST_0();
     }
 
     /**
@@ -1067,9 +1268,12 @@ public class GenJVM {
         genLoad(ctx, size, JType.INT);
 
         String className;
-        switch (classNameLit) {
-        case Literal(STRING(String name)): className = name; break;
-        default: throw Debug.abort("invalid argument for oarray", classNameLit);
+        if (classNameLit instanceof Tree.Literal
+            && ((Tree.Literal)classNameLit).value instanceof AConstant.StringValue) {
+            className =
+                ((AConstant.StringValue)((Tree.Literal)classNameLit).value).value;
+        } else {
+            throw Debug.abort("invalid argument for oarray", classNameLit);
         }
 
         JReferenceType elemType;
@@ -1134,17 +1338,19 @@ public class GenJVM {
     }
 
     protected void liftStringConcatenations(Tree tree, LinkedList accu) {
-        switch (tree) {
-        case Apply(Select(Tree qualifier, Name selector), Tree[] args): {
-            Symbol funSym = ((Tree.Apply)tree).fun.symbol();
+        if (tree instanceof Tree.Apply
+            && ((Tree.Apply)tree).fun instanceof Tree.Select) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree.Select select = (Tree.Select)apply.fun;
+            Symbol funSym = select.symbol();
             if  (prims.isPrimitive(funSym)
                  && prims.getPrimitive(funSym) == Primitive.CONCAT) {
-                liftStringConcatenations(qualifier, accu);
-                liftStringConcatenations(args[0], accu);
-            } else
+                liftStringConcatenations(select.qualifier, accu);
+                liftStringConcatenations(apply.args[0], accu);
+            } else {
                 accu.addLast(tree);
-            } break;
-        default:
+            }
+        } else {
             accu.addLast(tree);
         }
     }
@@ -1187,35 +1393,17 @@ public class GenJVM {
 
     /**
      * Return true iff the given symbol is a primitive, AND that
-     * primitive is recognized by this back-end, AND that primitive is
-     * a "jumping" one.
-     */
-    protected boolean isJumpingPrimitive(Symbol sym) {
-        if (prims.isPrimitive(sym)) {
-            switch (prims.getPrimitive(sym)) {
-            case ID   : case EQ  : case NE   :
-            case LT   : case LE  : case GE   : case GT :
-            case ZNOT : case ZOR : case ZAND :
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Return true iff the given symbol is a primitive, AND that
      * primitive is recognized by this back-end.
      */
     protected boolean isKnownPrimitive(Symbol sym) {
-        if (isJumpingPrimitive(sym))
-            return true;
-
         if (prims.isPrimitive(sym)) {
             switch (prims.getPrimitive(sym)) {
             case POS : case NEG :
             case ADD : case SUB : case MUL : case DIV : case MOD :
             case NOT : case OR : case XOR : case AND :
             case LSL : case LSR : case ASR :
+            case EQ : case NE : case LT : case LE : case GE : case GT :
+            case ZNOT : case ZOR : case ZAND :
             case NEW_ZARRAY : case NEW_BARRAY : case NEW_SARRAY :
             case NEW_CARRAY : case NEW_IARRAY : case NEW_LARRAY :
             case NEW_FARRAY : case NEW_DARRAY : case NEW_OARRAY :
@@ -1276,16 +1464,14 @@ public class GenJVM {
      * Return the unboxed version of the given tree.
      */
     protected Tree unbox(Tree tree) {
-        switch (tree) {
-        case Apply(Tree fun, Tree[] args):
-            if (prims.getPrimitive(fun.symbol()) == Primitive.BOX) {
-                assert args.length == 1;
-                return args[0];
-            } else
-                return tree;
-        default:
-            return tree;
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            if (prims.getPrimitive(apply.fun.symbol()) == Primitive.BOX) {
+                assert apply.args.length == 1;
+                return apply.args[0];
+            }
         }
+        return tree;
     }
 
     /// Modules
@@ -1322,10 +1508,44 @@ public class GenJVM {
             argNames[i] = params[i].name.toString();
 
         return clazz.addNewMethod(javaModifiers(method) | addFlags,
-                                  method.name.toString(),
+                                  jvmName(method.name),
                                   methodType.getReturnType(),
                                   methodType.getArgumentTypes(),
                                   argNames);
+    }
+
+    protected String jvmName(Name name) {
+        return jvmName(name.toString());
+    }
+
+    protected String jvmName(String name) {
+        if (name.startsWith("<"))
+            return name;
+
+        StringBuffer buffer = null;
+        for (int i = 0; i < name.length(); i++) {
+            char ch = name.charAt(i);
+            boolean safe =
+                (0x20 <= ch && ch <= 0x7e)
+                && ch != '.'
+                && ch != ';'
+                && ch != '['
+                && ch != '/';
+            if (!safe) {
+                if (buffer == null) {
+                    buffer = new StringBuffer(name.length() + 6);
+                    buffer.append(name.substring(0, i));
+                }
+                buffer.append("$u");
+                String hex = Integer.toHexString(ch).toUpperCase();
+                for (int j = hex.length(); j < 4; j++)
+                    buffer.append('0');
+                buffer.append(hex);
+            } else if (buffer != null) {
+                buffer.append(ch);
+            }
+        }
+        return buffer == null ? name : buffer.toString();
     }
 
     /**
@@ -1345,7 +1565,7 @@ public class GenJVM {
                                                 JClass.NO_INTERFACES,
                                                 ctx.sourceFileName);
         Scope.SymbolIterator memberIt =
-            cSym.members().iterator();
+            new Scope.UnloadIterator(cSym.members().iterator());
         while (memberIt.hasNext()) {
             Symbol member = memberIt.next();
             if (!member.isMethod()
@@ -1375,7 +1595,6 @@ public class GenJVM {
                                      Position.line(member.pos));
         }
         addScalaAttr(mirrorClass, pickle);
-
         writeClassFile(mirrorClass);
     }
 
@@ -1384,7 +1603,6 @@ public class GenJVM {
      * symbol table is saved.
      */
     protected void addScalaAttr(JClass cls, Pickle pickle) {
-        // change this to true to enable .symbl file generation
         if (false) {
             pickles.add(cls);
             pickles.add(pickle);
@@ -1458,44 +1676,50 @@ public class GenJVM {
      * Return the Java type corresponding to the given Scala type.
      */
     protected JType typeStoJ(Type tp) {
-        switch (tp) {
-        case ConstantType(Type base, _):
-            return typeStoJ(base);
-        case TypeRef(_, Symbol sym, _):
-            Object value = typeMap.get(sym);
-            if (value != null) return (JType)value;
+        if (tp instanceof Type.UnboxedType) {
+            switch (((Type.UnboxedType)tp).tag) {
+            case TypeTags.BYTE:
+                return JType.BYTE;
+            case TypeTags.CHAR:
+                return JType.CHAR;
+            case TypeTags.SHORT:
+                return JType.SHORT;
+            case TypeTags.INT:
+                return JType.INT;
+            case TypeTags.LONG:
+                return JType.LONG;
+            case TypeTags.FLOAT:
+                return JType.FLOAT;
+            case TypeTags.DOUBLE:
+                return JType.DOUBLE;
+            case TypeTags.BOOLEAN:
+                return JType.BOOLEAN;
+            case TypeTags.UNIT:
+                return JType.VOID;
+            case TypeTags.STRING:
+                return JObjectType.JAVA_LANG_STRING;
+            default:
+                break;
+            }
+        } else if (tp instanceof Type.UnboxedArrayType) {
+            return new JArrayType(typeStoJ(((Type.UnboxedArrayType)tp).elemtp));
+        } else if (tp instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)tp;
+            JType[] argTypes = new JType[methodType.vparams.length];
+            for (int i = 0; i < methodType.vparams.length; ++i)
+                argTypes[i] = typeStoJ(methodType.vparams[i].info());
+            return new JMethodType(typeStoJ(methodType.result), argTypes);
+        }
+
+        Symbol sym = tp.symbol();
+        if (sym == Symbol.NONE)
+            throw Debug.abort("invalid type", tp);
+        else if (typeMap.containsKey(sym))
+            return (JType)typeMap.get(sym);
+        else {
             JType jTp = new JObjectType(javaName(sym));
             typeMap.put(sym, jTp);
             return jTp;
-        case UnboxedType(TypeTags.BYTE):
-            return JType.BYTE;
-        case UnboxedType(TypeTags.CHAR):
-            return JType.CHAR;
-        case UnboxedType(TypeTags.SHORT):
-            return JType.SHORT;
-        case UnboxedType(TypeTags.INT):
-            return JType.INT;
-        case UnboxedType(TypeTags.LONG):
-            return JType.LONG;
-        case UnboxedType(TypeTags.FLOAT):
-            return JType.FLOAT;
-        case UnboxedType(TypeTags.DOUBLE):
-            return JType.DOUBLE;
-        case UnboxedType(TypeTags.BOOLEAN):
-            return JType.BOOLEAN;
-        case UnboxedType(TypeTags.UNIT):
-            return JType.VOID;
-        case UnboxedType(TypeTags.STRING):
-            return JObjectType.JAVA_LANG_STRING;
-        case UnboxedArrayType(Type elementType):
-            return new JArrayType(typeStoJ(elementType));
-        case MethodType(Symbol[] vparams, Type result):
-            JType[] argTypes = new JType[vparams.length];
-            for (int i = 0; i < vparams.length; ++i)
-                argTypes[i] = typeStoJ(vparams[i].info());
-            return new JMethodType(typeStoJ(result), argTypes);
-        default:
-            throw Debug.abort("invalid type", tp);
         }
     }
 
@@ -1575,37 +1799,6 @@ public class GenJVM {
                                         Position.line(tree.pos));
     }
 
-    protected void genLocalVariableTable(Context ctx) {
-        JLocalVariable[] vars = ctx.method.getLocalVariables();
-
-        if (!global.debuginfo || vars.length == 0)
-            return;
-
-        JConstantPool pool = ctx.clazz.getConstantPool();
-        int pc = ctx.code.getPC();
-        int anonCounter = 1;
-
-        ByteBuffer lvTab = ByteBuffer.allocate(2 + 10 * vars.length);
-        lvTab.putShort((short)vars.length);
-        for (int i = 0; i < vars.length; i++) {
-            JLocalVariable lv = vars[i];
-            String name = (lv.getName() == null)
-                ? "<anon" + (anonCounter++) + ">" : lv.getName();
-            lvTab.putShort((short)0);
-            lvTab.putShort((short)pc);
-            lvTab.putShort((short)pool.addUtf8(name));
-            lvTab.putShort((short)pool.addUtf8(lv.getType().getSignature()));
-            lvTab.putShort((short)lv.getIndex());
-        }
-        JAttribute attr =
-            fjbgContext.JOtherAttribute(ctx.clazz,
-                                        ctx.method,
-                                        "LocalVariableTable",
-                                        lvTab.array());
-        ctx.code.addAttribute(attr);
-    }
-
-
     /// Context
     //////////////////////////////////////////////////////////////////////
 
@@ -1669,8 +1862,8 @@ public class GenJVM {
                                   boolean useWideJumps) {
         Symbol mSym = mDef.symbol();
 
-        global.log("entering method " + Debug.show(mSym)
-                   + " (type: " + Debug.show(mSym.info()) + ")"
+        global.log("entering method " + Debug.toString(mSym)
+                   + " (type: " + Debug.toString(mSym.info()) + ")"
                    + " wide jumps? " + useWideJumps);
 
         JMethod method = addNewScalaMethod(ctx.clazz, mSym, 0);
@@ -1692,12 +1885,6 @@ public class GenJVM {
                                                             new byte[]{}));
 
         if (ctx.isRemote && mSym.isPublic()) {
-            // (see http://java.sun.com/docs/books/vmspec/html/ClassFile.doc.html#3129)
-            // Exceptions_attribute {
-            // ..
-            // u2 number_of_exceptions;
-    	    // u2 exception_index_table[number_of_exceptions];
-            // }
             JConstantPool cp = ctx.clazz.getConstantPool();
             int reInx = cp.addClass(JAVA_RMI_REMOTEEXCEPTION);
             ByteBuffer contents = ByteBuffer.allocate(4); // u2 + u2[1]
@@ -1717,6 +1904,36 @@ public class GenJVM {
     protected void leaveMethod(Context ctx) {
         genLocalVariableTable(ctx);
         global.log("leaving method");
+    }
+
+    protected void genLocalVariableTable(Context ctx) {
+        JLocalVariable[] vars = ctx.method.getLocalVariables();
+
+        if (!global.debuginfo || vars.length == 0)
+            return;
+
+        JConstantPool pool = ctx.clazz.getConstantPool();
+        int pc = ctx.code.getPC();
+        int anonCounter = 1;
+
+        ByteBuffer lvTab = ByteBuffer.allocate(2 + 10 * vars.length);
+        lvTab.putShort((short)vars.length);
+        for (int i = 0; i < vars.length; i++) {
+            JLocalVariable lv = vars[i];
+            String name = (lv.getName() == null)
+                ? "<anon" + (anonCounter++) + ">" : lv.getName();
+            lvTab.putShort((short)0);
+            lvTab.putShort((short)pc);
+            lvTab.putShort((short)pool.addUtf8(name));
+            lvTab.putShort((short)pool.addUtf8(lv.getType().getSignature()));
+            lvTab.putShort((short)lv.getIndex());
+        }
+        JAttribute attr =
+            fjbgContext.JOtherAttribute(ctx.clazz,
+                                        ctx.method,
+                                        "LocalVariableTable",
+                                        lvTab.array());
+        ctx.code.addAttribute(attr);
     }
 
     /// I/O
@@ -1789,7 +2006,7 @@ public class GenJVM {
     protected void addValueClassMembers(Context ctx, Tree.ClassDef cDef) {
         Symbol cSym = cDef.symbol();
         Scope.SymbolIterator memberIt =
-            cSym.members().iterator();
+            new Scope.UnloadIterator(cSym.members().iterator());
         while (memberIt.hasNext()) {
             Symbol member = memberIt.next();
             if (member.isTerm() && !member.isMethod())
@@ -1809,14 +2026,16 @@ public class GenJVM {
             Phase bkpCurrent = global.currentPhase;
             global.currentPhase = refCheckPhase;
             Scope.SymbolIterator memberIt =
-                iSym.members().iterator();
+                new Scope.UnloadIterator(iSym.members().iterator());
             while (memberIt.hasNext()) {
                 Symbol member = memberIt.next();
-                if (member.isTerm() && !member.isMethod() && member.isPrivate())
-                    switch (member.info()) {
-                    case ConstantType(_, AConstant value):
+                if (member.isTerm() && !member.isMethod() && member.isPrivate()) {
+                    Type info = member.info();
+                    if (info instanceof Type.ConstantType) {
+                        AConstant value = ((Type.ConstantType)info).value;
                         staticMembers.put(member, value);
                     }
+                }
             }
             global.currentPhase = bkpCurrent;
 
@@ -1824,7 +2043,7 @@ public class GenJVM {
             Iterator smIt = staticMembers.keySet().iterator();
             while (smIt.hasNext()) {
                 Symbol sm = (Symbol)smIt.next();
-                String smName = sm.name.toString();
+                String smName = jvmName(sm.name);
                 JType tp = typeStoJ(sm.info());
                 JField field =
                     ctx.clazz.addNewField((javaModifiers(sm)

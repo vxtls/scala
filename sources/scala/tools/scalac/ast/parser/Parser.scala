@@ -461,8 +461,9 @@ class Parser(unit: CompilationUnit) {
     if (operator eq Names.ERROR) -1
     else {
       val first_ch = operator.charAt(0);
-      if (((first_ch >= 'A') && (first_ch <= 'Z')) ||
-          ((first_ch >= 'a') && (first_ch <= 'z')))
+      val first_ci = first_ch.coerceToInt;
+      if (((first_ci >= 'A'.coerceToInt) && (first_ci <= 'Z'.coerceToInt)) ||
+          ((first_ci >= 'a'.coerceToInt) && (first_ci <= 'z'.coerceToInt)))
         1
       else
         first_ch match {

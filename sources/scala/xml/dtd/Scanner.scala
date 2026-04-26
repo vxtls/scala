@@ -33,8 +33,11 @@ class Scanner with Tokens {
   //                                            zzz    scanner methods   zzz
 
   // todo: see XML specification... probably isLetter,isDigit is fine
-  final def isIdentChar = { ('a' <= c && c <= 'z')
-                           || ('A' <= c && c <= 'Z')};
+  final def isIdentChar = {
+    val ci = c.coerceToInt;
+    ('a'.coerceToInt <= ci && ci <= 'z'.coerceToInt) ||
+    ('A'.coerceToInt <= ci && ci <= 'Z'.coerceToInt)
+  };
 
   final def next = if( it.hasNext ) c = it.next else c = ENDCH;
 

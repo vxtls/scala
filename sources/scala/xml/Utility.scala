@@ -359,7 +359,7 @@ object Utility {
    * @param sb
    */
   def appendQuoted(s: String, sb: StringBuffer) = {
-    val ch = if (s.indexOf('"') == -1) '"' else '\'';
+    val ch = if (s.indexOf('"'.coerceToInt) == -1) '"' else '\'';
     sb.append(ch).append(s).append(ch)
   }
 

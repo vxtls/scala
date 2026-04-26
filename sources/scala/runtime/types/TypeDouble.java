@@ -14,7 +14,7 @@ import scala.runtime.RunTime;
 import scala.Type;
 import scala.Array;
 
-public public class TypeDouble extends ValueType {
+public class TypeDouble extends ValueType {
     private final scala.Double ZERO = RunTime.box_dvalue(0.0);
     public Array newArray(int size) {
         return RunTime.box_darray(new double[size]);
@@ -29,4 +29,3 @@ public public class TypeDouble extends ValueType {
     public String toString() { return "scala.Double"; }
     public int hashCode() { return 0x11111111; }
 };
-

@@ -39,26 +39,30 @@ public class InterpreterPrinter implements DefinitionPrinter {
 
     public void showValueDefinition(String signature, Object value) {
         EvaluatorResult result = interpreter.toString(value, null);
-        switch (result) {
-        case Value(Object string, _):
+        if (result instanceof EvaluatorResult.Value) {
+            Object string = ((EvaluatorResult.Value)result).value;
             writer.println(signature + " = " + string);
             writer.flush();
             return;
-        case Error(EvaluatorException exception):
+        }
+        if (result instanceof EvaluatorResult.Error) {
+            EvaluatorException exception = ((EvaluatorResult.Error)result).exception;
             writer.print(signature + " = ");
             writer.print(exception.getScalaErrorMessage(true));
             writer.flush();
             return;
-        default:
-            throw Debug.abort("illegal case", result);
         }
+        throw Debug.abort("illegal case", result);
     }
 
     public void showResult(EvaluatorResult result, boolean interactive) {
-        switch (result) {
-        case Void:
+        if (result == EvaluatorResult.Void) {
             return;
-        case Value(Object value, String type):
+        }
+        if (result instanceof EvaluatorResult.Value) {
+            EvaluatorResult.Value valueResult = (EvaluatorResult.Value)result;
+            Object value = valueResult.value;
+            String type = valueResult.type;
             if (interactive)
                 if (value instanceof String)
                     writer.println(value + ": " + type);
@@ -66,15 +70,16 @@ public class InterpreterPrinter implements DefinitionPrinter {
                     showResult(interpreter.toString(value, type), interactive);
             writer.flush();
             return;
-        case Error(EvaluatorException exception):
+        }
+        if (result instanceof EvaluatorResult.Error) {
+            EvaluatorException exception = ((EvaluatorResult.Error)result).exception;
             String name = Thread.currentThread().getName();
             writer.print("Exception in thread \"" + name + "\" ");
             writer.print(exception.getScalaErrorMessage(true));
             writer.flush();
             return;
-        default:
-            throw Debug.abort("illegal case", result);
         }
+        throw Debug.abort("illegal case", result);
     }
 
     //########################################################################

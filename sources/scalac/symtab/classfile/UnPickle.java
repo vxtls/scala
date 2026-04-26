@@ -17,8 +17,8 @@ import scalac.*;
 import scalac.atree.AConstant;
 import scalac.util.*;
 import scalac.symtab.*;
-import Symbol.*;
-import Type.*;
+import scalac.symtab.Symbol.*;
+import scalac.symtab.Type.*;
 
 public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 
@@ -244,9 +244,9 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 		break;
 	    default:
 		assert isSymbolEntry(n) : n;
-		Name name = readNameRef();
+		Name symName = readNameRef();
 		if (global.debug)
-		    global.log("reading " + name + " at " + n);
+		    global.log("reading " + symName + " at " + n);
 		owner = readSymbolRef();
 		if (entries[n] == null) {
 		    int flags = readNat();
@@ -254,7 +254,7 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 		    switch (tag) {
 		    case TYPEsym:
 			entries[n] = sym = owner.newAbstractType(
-			    Position.NOPOS, flags, name);
+			    Position.NOPOS, flags, symName);
 			if ((flags & VIEWBOUND) != 0) {
 			    sym.setInfo(global.definitions.ANY_TYPE());
 			    sym.setVuBound(getType(inforef, sym));
@@ -266,9 +266,9 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 
 		    case ALIASsym:
 			entries[n] = sym = owner.newTypeAlias(
-			    Position.NOPOS, flags, name);
+			    Position.NOPOS, flags, symName);
 			sym.setInfo(getType(inforef, sym));
-			Symbol constr = readSymbolRef();
+			Symbol aliasConstr = readSymbolRef();
 			break;
 
 		    case CLASSsym:
@@ -276,31 +276,31 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
                             Symbol modulesym = readSymbolRef();
                             entries[n] = sym = modulesym.moduleClass();
                             sym.flags = flags;
-                        } else if (classroot != null && name == classroot.name && owner == classroot.owner()) {
+                        } else if (classroot != null && symName == classroot.name && owner == classroot.owner()) {
 			    if (global.debug)
                                 global.log("overwriting " + classroot);
 			    entries[n] = sym = classroot;
 			    sym.flags = flags;
                         } else {
                             entries[n] = sym = owner.newClass(
-                                Position.NOPOS, flags, name);
+                                Position.NOPOS, flags, symName);
                         }
 			sym.setInfo(getType(inforef, sym));
 			sym.setTypeOfThis(readTypeRef(sym));
-			Symbol constr = readSymbolRef();
-			assert constr == sym.allConstructors();
+			Symbol classConstr = readSymbolRef();
+			assert classConstr == sym.allConstructors();
 			break;
 
 		    case VALsym:
-			if (moduleroot != null && name == moduleroot.name && owner == moduleroot.owner()) {
+			if (moduleroot != null && symName == moduleroot.name && owner == moduleroot.owner()) {
 			    if (global.debug)
 				global.log("overwriting " + moduleroot);
 			    entries[n] = sym = moduleroot;
                             sym.flags = flags;
                         } else if ((flags & MODUL) != 0) {
                             entries[n] = sym = owner.newModule(
-                                Position.NOPOS, flags, name);
-                        } else if (name == Names.CONSTRUCTOR) {
+                                Position.NOPOS, flags, symName);
+                        } else if (symName == Names.CONSTRUCTOR) {
                             Symbol tsym = bp < end ? readSymbolRef() : null;
                             if (tsym == null) {
                                 entries[n] = sym = owner.newConstructor(
@@ -311,7 +311,7 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
                             }
                         } else {
                             entries[n] = sym = owner.newTerm(
-                                Position.NOPOS, flags, name);
+                                Position.NOPOS, flags, symName);
                         }
                         if (sym.isModule()) {
                             Symbol clasz = readSymbolRef();
@@ -416,11 +416,11 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
                 }
 		break;
 	    case METHODtpe:
-		Type restype = readTypeRef(owner);
-		int bp1 = bp;
+		Type methodRestype = readTypeRef(owner);
+		int methodBp = bp;
 		Type[] argtypes = readTypeRefs(end, owner);
 		int[] flags = new int[argtypes.length];
-		bp = bp1;
+		bp = methodBp;
 		readFlags(flags);
 		Symbol[] params = new Symbol[argtypes.length];
 		for (int i = 0; i < argtypes.length; i++) {
@@ -428,11 +428,11 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 		    params[i] = owner.newVParam(
                         Position.NOPOS, flags[i], name, argtypes[i]);
 		}
-		tpe = Type.MethodType(params, restype);
+		tpe = Type.MethodType(params, methodRestype);
 		break;
 	    case POLYtpe:
-		Type restype = readTypeRef(owner);
-		tpe = Type.PolyType(readSymbolRefs(end), restype);
+		Type polyRestype = readTypeRef(owner);
+		tpe = Type.PolyType(readSymbolRefs(end), polyRestype);
 		break;
 	    case OVERLOADEDtpe:
 		int bp0 = bp;
@@ -640,4 +640,3 @@ public class UnPickle implements Kinds, Modifiers, EntryTags, TypeTags {
 	}
     }
 }
-

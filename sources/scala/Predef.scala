@@ -154,8 +154,8 @@ object Predef {
   def view(x: char): Ordered[char] = new Ordered[char] with Proxy(x) {
     def compareTo [b >: char <% Ordered[b]](y: b): int = y match {
       case y1: char =>
-        if (x < y1) -1
-        else if (x > y1) 1
+        if (x.coerceToInt < y1.coerceToInt) -1
+        else if (x.coerceToInt > y1.coerceToInt) 1
         else 0
       case _ => -(y compareTo x)
     }

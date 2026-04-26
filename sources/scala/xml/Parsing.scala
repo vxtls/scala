@@ -78,14 +78,16 @@ object Parsing {
   def isPubIDChar( c:Char ) = c match {
     case '\u0020' | '\u000D' | '\u000A' => true;
     case _ if
-      ('0' < c && c < '9')||('a' < c && c < 'z')||('A' < c && c < 'Z') => true;
+      ('0'.coerceToInt < c.coerceToInt && c.coerceToInt < '9'.coerceToInt) ||
+      ('a'.coerceToInt < c.coerceToInt && c.coerceToInt < 'z'.coerceToInt) ||
+      ('A'.coerceToInt < c.coerceToInt && c.coerceToInt < 'Z'.coerceToInt) => true
     case '-' | '\''| '(' | ')' | '+' | ',' | '.' | '/' | ':'  | '=' |
          '?' | ';' | '!' | '*' | '#' | '@' | '$' | '_' | '%'           => true
     case _ => false;
   }
 
   def checkSysID( s:String ):boolean = {
-    s.indexOf('"') == -1 || s.indexOf('\'') == -1
+    s.indexOf('"'.coerceToInt) == -1 || s.indexOf('\''.coerceToInt) == -1
   }
 
   def checkPubID( s:String ):boolean = {

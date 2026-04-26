@@ -827,7 +827,7 @@ public class HTMLPrinter {
 /**
  * Map from Object to String.
  */
-public abstract class StringOf {
+abstract class StringOf {
 
     /**
      * Gives the string representation of an object.

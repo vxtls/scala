@@ -8,7 +8,6 @@
 
 import scala.tools.util.ConsoleReporter;
 import scalac.{CompilerCommand, Global => scalac_Global};
-import scalac.symtab.classfile.CLRTypes;
 
 package scala.tools.scalac {
 
@@ -31,28 +30,18 @@ object Main {
     val reporter = new ConsoleReporter();
     val command = new CompilerCommand(
       PRODUCT, VERSION, reporter, new CompilerPhases());
-    var ok = true;
     if (command.parse(args) && command.files.list.size() > 0) {
-      if (command.target.value == scalac_Global.TARGET_MSIL) {
-	try { CLRTypes.init(command); }
-	catch { case e: Error =>
-          e.printStackTrace();
-          ok = false;
-        }
-      }
-      if (ok) {
-        val timer = scalac_Global.getTimer(reporter);
-        timer.start();
-	val global = new Global(command, timer, false);
-	val units = global.compile(command.files.toArray(), false);
-	if (reporter.errors() == 0)
-          if (!global.PHASE.CODEGEN.hasSkipFlag()) global.dump(units);
-        timer.stop("total");
-	reporter.printSummary();
-      }
+      val timer = scalac_Global.getTimer(reporter);
+      timer.start();
+      val global = new Global(command, timer, false);
+      val units = global.compile(command.files.toArray(), false);
+      if (reporter.errors() == 0)
+        if (!global.PHASE.CODEGEN.hasSkipFlag()) global.dump(units);
+      timer.stop("total");
+      reporter.printSummary();
     }
     if( exitOnError ) {
-      System.exit(if (reporter.errors() > 0 || !ok) 1 else 0);
+      System.exit(if (reporter.errors() > 0) 1 else 0);
     }
   }
 }

@@ -370,7 +370,7 @@ class SymbolicXMLBuilder(make: TreeFactory, gen: TreeGen, p: Parser, preserveWS:
 
 
   def getPrefix( name:String ):Option[String] = {
-    val i = name.indexOf(':');
+    val i = name.indexOf(':'.coerceToInt);
     if( i != -1 ) Some( name.substring(0, i) ) else None
   }
 
@@ -402,7 +402,7 @@ class SymbolicXMLBuilder(make: TreeFactory, gen: TreeGen, p: Parser, preserveWS:
     while( attrIt.hasNext ) {
       val z = attrIt.next;
       if( z.startsWith("xmlns") ) {
-        val i = z.indexOf(':');
+        val i = z.indexOf(':'.coerceToInt);
         if( i == -1 )
           setNS.update("default", attrMap( z ) );
         else {
@@ -413,7 +413,7 @@ class SymbolicXMLBuilder(make: TreeFactory, gen: TreeGen, p: Parser, preserveWS:
       }
     }
     /* */
-    val i = label.indexOf(':');
+    val i = label.indexOf(':'.coerceToInt);
     val Pair( namespace, newlabel ) = qualified( pos, label );
 
     var attr:Array[Tree] =

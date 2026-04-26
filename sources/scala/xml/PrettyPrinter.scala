@@ -47,13 +47,13 @@ class PrettyPrinter( width:Int, step:Int ) {
     if( s.length() < tmp )
       return List(Box(ind,s));
     val sb = new StringBuffer();
-    var i = s.indexOf(' ');
+    var i = s.indexOf(' '.coerceToInt);
     if( i > tmp ) throw new BrokenException(); // cannot break
 
     var last = i::Nil;
     while( i < tmp ) {
       last = i::last;
-      i = s.indexOf(' ', i );
+      i = s.indexOf(' '.coerceToInt, i );
     }
     var res:List[Item] = Nil;
     while( Nil != last ) try {

@@ -183,6 +183,12 @@ class CodeFactory(val unit: CompilationUnit, pos1: Int) extends PatternTool(unit
 
   // used by Equals
   private def getCoerceToInt(left: Type):  Symbol = {
+    val sym0 = left.lookupNonPrivate(Names.coerceToInt);
+    if (sym0 != Symbol.NONE)
+      return sym0;
+    val sym1 = left.deconst().symbol().lookup(Names.coerceToInt);
+    if (sym1 != Symbol.NONE)
+      return sym1.stableAlternative();
     val sym = left.lookupNonPrivate(Names.coerce);
     //assert sym != Symbol.NONE : Debug.show(left);
     val syms = sym.alternativeSymbols();

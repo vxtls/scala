@@ -163,6 +163,11 @@ public class Names {
     public static final Name cur = Name.fromString("cur"); // used in translation of automata
     public static final Name cast = Name.fromString("cast");
     public static final Name coerce = Name.fromString("coerce");
+    public static final Name coerceToDouble = Name.fromString("coerceToDouble");
+    public static final Name coerceToFloat = Name.fromString("coerceToFloat");
+    public static final Name coerceToLong = Name.fromString("coerceToLong");
+    public static final Name coerceToInt = Name.fromString("coerceToInt");
+    public static final Name coerceToShort = Name.fromString("coerceToShort");
     public static final Name defaultValue = Name.fromString("defaultValue");
     public static final Name elem = Name.fromString("elem");
     public static final Name elements = Name.fromString("elements");
@@ -188,6 +193,7 @@ public class Names {
     public static final Name isEmpty = Name.fromString("isEmpty");
     public static final Name instantiate = Name.fromString("instantiate");
     public static final Name java = Name.fromString("java");
+    public static final Name java_lang = Name.fromString("java.lang");
     public static final Name lang = Name.fromString("lang");
     public static final Name length = Name.fromString("length");
     public static final Name _match = Name.fromString("match");
@@ -206,6 +212,7 @@ public class Names {
     public static final Name result = Name.fromString("$result");
     public static final Name runtime = Name.fromString("runtime");
     public static final Name scala = Name.fromString("scala");
+    public static final Name scala_Predef = Name.fromString("scala.Predef");
     public static final Name setParents = Name.fromString("setParents");
     public static final Name synchronized_ = Name.fromString("synchronized");
     public static final Name tag = Name.fromString("$tag");

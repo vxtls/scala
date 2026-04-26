@@ -172,4 +172,3 @@ trait Map[A, +B] with PartialFunction[A, B] with Iterable[Pair[A, B]] {
             } + "}";
 
 }
-

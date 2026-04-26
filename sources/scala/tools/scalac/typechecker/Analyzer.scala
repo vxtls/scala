@@ -1563,7 +1563,7 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 	case Tree.Literal(constant) =>
 	  var n: int = constant match {
             case AConstant$INT(value) => value
-            case AConstant$CHAR(value) => value
+            case AConstant$CHAR(value) => value.coerceToInt
             case _ => Integer.MAX_VALUE
           }
 	  val value1: AConstant =
@@ -1592,12 +1592,12 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 	  val v = infer.bestView(tree.getType(), pt, Names.EMPTY);
 	  if (v != null) return applyView(v, tree, mode, pt);
 	  // todo: remove
- 	  val coerceMeth: Symbol = tree.getType().lookup(Names.coerce);
+ 	  val coerceMeth: Symbol = infer.coerceMethod(tree.getType(), pt);
  	  if (coerceMeth != Symbol.NONE) {
  	    val coerceType = infer.checkAccessible(
  	      tree.pos, coerceMeth, tree.getType().memberType(coerceMeth),
  	      tree, tree.getType());
- 	    val tree1 = make.Select(tree.pos, tree, Names.coerce)
+ 	    val tree1 = make.Select(tree.pos, tree, coerceMeth.name)
  	    .setSymbol(coerceMeth)
  	    .setType(coerceType);
 	    return adapt(tree1, mode, pt);

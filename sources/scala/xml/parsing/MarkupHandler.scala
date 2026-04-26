@@ -23,7 +23,7 @@ abstract class MarkupHandler[A <: AnyRef] {
 
   /** returns prefix of the qualified name if any */
   final def namespacePrefix(name: String): Option[String] = {
-    val i = name.indexOf(':');
+    val i = name.indexOf(':'.coerceToInt);
     if( i != -1 ) Some( name.substring(0, i) ) else None
   }
 

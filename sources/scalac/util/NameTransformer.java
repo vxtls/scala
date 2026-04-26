@@ -24,6 +24,7 @@ public class NameTransformer {
        operatorName['<'] = "$less";
        operatorName['>'] = "$greater";
        operatorName['!'] = "$bang";
+       operatorName['@'] = "$at";
        operatorName['#'] = "$hash";
        operatorName['%'] = "$percent";
        operatorName['^'] = "$up";
@@ -34,6 +35,7 @@ public class NameTransformer {
        operatorName['+'] = "$plus";
        operatorName['-'] = "$minus";
        operatorName[':'] = "$colon";
+       operatorName['?'] = "$qmark";
        operatorName['\\']= "$bslash";
     }
 

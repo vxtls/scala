@@ -425,7 +425,7 @@ object SymbolPrinter {
 
 
 object StopWatch {
-  var startTimeMillis: Long = 0;
+  var startTimeMillis: Long = 0.coerceToLong;
 
   /** arm the stop watch */
   def start: Unit = {

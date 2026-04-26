@@ -147,13 +147,14 @@ object List {
   def fromString(str: String, separator: Char): List[String] = {
     var res: List[String] = Nil;
     var start = 0;
-    var end = str.indexOf(separator);
+    val sep = separator.coerceToInt;
+    var end = str.indexOf(sep);
     while (end >= 0) {
       if (end > start)
         res = str.substring(start, end) :: res;
       end = end + 1;
       start = end;
-      end = str.indexOf(separator, end);
+      end = str.indexOf(sep, end);
     }
     res.reverse
   }

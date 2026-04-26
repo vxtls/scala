@@ -161,4 +161,3 @@ abstract class AttributeSeq with Seq[Attribute] {
       def get(p:Pair[String,String]) = AttributeSeq.this.lookup(p._1, p._2);
     }
 }
-

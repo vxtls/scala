@@ -59,8 +59,6 @@ public class CompilerCommand extends CommandParser {
     public final StringOptionParser extdirs;
     public final StringOptionParser outpath;
     public final StringOptionParser encoding;
-    public final StringOptionParser assemrefs;
-    public final StringOptionParser assemname;
     public final ChoiceOptionParser target;
     public final BooleanOptionParser noimports;
     public final BooleanOptionParser nopredefs;
@@ -167,16 +165,8 @@ public class CompilerCommand extends CommandParser {
             "separate", new String[]{"yes", "no"}, "default"),
 
         this.target = new ChoiceOptionParser(this,
-            "target", "Specify which backend to use (jvm, msil)",
+            "target", "Specify which backend to use (int, jvm, jvmfromicode)",
             "target", Global.TARGETS, Global.TARGET_JVM),
-
-        this.assemrefs = new StringOptionParser(this, "r",
-	    "Assemblies referenced by the source program (only relevant with '-target:msil')",
-            "assembly files", "."),
-
-        this.assemname = new StringOptionParser(this, "o",
-            "Name of the output assembly (only relevant with '-target:msil')",
-            "assembly name", null),
 
         this.debug = new BooleanOptionParser(this,
             "debug", "Output debugging messages",

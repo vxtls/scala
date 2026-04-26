@@ -132,13 +132,13 @@ class MetaParser {
                 //System.out.println("*** " + syms);//DEBUG
                 Type clazztype = Type.appliedType(ctype, Symbol.type(smbls));
                 Symbol constr = clazz.primaryConstructor();
-                switch (constr.rawInfo()) {
-                case MethodType(Symbol[] vparams, _):
+                Type constrInfo = constr.rawInfo();
+                if (constrInfo instanceof Type.MethodType) {
+                    Type.MethodType methodType = (Type.MethodType)constrInfo;
                     constr.setInfo(Type.PolyType
-                                   (smbls, Type.MethodType(vparams, clazztype)));
-                    break;
-                default:
-                    throw new ApplicationError(constr.rawInfo());
+                                   (smbls, Type.MethodType(methodType.vparams, clazztype)));
+                } else {
+                    throw new ApplicationError(constrInfo);
                 }
             } catch (NoSuchElementException e) {
             }
@@ -150,10 +150,10 @@ class MetaParser {
                 nextToken();
                 basetpes.add(parseType());
             } while (token.equals("with"));
-            switch (defaultType) {
-            case CompoundType(_, Scope scope):
+            if (defaultType instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)defaultType;
                 Type[] ts = (Type[])basetpes.toArray(new Type[basetpes.size()]);
-                res = Type.compoundType(ts, scope, defaultType.symbol());
+                res = Type.compoundType(ts, compoundType.members, defaultType.symbol());
             }
         }
         assert ";".equals(token);

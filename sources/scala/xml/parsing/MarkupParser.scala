@@ -156,7 +156,7 @@ abstract class MarkupParser[MarkupType <: AnyRef] {
     cbuf.setLength( 0 );
     // @todo: normalize attribute value
     // well-formedness constraint
-    if (str.indexOf('<') != -1) {
+    if (str.indexOf('<'.coerceToInt) != -1) {
       reportSyntaxError( "'<' not allowed in attrib value" ); ""
     }
     else

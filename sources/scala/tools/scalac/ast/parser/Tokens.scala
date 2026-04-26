@@ -109,7 +109,7 @@ object Tokens {
 
   /** Returns the token corresponding to given name. */
   def name2token(name: Name): int =
-    if (name.index <= maxKey) key(name.index) else IDENTIFIER;
+    if (name.index <= maxKey) key(name.index).coerceToInt else IDENTIFIER;
 
   /** Returns the string representation of given token. */
   def token2string(token: int): String = token match {

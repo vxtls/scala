@@ -231,7 +231,7 @@ abstract class FactoryAdapter extends DefaultHandler() {
 
         var systemId = ex.getSystemId();
         if (systemId != null) {
-            val index = systemId.lastIndexOf('/');
+            val index = systemId.lastIndexOf('/'.coerceToInt);
             if (index != -1)
                 systemId = systemId.substring(index + 1);
             //System.err.print(systemId);
