@@ -380,7 +380,7 @@ object TreeInfo {
       case Type.MethodType(vparams, result) => "MethodType( (" + apply(vparams) + "), " + apply(result) + ")\n";
       case Type.PolyType(tparams, result) => "PolyType( (" + apply(tparams) + "), " + apply(result) + ")\n";
       case Type.OverloadedType(alts, alttypes) => "OverloadedType()";
-      case Type.LazyType() => "LazyType()\n";
+      case _: Type.LazyType => "LazyType()\n";
       case Type.TypeVar(orig, constr) => "TypeVar()";
       case Type.UnboxedType(tag) => "UnboxedType(" + tag + ");\n";
       case Type.UnboxedArrayType(tag) => "UnboxedArrayType(" + tag + ")\n";

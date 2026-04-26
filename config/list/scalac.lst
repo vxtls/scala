@@ -13,6 +13,8 @@
 ../../../scalac/CompilationUnit.java
 
 ../../../scalac/ast/DefaultTreeFactory.java
+../../../scalac/ast/GenTransformer.java
+../../../scalac/ast/GenTreeCloner.java
 ../../../scalac/ast/LazyTreeCopier.java
 ../../../scalac/ast/StrictTreeCopier.java
 ../../../scalac/ast/Transformer.java
@@ -52,8 +54,6 @@
 ../../../scalac/backend/Primitive.java
 ../../../scalac/backend/Primitives.java
 ../../../scalac/backend/jvm/GenJVM.java
-../../../scalac/backend/msil/GenMSIL.java
-../../../scalac/backend/msil/TypeCreator.java
 
 ../../../scalac/checkers/CheckTreeNodes.java
 ../../../scalac/checkers/TreeChecker.java
@@ -62,9 +62,6 @@
 ../../../scalac/framework/Promise.java
 
 ../../../scalac/symtab/classfile/AttributeParser.java
-../../../scalac/symtab/classfile/CLRClassParser.java
-../../../scalac/symtab/classfile/CLRPackageParser.java
-../../../scalac/symtab/classfile/CLRTypes.java
 ../../../scalac/symtab/classfile/ClassParser.java
 ../../../scalac/symtab/classfile/ClassfileConstants.java
 ../../../scalac/symtab/classfile/ClassfileParser.java
@@ -79,11 +76,20 @@
 ../../../scalac/symtab/classfile/UnPickle.java
 
 ../../../scalac/symtab/AttributeInfo.java
+../../../scalac/symtab/AbsTypeSymbol.java
+../../../scalac/symtab/AliasTypeSymbol.java
+../../../scalac/symtab/ClassSymbol.java
 ../../../scalac/symtab/ClosureHistory.java
+../../../scalac/symtab/ConstructorSymbol.java
+../../../scalac/symtab/CyclicReference.java
 ../../../scalac/symtab/Definitions.java
 ../../../scalac/symtab/EntryTags.java
 ../../../scalac/symtab/Kinds.java
+../../../scalac/symtab/LinkedClassSymbol.java
+../../../scalac/symtab/LinkedModuleSymbol.java
 ../../../scalac/symtab/Modifiers.java
+../../../scalac/symtab/ModuleClassSymbol.java
+../../../scalac/symtab/ModuleSymbol.java
 ../../../scalac/symtab/Scope.java
 ../../../scalac/symtab/SourceCompleter.java
 ../../../scalac/symtab/SymSet.java
@@ -95,8 +101,10 @@
 ../../../scalac/symtab/SymbolOrigin.java
 ../../../scalac/symtab/SymbolSubstTypeMap.java
 ../../../scalac/symtab/SymbolTablePrinter.java
+../../../scalac/symtab/TermSymbol.java
 ../../../scalac/symtab/Type.java
 ../../../scalac/symtab/TypeTags.java
+../../../scalac/symtab/TypeSymbol.java
 
 ../../../scalac/transformer/AddAccessorsPhase.java
 ../../../scalac/transformer/AddConstructors.java
@@ -117,20 +125,34 @@
 ../../../scalac/typechecker/AnalyzerPhase.java
 ../../../scalac/typechecker/Infer.java
 
+../../../scalac/util/AbstractFileReader.java
+../../../scalac/util/ArgumentParser.java
 ../../../scalac/util/ArrayApply.java
+../../../scalac/util/BooleanOptionParser.java
+../../../scalac/util/ChoiceOptionParser.java
+../../../scalac/util/CommandParser.java
 ../../../scalac/util/Debug.java
 ../../../scalac/util/EmptyPhase.java
 ../../../scalac/util/FreshNameCreator.java
+../../../scalac/util/HelpOptionParser.java
 ../../../scalac/util/Name.java
 ../../../scalac/util/NameTransformer.java
 ../../../scalac/util/Names.java
 ../../../scalac/util/OptionParser.java
+../../../scalac/util/PhaseSetOptionParser.java
 ../../../scalac/util/PrefixMatcher.java
+../../../scalac/util/PrintOptionParser.java
+../../../scalac/util/ScalaFileArgumentParser.java
+../../../scalac/util/ScalaProgramArgumentParser.java
 ../../../scalac/util/SourceRepresentation.java
+../../../scalac/util/StringOptionParser.java
 ../../../scalac/util/Strings.java
 ../../../scalac/util/TermName.java
 ../../../scalac/util/TypeName.java
 ../../../scalac/util/TypeNames.java
+../../../scalac/util/UnknownArgumentParser.java
+../../../scalac/util/UnknownOptionParser.java
+../../../scalac/util/VersionOptionParser.java
 
 ../../../scalac/transformer/ICodePhase.java
 ../../../scalac/transformer/WholeProgPhase.java

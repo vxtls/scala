@@ -85,17 +85,48 @@ public class ScalaTemplate {
     public Object invoke(Object self, Symbol method, Object[] args) {
         CodePromise code = (CodePromise)vtable.get(method);
         if (code == null) {
-            // !!! generalize use of overridingSymbol in interpreter
             code = (CodePromise)vtable.get(method.overridingSymbol(symbol.thisType(), true));
+        }
+        if (code == null) {
+            code = (CodePromise)vtable.get(method.overridingSymbol(symbol.thisType()));
+        }
+        if (code == null) {
+            code = findBySignature(method);
         }
         assert code != null : Debug.show(symbol) + "->" + Debug.show(method);
         return evaluator.evaluate(code, self, args);
     }
 
+    private CodePromise findBySignature(Symbol method) {
+        java.util.Iterator entries = vtable.entrySet().iterator();
+        while (entries.hasNext()) {
+            Map.Entry entry = (Map.Entry)entries.next();
+            Object key = entry.getKey();
+            if (!(key instanceof Symbol)) continue;
+            Symbol candidate = (Symbol)key;
+            if (sameMethodSignature(candidate, method))
+                return (CodePromise)entry.getValue();
+        }
+        return null;
+    }
+
+    private boolean sameMethodSignature(Symbol candidate, Symbol method) {
+        if (!candidate.isMethod() || !method.isMethod()) return false;
+        if (candidate.name != method.name) return false;
+        if (!candidate.owner().isSubClass(method.owner())) return false;
+        Symbol[] candidateParams = candidate.valueParams();
+        Symbol[] methodParams = method.valueParams();
+        if (candidateParams.length != methodParams.length) return false;
+        for (int i = 0; i < candidateParams.length; i++)
+            if (!candidateParams[i].type().isSameAs(methodParams[i].type()))
+                return false;
+        return true;
+    }
+
     public Object invoke(Object self, Method method, Object[] args) {
         CodePromise code = (CodePromise)vtable.get(method);
         assert code != null : Debug.show(symbol) + "->" + Debug.show(method);
-        return evaluator.evaluate(code, self, args);
+        return evaluator.adaptResult(method, evaluator.evaluate(code, self, args));
     }
 
     //########################################################################

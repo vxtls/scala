@@ -232,8 +232,7 @@ compute_value() {
         LIBRARY_SOURCES | \
         LIBRARY_CLASSES | \
         TOOLS_CLASSES   | \
-        FJBG_CLASSES    | \
-        MSIL_CLASSES    )
+        FJBG_CLASSES    )
             if eval [ -n \"\$SCALA_$1\" ]; then
                 if eval [ -f \"\$SCALA_$1\" -o -d \"\$SCALA_$1\" ]; then
                     eval current_$1=\"\$SCALA_$1\";
@@ -249,6 +248,27 @@ compute_value() {
                 eval abort \""File referred by default_$1 (\$default_$1)" \
                     "does not exist. Please, fix definition of default_$1 in" \
                     "file $SOURCE or define environment variable SCALA_$1."\";
+            fi;
+            ;;
+
+        MSIL_CLASSES    )
+            if eval [ -n \"\$SCALA_$1\" ]; then
+                if eval [ -f \"\$SCALA_$1\" -o -d \"\$SCALA_$1\" ]; then
+                    eval current_$1=\"\$SCALA_$1\";
+                else
+                    eval warning \""File referred by SCALA_$1 (\$SCALA_$1)" \
+                        "does not exist, using default value instead."\";
+                    unset SCALA_$1;
+                fi;
+            fi;
+            if eval [ -n \"\$current_$1\" ]; then
+                if eval [ -f \"\$current_$1\" -o -d \"\$current_$1\" ]; then
+                    :;
+                else
+                    eval abort \""File referred by default_$1 (\$default_$1)" \
+                        "does not exist. Please, fix definition of default_$1 in" \
+                        "file $SOURCE or define environment variable SCALA_$1."\";
+                fi;
             fi;
             ;;
 

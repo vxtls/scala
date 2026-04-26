@@ -221,7 +221,7 @@ class TransMatch( global:scalac_Global )
           }
           select(0, expanded) map { x:List[Tree] =>
             //Console.println("remove:Sequence, type = "+pat.getType());
-            val res = Sequence(lst2arr(x)).setType(pat.getType());
+            val res = new Sequence(lst2arr(x)).setType(pat.getType());
                                    //Console.println("remove:Sequence RETURNS "+res);
                                    res
                                  }
@@ -338,9 +338,9 @@ class TransMatch( global:scalac_Global )
       } catch {
         case e:Throwable =>
           e.printStackTrace();
-          Console.print("failed on pats "+scala.Iterator.fromArray(cases).toList.mkString("","\n","")+", message\n"+e.getMessage());
-          Console.print("  unit "+cunit);
-          Console.println(" with exception:"+e.getMessage());
+          scala.Console.print("failed on pats "+scala.Iterator.fromArray(cases).toList.mkString("","\n","")+", message\n"+e.getMessage());
+          scala.Console.print("  unit "+cunit);
+          scala.Console.println(" with exception:"+e.getMessage());
           //e.printStackTrace();
           System.exit(-1); //Debug.abort()
       }

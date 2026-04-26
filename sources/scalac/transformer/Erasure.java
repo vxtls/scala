@@ -12,11 +12,11 @@ package scalac.transformer;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.HashSet;
 
 import scalac.Global;
-import scalac.Phase;
 import scalac.CompilationUnit;
 import scalac.ast.Tree;
 import scalac.ast.Tree.Ident;
@@ -36,7 +36,6 @@ import scalac.symtab.Scope;
 import scalac.symtab.Scope.SymbolIterator;
 import scalac.symtab.SymSet;
 import scalac.symtab.Symbol;
-import scalac.symtab.SymbolTablePrinter;
 import scalac.backend.Primitive;
 import scalac.backend.Primitives;
 import scalac.util.Name;
@@ -84,17 +83,14 @@ public class Erasure extends GenTransformer implements Modifiers {
     /** The current unit */
     private CompilationUnit unit;
 
-    private final boolean forMSIL;
-
     //########################################################################
     // Public Constructors
 
     /** Initializes this instance. */
-    public Erasure(Global global) {
+	public Erasure(Global global) {
         super(global);
 	this.definitions = global.definitions;
         this.primitives = global.primitives;
-        this.forMSIL = global.target == global.TARGET_MSIL;
     }
 
     //########################################################################
@@ -108,60 +104,65 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Transforms the given tree. */
     public Tree transform(Tree tree) {
-        switch (tree) {
-
-	case ClassDef(_, _, _, _, _, Template(_, Tree[] body)):
+        if (tree instanceof Tree.ClassDef) {
+            Tree.ClassDef classDef = (Tree.ClassDef)tree;
+            Tree[] body = classDef.impl.body;
             Symbol clasz = tree.symbol();
             TreeList members = new TreeList(transform(body));
             addBridges(clasz, members);
             return gen.ClassDef(clasz, members.toArray());
-
-	case ValDef(_, _, _, Tree rhs):
+        } else if (tree instanceof Tree.ValDef) {
+            Tree rhs = ((Tree.ValDef)tree).rhs;
             Symbol field = tree.symbol();
 	    if (rhs != Tree.Empty) rhs = transform(rhs, field.nextType());
 	    return gen.ValDef(field, rhs);
-
-	case DefDef(_, _, _, _, _, Tree rhs):
+        } else if (tree instanceof Tree.DefDef) {
+            Tree rhs = ((Tree.DefDef)tree).rhs;
             Symbol method = tree.symbol();
             if (rhs != Tree.Empty)
                 rhs = transform(rhs, method.nextType().resultType());
 	    return gen.DefDef(method, rhs);
-
-        case LabelDef(_, Ident[] params, Tree body):
+        } else if (tree instanceof Tree.LabelDef) {
+            Tree.LabelDef labelDef = (Tree.LabelDef)tree;
+            Ident[] params = labelDef.params;
+            Tree body = labelDef.rhs;
             Symbol label = tree.symbol();
             body = transform(body, label.nextType().resultType());
 	    return gen.LabelDef(label, Tree.symbolOf(params), body);
-
-	case Assign(Tree lhs, Tree rhs):
+        } else if (tree instanceof Tree.Assign) {
+            Tree.Assign assign = (Tree.Assign)tree;
+            Tree lhs = assign.lhs;
+            Tree rhs = assign.rhs;
 	    lhs = transform(lhs);
 	    rhs = transform(rhs, lhs.type);
 	    return gen.Assign(tree.pos, lhs, rhs);
-
-	case Return(Tree expr):
+        } else if (tree instanceof Tree.Return) {
+            Tree expr = ((Tree.Return)tree).expr;
             Symbol method = tree.symbol();
             Type type = method.nextType().resultType();
 	    return gen.Return(tree.pos, method, transform(expr, type));
-
-        case New(Tree init):
+        } else if (tree instanceof Tree.New) {
+            Tree init = ((Tree.New)tree).init;
             if (tree.getType().symbol() == definitions.ARRAY_CLASS) {
-                switch (init) {
-                case Apply(_, Tree[] args):
+                if (init instanceof Tree.Apply) {
+                    Tree[] args = ((Tree.Apply)init).args;
                     assert args.length == 1: tree;
                     Type element = getArrayElementType(tree.getType()).erasure();
                     Tree size = transform(args[0]);
                     return genNewUnboxedArray(tree.pos, element, size);
-                default:
-                    throw Debug.abort("illegal case", tree);
                 }
+                throw Debug.abort("illegal case", tree);
             }
 	    return gen.New(tree.pos, transform(init));
-
-        case Create(_, _):
+        } else if (tree instanceof Tree.Create) {
             return gen.Create(tree.pos, Tree.Empty, tree.symbol());
-
-	case Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs):
-            fun = transform(fun);
-            vargs = transform(vargs);
+        } else if (tree instanceof Tree.Apply
+                   && ((Tree.Apply)tree).fun instanceof Tree.TypeApply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree.TypeApply typeApply = (Tree.TypeApply)apply.fun;
+            Tree fun = transform(typeApply.fun);
+            Tree[] targs = typeApply.args;
+            Tree[] vargs = transform(apply.args);
             Symbol symbol = fun.symbol();
             if (symbol == definitions.ANY_AS_ERASED) {
                 assert targs.length == 1 && vargs.length == 0: tree;
@@ -174,40 +175,48 @@ public class Erasure extends GenTransformer implements Modifiers {
                 return gen.mkIsInstanceOf(tree.pos, getQualifier(fun), type);
             }
             return genApply(tree.pos, fun, vargs);
-
-	case Apply(Tree fun, Tree[] vargs):
-            fun = transform(fun);
-            vargs = transform(vargs);
-            switch (fun) {
-            case Select(Apply(Tree bfun, Tree[] bargs), _):
+        } else if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree fun = transform(apply.fun);
+            Tree[] vargs = transform(apply.args);
+            if (fun instanceof Tree.Select
+                && ((Tree.Select)fun).qualifier instanceof Tree.Apply) {
+                Tree.Apply boxedApply = (Tree.Apply)((Tree.Select)fun).qualifier;
+                Tree bfun = boxedApply.fun;
+                Tree[] bargs = boxedApply.args;
                 Symbol bsym = bfun.symbol();
-                if (primitives.getPrimitive(bsym) != Primitive.BOX) break;
-                assert bargs.length == 1: fun;
-                switch (primitives.getPrimitive(fun.symbol())) {
-                case COERCE:
-                    assert vargs.length == 0: tree;
-                    Tree value = bargs[0];
-                    return coerce(value, fun.type().resultType());
-                case LENGTH:
-                    assert vargs.length == 0: tree;
-                    Tree array = bargs[0];
-                    return genUnboxedArrayLength(tree.pos, array);
-                case APPLY:
-                    assert vargs.length == 1: tree;
-                    Tree array = bargs[0];
-                    Tree index = vargs[0];
-                    return genUnboxedArrayGet(tree.pos, array, index);
-                case UPDATE:
-                    assert vargs.length == 2: tree;
-                    Tree array = bargs[0];
-                    Tree index = vargs[0];
-                    Tree value = vargs[1];
-                    return genUnboxedArraySet(tree.pos, array, index, value);
+                if (primitives.getPrimitive(bsym) == Primitive.BOX) {
+                    assert bargs.length == 1: fun;
+                    switch (primitives.getPrimitive(fun.symbol())) {
+                    case COERCE: {
+                        assert vargs.length == 0: tree;
+                        Tree value = bargs[0];
+                        return coerce(value, fun.type().resultType());
+                    }
+                    case LENGTH: {
+                        assert vargs.length == 0: tree;
+                        Tree array = bargs[0];
+                        return genUnboxedArrayLength(tree.pos, array);
+                    }
+                    case APPLY: {
+                        assert vargs.length == 1: tree;
+                        Tree array = bargs[0];
+                        Tree index = vargs[0];
+                        return genUnboxedArrayGet(tree.pos, array, index);
+                    }
+                    case UPDATE: {
+                        assert vargs.length == 2: tree;
+                        Tree array = bargs[0];
+                        Tree index = vargs[0];
+                        Tree value = vargs[1];
+                        return genUnboxedArraySet(tree.pos, array, index, value);
+                    }
+                    }
                 }
             }
             return genApply(tree.pos, fun, vargs);
-
-	case Select(Tree qualifier, _):
+        } else if (tree instanceof Tree.Select) {
+            Tree qualifier = ((Tree.Select)tree).qualifier;
             Symbol symbol = tree.symbol();
             Type prefix = qualifier.type().baseType(symbol.owner()).erasure();
             assert prefix != Type.NoType: tree + " -- " + Debug.show(symbol);
@@ -217,18 +226,15 @@ public class Erasure extends GenTransformer implements Modifiers {
             // Might end up with "box(unbox(...))". That's needed by backend.
             if (isUnboxedType(prefix)) qualifier = box(qualifier, true);
 	    return gen.Select(tree.pos, qualifier, symbol);
-
-        case Literal(AConstant.ZERO):
+        } else if (tree instanceof Tree.Literal
+                   && ((Tree.Literal)tree).value == AConstant.ZERO) {
 	    return gen.mkNullLit(tree.pos);
-
-        case Block(_, _):
-	case If(_, _, _):
-        case Switch(_, _, _, _):
+        } else if (tree instanceof Tree.Block
+                   || tree instanceof Tree.If
+                   || tree instanceof Tree.Switch) {
             return transform(tree, tree.getType().fullErasure());
-
-        default:
-            return super.transform(tree);
         }
+        return super.transform(tree);
     }
 
     //########################################################################
@@ -250,42 +256,46 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Transforms the given tree with given prototype. */
     private Tree transform(Tree tree, Type pt) {
-        switch (tree) {
-
-        case Block(Tree[] stats, Tree value):
-            return gen.Block(tree.pos, transform(stats), transform(value, pt));
-
-	case If(Tree cond, Tree thenp, Tree elsep):
+        if (tree == Tree.Empty) {
+            return transform(gen.mkDefaultValue(tree.pos, pt), pt);
+        } else if (tree instanceof Tree.Block) {
+            Tree.Block block = (Tree.Block)tree;
+            return gen.Block(tree.pos, transform(block.stats), transform(block.expr, pt));
+        } else if (tree instanceof Tree.If) {
+            Tree.If ifTree = (Tree.If)tree;
+            Tree cond = ifTree.cond;
+            Tree thenp = ifTree.thenp;
+            Tree elsep = ifTree.elsep;
 	    cond = transform(cond, UNBOXED_BOOLEAN);
 	    thenp = transform(thenp, pt);
 	    elsep = transform(elsep, pt);
-	    return gen.If(tree.pos, cond, thenp, elsep, pt);
-
-        case Switch(Tree test, int[] tags, Tree[] bodies, Tree otherwise):
-	    test = transform(test, UNBOXED_INT);
+	    return global.make.If(tree.pos, cond, thenp, elsep).setType(pt);
+        } else if (tree instanceof Tree.Switch) {
+            Tree.Switch switchTree = (Tree.Switch)tree;
+            Tree test = switchTree.test;
+            int[] tags = switchTree.tags;
+            Tree[] bodies = switchTree.bodies;
+            Tree otherwise = switchTree.otherwise;
+		    test = transform(test, UNBOXED_INT);
             bodies = transform(bodies, pt);
             otherwise = transform(otherwise, pt);
-            return gen.Switch(tree.pos, test, tags, bodies, otherwise, pt);
-
-        case Return(_):
-            // !!! why do we build a block here?
+            return global.make.Switch(tree.pos, test, tags, bodies, otherwise).setType(pt);
+        } else if (tree instanceof Tree.Return) {
+            // Preserve return side effects while synthesizing the value flow.
             Tree value = transform(gen.mkDefaultValue(tree.pos, pt), pt);
             return gen.mkBlock(transform(tree), value);
-
-        case LabelDef(_, _, _):
-	case Assign(_, _):
-        case New(_):
-        case Apply(_, _):
-        case Super(_, _):
-        case This(_):
-        case Select(_, _):
-        case Ident(_):
-        case Literal(_):
+        } else if (tree instanceof Tree.LabelDef
+                   || tree instanceof Tree.Assign
+                   || tree instanceof Tree.New
+                   || tree instanceof Tree.Apply
+                   || tree instanceof Tree.Super
+                   || tree instanceof Tree.This
+                   || tree instanceof Tree.Select
+                   || tree instanceof Tree.Ident
+                   || tree instanceof Tree.Literal) {
             return coerce(transform(tree), pt);
-
-        default:
-            throw Debug.abort("illegal case", tree);
         }
+        throw Debug.abort("illegal case", tree);
     }
 
     /** Transforms Unit literal with given prototype. */
@@ -298,6 +308,14 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Coerces the given tree to the given type. */
     private Tree coerce(Tree tree, Type pt) {
+        if (pt.isSameAs(UNBOXED_UNIT)) {
+            if (tree.type() == Type.ErrorType) return tree;
+            if (tree.type().isSameAs(UNBOXED_UNIT)
+                || isSubType(tree.type(), definitions.UNIT_TYPE())) {
+                return tree.type().isSameAs(UNBOXED_UNIT) ? tree : unbox(tree, pt);
+            }
+            return gen.mkUnitBlock(tree);
+        }
         if (isSubType(tree.type(), pt)) {
             if (tree.type().symbol() == definitions.ARRAY_CLASS) {
                 if (pt.symbol() != definitions.ARRAY_CLASS) {
@@ -348,11 +366,11 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Boxes the given tree. */
     private Tree box(Tree tree, boolean force) {
-        switch (tree) {
-        case Apply(Tree fun, Tree[] args):
-            if (primitives.getPrimitive(fun.symbol()) == Primitive.UNBOX) {
-                assert args.length == 1: tree;
-                if (!force) return args[0];
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            if (primitives.getPrimitive(apply.fun.symbol()) == Primitive.UNBOX) {
+                assert apply.args.length == 1: tree;
+                if (!force) return apply.args[0];
             }
         }
         Symbol symbol = primitives.getBoxValueSymbol(tree.getType());
@@ -364,11 +382,11 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Unboxes the given tree to the given type. */
     private Tree unbox(Tree tree, Type pt) {
-        switch (tree) {
-        case Apply(Tree fun, Tree[] args):
-            if (primitives.getPrimitive(fun.symbol()) == Primitive.BOX) {
-                assert args.length == 1: tree;
-                return args[0];
+        if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            if (primitives.getPrimitive(apply.fun.symbol()) == Primitive.BOX) {
+                assert apply.args.length == 1: tree;
+                return apply.args[0];
             }
         }
         Symbol symbol = primitives.getUnboxValueSymbol(pt);
@@ -378,6 +396,7 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Converts the given tree to the given type. */
     private Tree convert(Tree tree, Type to) {
+        if (isSameAs(tree.type(), to)) return tree;
         Symbol symbol = primitives.getConvertSymbol(tree.type(), to);
         return gen.mkApply_V(
             gen.mkGlobalRef(tree.pos, symbol), new Tree[]{tree});
@@ -397,8 +416,8 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Generates an application with given function and arguments. */
     private Tree genApply(int pos, Tree fun, Tree[] args) {
-        switch (fun.getType()) {
-        case MethodType(Symbol[] params, Type result):
+        if (fun.getType() instanceof Type.MethodType) {
+            Symbol[] params = ((Type.MethodType)fun.getType()).vparams;
             Tree[] args1 = args;
             for (int i = 0; i < args.length; i++) {
                 Tree arg = args[i];
@@ -410,9 +429,8 @@ public class Erasure extends GenTransformer implements Modifiers {
                 args1[i] = arg1;
             }
             return gen.mkApply_V(pos, fun, args1);
-        default:
-            throw Debug.abort("illegal type " + fun.getType() + " for " + fun);
         }
+        throw Debug.abort("illegal type " + fun.getType() + " for " + fun);
     }
 
     /**
@@ -420,20 +438,56 @@ public class Erasure extends GenTransformer implements Modifiers {
      * of given type.
      */
     private Tree genNewUnboxedArray(int pos, Type element, Tree size) {
+        if (element instanceof Type.UnboxedType) {
+            return genNewUnboxedArray(pos, ((Type.UnboxedType)element).tag, size);
+        }
         if (global.target == global.TARGET_INT) {
             Tree[] targs = {gen.mkType(pos, element)};
             Tree[] vargs = {coerce(size, UNBOXED_INT)};
             Tree fun = gen.mkGlobalRef(pos, primitives.NEW_OARRAY);
             return gen.mkApplyTV(fun, targs, vargs);
         }
-        switch (element) {
-        case UnboxedType(int kind): return genNewUnboxedArray(pos, kind, size);
-        }
         String name = primitives.getNameForClassForName(element);
         Tree[] args = { coerce(size, UNBOXED_INT), gen.mkStringLit(pos,name) };
         Tree array =
-            gen.mkApply_V(gen.mkGlobalRef(pos,primitives.NEW_OARRAY), args);
+            gen.mkApply_V(gen.mkGlobalRef(pos, primitives.NEW_OARRAY), args);
         return gen.mkAsInstanceOf(array, Type.UnboxedArrayType(element));
+    }
+
+    private Tree unboxArray(Tree array, Type arrayType) {
+        Type element = arrayElementType(arrayType).erasure();
+        return coerce(array, Type.UnboxedArrayType(element));
+    }
+
+    private Tree genBoxedArrayLength(int pos, Tree array) {
+        Symbol symbol = primitives.getArrayLengthSymbol(array.getType());
+        Tree[] args = { array };
+        return gen.mkApply_V(gen.mkGlobalRef(pos, symbol), args);
+    }
+
+    private Tree genBoxedArrayGet(int pos, Tree array, Tree index) {
+        Symbol symbol = primitives.getArrayGetSymbol(array.getType());
+        index = coerce(index, UNBOXED_INT);
+        Tree[] args = { array, index };
+        return gen.mkApply_V(gen.mkGlobalRef(pos, symbol), args);
+    }
+
+    private Tree genBoxedArraySet(int pos, Tree array, Tree index, Tree value) {
+        Symbol symbol = primitives.getArraySetSymbol(array.getType());
+        index = coerce(index, UNBOXED_INT);
+        value = coerce(value, getArrayElementType(array.getType()));
+        Tree[] args = { array, index, value };
+        return gen.mkApply_V(gen.mkGlobalRef(pos, symbol), args);
+    }
+
+    private Type arrayElementType(Type arrayType) {
+        if (arrayType instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)arrayType;
+            if (typeRef.sym == definitions.ARRAY_CLASS &&
+                typeRef.args.length == 0)
+                return definitions.ANYREF_TYPE();
+        }
+        return getArrayElementType(arrayType);
     }
 
     /**
@@ -478,12 +532,10 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Returns the qualifier of the given tree. */
     private Tree getQualifier(Tree tree) {
-        switch (tree) {
-        case Select(Tree qualifier, _):
-            return qualifier;
-        default:
-            throw Debug.abort("no qualifier for tree", tree);
+        if (tree instanceof Tree.Select) {
+            return ((Tree.Select)tree).qualifier;
         }
+        throw Debug.abort("no qualifier for tree", tree);
     }
 
     /** Are the given erased types in a subtyping relation? */
@@ -504,67 +556,62 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     /** Is the given type an unboxed type? */
     private boolean isUnboxedType(Type type) {
-	switch (type) {
-	case UnboxedType(_)     : return true;
-	case UnboxedArrayType(_): return true;
-	default                 : return false;
-	}
+	return type instanceof Type.UnboxedType || type instanceof Type.UnboxedArrayType;
     }
 
     /** Is the given type an unboxed simple type? */
     private boolean isUnboxedSimpleType(Type type) {
-	switch (type) {
-	case UnboxedType(_)     : return true;
-	default                 : return false;
-	}
+	return type instanceof Type.UnboxedType;
     }
 
     /** Is the given type an unboxed array type? */
     private boolean isUnboxedArrayType(Type type) {
-	switch (type) {
-	case UnboxedArrayType(_): return true;
-	default                 : return false;
-	}
+	return type instanceof Type.UnboxedArrayType;
     }
 
     /** Returns the boxed version of the given unboxed type. */
     private Type boxUnboxedType(Type type) {
-	switch (type) {
-	case UnboxedType(TypeTags.UNIT):
-            return definitions.UNIT_CLASS.type();
-	case UnboxedType(TypeTags.BOOLEAN):
-            return definitions.BOOLEAN_CLASS.type();
-	case UnboxedType(TypeTags.BYTE):
-            return definitions.BYTE_CLASS.type();
-	case UnboxedType(TypeTags.SHORT):
-            return definitions.SHORT_CLASS.type();
-	case UnboxedType(TypeTags.CHAR):
-            return definitions.CHAR_CLASS.type();
-	case UnboxedType(TypeTags.INT):
-            return definitions.INT_CLASS.type();
-	case UnboxedType(TypeTags.LONG):
-            return definitions.LONG_CLASS.type();
-	case UnboxedType(TypeTags.FLOAT):
-            return definitions.FLOAT_CLASS.type();
-	case UnboxedType(TypeTags.DOUBLE):
-            return definitions.DOUBLE_CLASS.type();
-	case UnboxedArrayType(Type element):
+	if (type instanceof Type.UnboxedType) {
+            switch (((Type.UnboxedType)type).tag) {
+            case TypeTags.UNIT:
+                return definitions.UNIT_CLASS.type();
+            case TypeTags.BOOLEAN:
+                return definitions.BOOLEAN_CLASS.type();
+            case TypeTags.BYTE:
+                return definitions.BYTE_CLASS.type();
+            case TypeTags.SHORT:
+                return definitions.SHORT_CLASS.type();
+            case TypeTags.CHAR:
+                return definitions.CHAR_CLASS.type();
+            case TypeTags.INT:
+                return definitions.INT_CLASS.type();
+            case TypeTags.LONG:
+                return definitions.LONG_CLASS.type();
+            case TypeTags.FLOAT:
+                return definitions.FLOAT_CLASS.type();
+            case TypeTags.DOUBLE:
+                return definitions.DOUBLE_CLASS.type();
+            default:
+                break;
+            }
+	} else if (type instanceof Type.UnboxedArrayType) {
+            Type element = ((Type.UnboxedArrayType)type).elemtp;
             return Type.appliedType(
                 definitions.ARRAY_CLASS.type(), new Type[] {element});
-	default:
-            throw Debug.abort("illegal case", type);
 	}
+        throw Debug.abort("illegal case", type);
     }
 
     /** Returns the element type of the given array type. */
     private Type getArrayElementType(Type type) {
-        switch (type) {
-        case TypeRef(_, Symbol symbol, Type[] args):
-            if (symbol != definitions.ARRAY_CLASS) break;
-            assert args.length == 1: type;
-            return args[0];
-        case UnboxedArrayType(Type element):
-            return element;
+        if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            if (typeRef.sym == definitions.ARRAY_CLASS) {
+                assert typeRef.args.length == 1: type;
+                return typeRef.args[0];
+            }
+        } else if (type instanceof Type.UnboxedArrayType) {
+            return ((Type.UnboxedArrayType)type).elemtp;
         }
         throw Debug.abort("non-array type", type);
     }
@@ -575,12 +622,24 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     private TreeList bridges;
     private HashMap bridgeSyms;
+    private HashMap currentMethodSyms;
+
+    private boolean hasBridgeSymbol(Name name, Type bridgeType) {
+        for (Iterator i = bridgeSyms.values().iterator(); i.hasNext(); ) {
+            SymSet syms = (SymSet)i.next();
+            Symbol[] brs = syms.toArray();
+            for (int j = 0; j < brs.length; j++) {
+                if (brs[j].name == name && isSameAs(brs[j].type(), bridgeType))
+                    return true;
+            }
+        }
+        return false;
+    }
 
     /** Add bridge which Java-overrides `sym1' and which forwards to `sym'
      */
     public void addBridge(Symbol owner, Symbol sym, Symbol sym1) {
 	Type bridgeType = sym1.nextType();
-
 	// create bridge symbol and add to bridgeSyms(sym)
 	// or return if bridge with required type already exists for sym.
 	SymSet bridgesOfSym = (SymSet) bridgeSyms.get(sym);
@@ -589,6 +648,13 @@ public class Erasure extends GenTransformer implements Modifiers {
 	for (int i = 0; i < brs.length; i++) {
 	    if (isSameAs(brs[i].type(), bridgeType)) return;
 	}
+        if (hasBridgeSymbol(sym.name, bridgeType))
+            return;
+        if (hasFinalInheritedJvmMethod(owner, sym.name, bridgeType))
+            return;
+        if ((sym.owner() != owner || sym.isFinal()) &&
+            hasConcreteInheritedJvmMethod(owner, sym.name, bridgeType))
+            return;
 	Symbol bridgeSym = sym.cloneSymbol();
 	bridgeSym.flags |= (SYNTHETIC | BRIDGE);
 	bridgeSym.flags &= ~(JAVA | DEFERRED);
@@ -596,23 +662,34 @@ public class Erasure extends GenTransformer implements Modifiers {
 	bridgeSyms.put(sym, bridgesOfSym);
         bridgeSym.setOwner(owner);
 
-	// check that there is no overloaded symbol with same erasure as bridge
-	// todo: why only check for overloaded?
-	Symbol overSym = owner.members().lookup(sym.name);
-	switch (overSym.nextType()) {
-	case OverloadedType(Symbol[] alts, Type[] alttypes):
-	    for (int i = 0; i < alts.length; i++) {
-		if (sym != alts[i] && isSameAs(bridgeType, alttypes[i])) {
-		    unit.error(sym.pos, "overlapping overloaded alternatives; " +
-			       "overridden " + sym1 + sym1.locationString() +
-			       " has same erasure as " + alts[i] +
-			       alttypes[i] + alts[i].locationString());
+	// Avoid generating a bridge that collides with an existing method
+	// after erasure. That would yield an invalid classfile.
+        Type erasedBridgeType = bridgeType.fullErasure();
+        Symbol[] alts = declaredAlternativesOf(owner, sym.name);
+        for (int i = 0; i < alts.length; i++) {
+            Type altType = bridgeTypeFor(owner, alts[i]);
+            if (altType != Type.NoType &&
+                altType != Type.ErrorType &&
+                hasSameJvmType(bridgeType, altType))
+                return;
+        }
+	for (int i = 0; i < alts.length; i++) {
+	    Type altType = bridgeTypeFor(owner, alts[i]);
+	    if (sym != alts[i] &&
+                altType != Type.NoType &&
+                altType != Type.ErrorType &&
+                hasSameJvmType(bridgeType, altType)) {
+		unit.error(sym.pos, "overlapping overloaded alternatives; " +
+			   "overridden " + sym1 + sym1.locationString() +
+			   " has same erasure as " + alts[i] +
+			   altType + alts[i].locationString());
 		}
-	    }
 	}
 
-	switch (bridgeType) {
-	case MethodType(Symbol[] params, Type restp):
+	if (bridgeType instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)bridgeType;
+            Symbol[] params = methodType.vparams;
+            Type restp = methodType.result;
 	    // assign to bridge symbol its bridge type
 	    // where owner of all parameters is bridge symbol itself.
 	    Symbol[] params1 = new Symbol[params.length];
@@ -625,31 +702,6 @@ public class Erasure extends GenTransformer implements Modifiers {
         }
 
     }
-
-    /** Add an "empty bridge" (abstract method declaration) to satisfy
-     *  CLR's requirement that classes should provide declaration
-     *  for all methods of the interfaces they implement
-     */
-    /*
-    public void addEmptyBridge(Symbol owner, Symbol method) {
-	Type bridgeType = method.nextType();
-	Symbol bridgeSym = method.cloneSymbol(owner);
-	bridgeSym.flags = bridgeSym.flags & ~JAVA | SYNTHETIC | DEFERRED;
-	//bridgeSym.setOwner(owner);
-	switch (bridgeType) {
-	case MethodType(Symbol[] params, Type restp):
-	    // assign to bridge symbol its bridge type
-	    // where owner of all parameters is bridge symbol itself.
-	    Symbol[] params1 = new Symbol[params.length];
-	    for (int i = 0; i < params.length; i++) {
-		params1[i] = params[i].cloneSymbol(bridgeSym);
-	    }
-	    bridgeSym.setType(Type.MethodType(params1, restp));
-	    Tree bridge = gen.DefDef(bridgeSym, Tree.Empty);
-            bridges.append(bridge);
-	}
-    }
-    */
 
     private final Map interfaces/*<Symbol,Set<Symbol>>*/ = new HashMap();
 
@@ -673,7 +725,6 @@ public class Erasure extends GenTransformer implements Modifiers {
         Symbol svper = clasz.parents()[0].symbol();
         assert svper.isClass() && !svper.isInterface(): Debug.show(clasz);
         Set interfaces = new HashSet(getInterfacesOf(clasz));
-        interfaces.removeAll(getInterfacesOf(svper));
         for (Iterator i = interfaces.iterator(); i.hasNext(); ) {
             Symbol inter = (Symbol)i.next();
             addInterfaceBridgesAux(clasz, inter.members());
@@ -681,19 +732,310 @@ public class Erasure extends GenTransformer implements Modifiers {
     }
 
     private void addInterfaceBridgesAux(Symbol owner, Scope symbols) {
-        for (Scope.SymbolIterator i = symbols.iterator();
-	     i.hasNext();) {
+        for (Scope.SymbolIterator i = symbols.iterator(); i.hasNext();) {
             Symbol member = i.next();
             if (!member.isTerm() || !member.isDeferred()) continue;
             addInterfaceBridges(owner, member);
         }
     }
 
+    private Symbol[] alternativesOf(Symbol symbol) {
+        if (symbol == Symbol.NONE) return Symbol.EMPTY_ARRAY;
+        Type info = symbol.type();
+        if (info instanceof Type.OverloadedType)
+            return ((Type.OverloadedType)info).alts;
+        return new Symbol[] { symbol };
+    }
+
+    private Symbol[] declaredAlternativesOf(Symbol owner, Name name) {
+        ArrayList alts = new ArrayList();
+        if (currentMethodSyms != null) {
+            ArrayList current = (ArrayList)currentMethodSyms.get(owner);
+            if (current != null) {
+                for (int i = 0; i < current.size(); i++) {
+                    Symbol candidate = (Symbol)current.get(i);
+                    if (candidate.name == name)
+                        alts.add(candidate);
+                }
+            }
+        }
+        if (!alts.isEmpty())
+            return (Symbol[])alts.toArray(new Symbol[alts.size()]);
+        for (Scope.SymbolIterator i = owner.members().iterator(true); i.hasNext();) {
+            Symbol candidate = i.next();
+            if (candidate.owner() == owner && candidate.name == name)
+                alts.add(candidate);
+        }
+        return (Symbol[])alts.toArray(new Symbol[alts.size()]);
+    }
+
+    private boolean isBridgeCandidate(Symbol symbol) {
+        return symbol != Symbol.NONE
+            && symbol.isTerm()
+            && symbol.isMethod()
+            && !symbol.isPrivate()
+            && !symbol.isStatic()
+            && !symbol.isInitializer();
+    }
+
+    private Type erasedMemberType(Type pre, Symbol symbol) {
+        Type memberType = pre.memberType(symbol);
+        if (memberType == Type.NoType || memberType == Type.ErrorType)
+            return memberType;
+        return memberType.derefDef().fullErasure();
+    }
+
+    private Type rawErasedType(Symbol symbol) {
+        Type type = symbol.nextType();
+        if (type == Type.NoType || type == Type.ErrorType)
+            return type;
+        return type.derefDef().fullErasure();
+    }
+
+    private Type bridgeTypeFor(Symbol owner, Symbol symbol) {
+        Type type = Type.NoType;
+        if (symbol.owner() == owner) {
+            try {
+                type = owner.thisType().memberType(symbol);
+            } catch (Type.Malformed ex) {}
+        }
+        if (type == Type.NoType || type == Type.ErrorType)
+            type = symbol.nextType();
+        if (type == Type.NoType || type == Type.ErrorType)
+            return type;
+        return type.derefDef();
+    }
+
+    private boolean overridesAfterErasure(Type pre, Symbol overriding, Symbol overridden) {
+        if (!isBridgeCandidate(overriding) || !isBridgeCandidate(overridden))
+            return false;
+        if (overriding.name != overridden.name)
+            return false;
+        Type overridingType = erasedMemberType(pre, overriding);
+        Type overriddenType = erasedMemberType(pre, overridden);
+        if (overridingType == Type.NoType || overridingType == Type.ErrorType ||
+            overriddenType == Type.NoType || overriddenType == Type.ErrorType)
+            return false;
+        return isSubType(overridingType, overriddenType);
+    }
+
+    private boolean matchesAfterErasure(Type pre, Symbol overriding, Symbol overridden) {
+        if (overridesAfterErasure(pre, overriding, overridden))
+            return true;
+        if (!isBridgeCandidate(overriding) || !isBridgeCandidate(overridden))
+            return false;
+        if (overriding.name != overridden.name)
+            return false;
+        Type overridingType = erasedMemberType(pre, overriding);
+        Type overriddenType = erasedMemberType(pre, overridden);
+        if (!(overridingType instanceof Type.MethodType) ||
+            !(overriddenType instanceof Type.MethodType))
+            return false;
+        Type.MethodType overridingMethod = (Type.MethodType)overridingType;
+        Type.MethodType overriddenMethod = (Type.MethodType)overriddenType;
+        if (overridingMethod.vparams.length != overriddenMethod.vparams.length)
+            return false;
+        for (int i = 0; i < overridingMethod.vparams.length; i++)
+            if (!hasSameJvmType(overridingMethod.vparams[i].type(),
+                                overriddenMethod.vparams[i].type()))
+                return false;
+        return true;
+    }
+
+    private boolean hasSameErasedBridgeType(Type pre, Symbol sym1, Symbol sym2) {
+        Type type1 = erasedMemberType(pre, sym1);
+        Type type2 = erasedMemberType(pre, sym2);
+        if (type1 == Type.NoType || type1 == Type.ErrorType ||
+            type2 == Type.NoType || type2 == Type.ErrorType)
+            return false;
+        return type1.isSameAs(type2);
+    }
+
+    private boolean hasSameRawBridgeType(Symbol sym1, Symbol sym2) {
+        Type type1 = rawErasedType(sym1);
+        Type type2 = rawErasedType(sym2);
+        if (type1 == Type.NoType || type1 == Type.ErrorType ||
+            type2 == Type.NoType || type2 == Type.ErrorType)
+            return false;
+        return type1.isSameAs(type2);
+    }
+
+    private boolean hasSameBridgeType(Symbol owner, Symbol sym1, Symbol sym2) {
+        return isSameAs(sym1.nextType(), sym2.nextType());
+    }
+
+    private boolean hasFinalInheritedJvmMethod(Symbol owner, Name name, Type bridgeType) {
+        Type[] parents = owner.parents();
+        for (int i = 0; i < parents.length; i++) {
+            Symbol parent = parents[i].symbol();
+            if (parent == Symbol.NONE) continue;
+            Symbol[] candidates = alternativesOf(parent.members().lookup(name));
+            for (int j = 0; j < candidates.length; j++) {
+                Symbol candidate = candidates[j];
+                if (!isBridgeCandidate(candidate) || candidate.isDeferred() ||
+                    !candidate.isFinal())
+                    continue;
+                Type candidateType = bridgeTypeFor(owner, candidate);
+                if (candidateType != Type.NoType &&
+                    candidateType != Type.ErrorType &&
+                    (hasSameJvmParameters(bridgeType, candidateType) ||
+                     hasSameParameterCount(bridgeType, candidateType)))
+                    return true;
+            }
+            if (hasFinalInheritedJvmMethod(parent, name, bridgeType))
+                return true;
+        }
+        return false;
+    }
+
+    private boolean hasConcreteInheritedJvmMethod(Symbol owner, Name name, Type bridgeType) {
+        Type[] parents = owner.parents();
+        for (int i = 0; i < parents.length; i++) {
+            Symbol parent = parents[i].symbol();
+            if (parent == Symbol.NONE) continue;
+            Symbol[] candidates = alternativesOf(parent.members().lookup(name));
+            for (int j = 0; j < candidates.length; j++) {
+                Symbol candidate = candidates[j];
+                if (!isBridgeCandidate(candidate) || candidate.isDeferred())
+                    continue;
+                Type candidateType = bridgeTypeFor(owner, candidate);
+                if (candidateType != Type.NoType &&
+                    candidateType != Type.ErrorType &&
+                    hasSameJvmType(bridgeType, candidateType))
+                    return true;
+            }
+            if (hasConcreteInheritedJvmMethod(parent, name, bridgeType))
+                return true;
+        }
+        return false;
+    }
+
+    private boolean hasSameJvmParameters(Type type1, Type type2) {
+        type1 = type1.fullErasure();
+        type2 = type2.fullErasure();
+        if (type1 instanceof Type.MethodType && type2 instanceof Type.MethodType) {
+            Type.MethodType method1 = (Type.MethodType)type1;
+            Type.MethodType method2 = (Type.MethodType)type2;
+            if (method1.vparams.length != method2.vparams.length)
+                return false;
+            for (int i = 0; i < method1.vparams.length; i++) {
+                if (!hasSameJvmType(method1.vparams[i].nextType(),
+                                    method2.vparams[i].nextType()))
+                    return false;
+            }
+            return true;
+        }
+        return !(type1 instanceof Type.MethodType) && !(type2 instanceof Type.MethodType);
+    }
+
+    private boolean hasSameParameterCount(Type type1, Type type2) {
+        type1 = type1.fullErasure();
+        type2 = type2.fullErasure();
+        if (type1 instanceof Type.MethodType && type2 instanceof Type.MethodType) {
+            Type.MethodType method1 = (Type.MethodType)type1;
+            Type.MethodType method2 = (Type.MethodType)type2;
+            return method1.vparams.length == method2.vparams.length;
+        }
+        return !(type1 instanceof Type.MethodType) && !(type2 instanceof Type.MethodType);
+    }
+
+    private boolean hasSameJvmType(Type type1, Type type2) {
+        type1 = type1.fullErasure();
+        type2 = type2.fullErasure();
+        if (type1 == Type.NoType || type1 == Type.ErrorType ||
+            type2 == Type.NoType || type2 == Type.ErrorType)
+            return false;
+        if (type1 instanceof Type.MethodType && type2 instanceof Type.MethodType) {
+            Type.MethodType method1 = (Type.MethodType)type1;
+            Type.MethodType method2 = (Type.MethodType)type2;
+            if (method1.vparams.length != method2.vparams.length)
+                return false;
+            for (int i = 0; i < method1.vparams.length; i++) {
+                if (!hasSameJvmType(method1.vparams[i].nextType(), method2.vparams[i].nextType()))
+                    return false;
+            }
+            return hasSameJvmType(method1.result, method2.result);
+        }
+        if (type1 instanceof Type.UnboxedType && type2 instanceof Type.UnboxedType)
+            return ((Type.UnboxedType)type1).tag == ((Type.UnboxedType)type2).tag;
+        if (type1 instanceof Type.UnboxedArrayType && type2 instanceof Type.UnboxedArrayType)
+            return hasSameJvmType(((Type.UnboxedArrayType)type1).elemtp,
+                                  ((Type.UnboxedArrayType)type2).elemtp);
+        return type1.symbol() == type2.symbol();
+    }
+
+    private Symbol findErasedOverrideInBase(Symbol method, Type base, Symbol owner) {
+        if (base == Type.NoType || base == Type.ErrorType || base.symbol() == Symbol.NONE)
+            return Symbol.NONE;
+        Symbol deferred = Symbol.NONE;
+        Symbol[] candidates = alternativesOf(base.symbol().members().lookup(method.name));
+        Type site = owner.thisType();
+        for (int i = 0; i < candidates.length; i++) {
+            Symbol candidate = candidates[i];
+            if (!matchesAfterErasure(site, method, candidate))
+                continue;
+            if (!candidate.isDeferred())
+                return candidate;
+            if (deferred == Symbol.NONE)
+                deferred = candidate;
+        }
+        return deferred;
+    }
+
+    private Symbol findErasedOverridingMethod(Symbol owner, Symbol method) {
+        Symbol deferred = Symbol.NONE;
+        Symbol[] candidates = declaredAlternativesOf(owner, method.name);
+        Type site = owner.thisType();
+        for (int i = 0; i < candidates.length; i++) {
+            Symbol candidate = candidates[i];
+            if (!matchesAfterErasure(site, candidate, method))
+                continue;
+            if (!candidate.isDeferred())
+                return candidate;
+            if (deferred == Symbol.NONE)
+                deferred = candidate;
+        }
+        return deferred;
+    }
+
+    private Symbol findErasedOverrideInParents(Symbol method, Type[] parents, Symbol owner) {
+        for (int i = 0; i < parents.length; i++) {
+            Symbol overridden = findErasedOverrideInBase(method, parents[i], owner);
+            if (overridden != Symbol.NONE)
+                return overridden;
+            Symbol parent = parents[i].symbol();
+            if (parent != Symbol.NONE) {
+                overridden = findErasedOverrideInParents(method, parent.parents(), owner);
+                if (overridden != Symbol.NONE)
+                    return overridden;
+            }
+        }
+        return Symbol.NONE;
+    }
+
+    private Symbol findErasedInterfaceOverride(Symbol method, Symbol owner) {
+        return findErasedOverrideInParents(method, method.owner().parents(), owner);
+    }
 
     private Symbol getOverriddenMethod(Symbol method) {
         Type[] parents = method.owner().parents();
         if (parents.length == 0) return Symbol.NONE;
-        return method.overriddenSymbol(parents[0]);
+        Symbol overridden = method.overriddenSymbol(parents[0]);
+        if (overridden == Symbol.NONE ||
+            !overridesAfterErasure(method.owner().thisType(), method, overridden))
+            overridden = findErasedOverrideInBase(method, parents[0], method.owner());
+        return overridden;
+    }
+
+    private Symbol getOverridingMethod(Symbol owner, Symbol method) {
+        Symbol declared = findErasedOverridingMethod(owner, method);
+        if (declared != Symbol.NONE)
+            return declared;
+        Symbol overriding = method.overridingSymbol(owner.thisType());
+        if (overriding == Symbol.NONE ||
+            overriding != method && !overridesAfterErasure(owner.thisType(), overriding, method))
+            overriding = findErasedOverridingMethod(owner, method);
+        return overriding;
     }
 
     public void addBridgeMethodsTo(Symbol method) {
@@ -705,14 +1047,11 @@ public class Erasure extends GenTransformer implements Modifiers {
 
     public void addInterfaceBridges(Symbol owner, Symbol method) {
 	assert owner.isClass() && !owner.isInterface(): Debug.show(owner);
-        Symbol overriding = method.overridingSymbol(owner.thisType());
+        Symbol overriding = getOverridingMethod(owner, method);
         if (overriding == method) {
             Symbol overridden = method.overriddenSymbol(owner.thisType().parents()[0], owner);
             if (!overridden.isNone() && !isSameAs(overridden.nextType(), method.nextType()))
                 addBridge(owner, method, overridden);
-	    // moved this into the TypeCreator class of the MSIL backend
-  	    //if (forMSIL && (overridden.isNone() || overridden.owner() != owner))
-  	    //	    addEmptyBridge(owner, method);
         } else if (!overriding.isNone() && !isSameAs(overriding.nextType(), method.nextType()))
             addBridge(owner, overriding, method);
     }
@@ -720,14 +1059,21 @@ public class Erasure extends GenTransformer implements Modifiers {
     private void addBridges(Symbol clasz, TreeList members) {
         TreeList savedBridges = bridges;
         HashMap savedBridgeSyms = bridgeSyms;
+        HashMap savedCurrentMethodSyms = currentMethodSyms;
         bridges = new TreeList();
         bridgeSyms = new HashMap();
+        currentMethodSyms = new HashMap();
 
         int length = members.length();
+        ArrayList methodSyms = new ArrayList();
+        for (int i = 0; i < length; i++) {
+            if (members.get(i) instanceof Tree.DefDef)
+                methodSyms.add(members.get(i).symbol());
+        }
+        currentMethodSyms.put(clasz, methodSyms);
         if (!clasz.isInterface()) {
             for (int i = 0; i < length; i++) {
-                switch (members.get(i)) {
-                case DefDef(_, _, _, _, _, Tree rhs):
+                if (members.get(i) instanceof Tree.DefDef) {
                     addBridgeMethodsTo(members.get(i).symbol());
                 }
             }
@@ -737,22 +1083,22 @@ public class Erasure extends GenTransformer implements Modifiers {
         members.append(bridges);
         if (bridges.length() > 0) {
             Type info = clasz.nextInfo();
-            switch (info) {
-            case CompoundType(Type[] parts, Scope members_):
-                members_ = members_.cloneScope();
+            if (info instanceof Type.CompoundType) {
+                Type.CompoundType compoundType = (Type.CompoundType)info;
+                Scope members_ = compoundType.members.cloneScope();
                 for (int i = 0; i < bridges.length(); i++) {
                     Tree bridge = (Tree)bridges.get(i);
                     members_.enterOrOverload(bridge.symbol());
                 }
-                clasz.updateInfo(Type.compoundType(parts, members_, info.symbol()));
-                break;
-            default:
+                clasz.updateInfo(Type.compoundType(compoundType.parts, members_, info.symbol()));
+            } else {
                 throw Debug.abort("class = " + Debug.show(clasz) + ", " +
                     "info = " + Debug.show(info));
             }
         }
         bridgeSyms = savedBridgeSyms;
         bridges = savedBridges;
+        currentMethodSyms = savedCurrentMethodSyms;
     }
 
 

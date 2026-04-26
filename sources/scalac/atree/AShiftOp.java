@@ -8,34 +8,33 @@
 
 package scalac.atree;
 
-import scalac.util.Debug;
-
 /** This class represents a shift operation. */
 public class AShiftOp {
 
     //########################################################################
     // Public Cases
 
+    private final String name;
+
+    private AShiftOp(String name) {
+        this.name = name;
+    }
+
     /** A logical shift to the left */
-    public case LSL;
+    public static final AShiftOp LSL = new AShiftOp("LSL");
 
     /** An arithmetic shift to the right */
-    public case ASR;
+    public static final AShiftOp ASR = new AShiftOp("ASR");
 
     /** A logical shift to the right */
-    public case LSR;
+    public static final AShiftOp LSR = new AShiftOp("LSR");
 
     //########################################################################
     // Public Methods
 
     /** Returns a string representation of this operation. */
     public String toString() {
-        switch (this) {
-        case LSL: return "LSL";
-        case ASR: return "ASR";
-        case LSR: return "LSR";
-        default: throw Debug.abort("unknown case", this);
-        }
+        return name;
     }
 
     //########################################################################

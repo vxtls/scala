@@ -10,7 +10,6 @@ package scalac.transformer;
 
 import scalac.*;
 import scalac.util.*;
-import scalac.parser.*;
 import scalac.symtab.*;
 import java.util.ArrayList;
 
@@ -33,12 +32,9 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
 	*/
         Type tp1 = tp;
         if (sym != Symbol.NONE) {
-            switch (tp) {
-            case MethodType(_, _):
-            case PolyType(_, _):
+            if (tp instanceof Type.MethodType || tp instanceof Type.PolyType) {
                 tp1 = transform(tp, sym);
-                break;
-            default:
+            } else {
                 if (sym.kind == CLASS)
                     tp1 = transform(tp, sym);
                 else
@@ -64,23 +60,21 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
         Type.Map setOwner(Symbol owner) { this.owner = owner; return this; }
 
         public Type apply(Type tp) {
-            switch (tp) {
-            case TypeRef(Type pre, Symbol sym, Type[] targs):
+            if (tp instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tp;
+                Type pre = typeRef.pre;
+                Symbol sym = typeRef.sym;
+                Type[] targs = typeRef.args;
                 if (sym.kind == CLASS) {
-                    switch (pre) {
-                    case NoPrefix:
-                        pre = sym.owner().enclClass().thisType();
-                        tp = Type.typeRef(pre, sym, targs);
+                    if (pre instanceof Type.ThisType) {
+                        Symbol s = ((Type.ThisType)pre).sym;
+                        if (s == Symbol.NONE) {
+                            pre = sym.owner().enclClass().thisType();
+                            tp = Type.typeRef(pre, sym, targs);
+                        }
                     }
                 }
-                switch (pre) {
-                case NoPrefix:
-                    if (LambdaLift.isLocal(sym, owner)) {
-                        assert targs.length == 0;
-                        return proxy(sym, owner).type();
-                    }
-                    break;
-                case ThisType(_):
+                if (pre instanceof Type.ThisType) {
                     if (sym.kind == CLASS &&
 			sym.primaryConstructor().isUpdatedAt(LambdaLiftPhase.this)) {
                         Symbol[] tparams = sym.primaryConstructor().nextInfo().typeParams();
@@ -99,9 +93,11 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
                             }
                             return Type.typeRef(pre, sym, targs1);
                         }
+                    } else if (LambdaLift.isLocal(sym, owner)) {
+                        assert targs.length == 0;
+                        return proxy(sym, owner).type();
                     }
                 }
-                break;
 /*
             case PolyType(Symbol[] tparams, _):
                 if (tparams.length != 0) {

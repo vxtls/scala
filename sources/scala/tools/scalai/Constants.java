@@ -70,12 +70,16 @@ public class Constants {
     // Public Methods - zero
 
     public Object zero(Type type) {
-        switch (type) {
-        case TypeRef(_, _, _)     : return literal(null);
-        case UnboxedArrayType(_)  : return literal(null);
-        case UnboxedType(int kind): return zero(kind);
-        default: throw Debug.abort("illegal type", type);
+        if (type instanceof Type.TypeRef) {
+            return literal(null);
         }
+        if (type instanceof Type.UnboxedArrayType) {
+            return literal(null);
+        }
+        if (type instanceof Type.UnboxedType) {
+            return zero(((Type.UnboxedType)type).tag);
+        }
+        throw Debug.abort("illegal type", type);
     }
 
     public Object zero(int kind) {

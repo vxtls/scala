@@ -173,10 +173,10 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
 
     /** Builds a default zero value according to given type. */
     public Tree mkDefaultValue(int pos, Type type) {
-        switch (type.unbox()) {
-        case UnboxedType(int tag): return mkDefaultValue(pos, tag);
-        }
-	if (definitions.ALLREF_TYPE().isSubType(type)) return mkNullLit(pos);
+        Type unboxed = type.unbox();
+        if (unboxed instanceof Type.UnboxedType)
+            return mkDefaultValue(pos, ((Type.UnboxedType)unboxed).tag);
+        if (definitions.ALLREF_TYPE().isSubType(type)) return mkNullLit(pos);
         return mkZeroLit(pos);
     }
 
@@ -281,21 +281,24 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
 
     /** Builds a qualifier corresponding to given stable prefix. */
     public Tree mkQualifier(int pos, Type stable) {
-        switch (stable) {
-	case NoPrefix:
+        if (stable == Type.NoPrefix) {
             return Tree.Empty;
-	case ThisType(Symbol clasz):
+        } else if (stable instanceof Type.ThisType) {
+            Symbol clasz = ((Type.ThisType)stable).sym;
             return This(pos, clasz);
-        case SingleType(Type prefix, Symbol member):
-	    Tree qualifier = mkRef(pos, prefix, member);
-	    switch (qualifier.type()) {
-	    case MethodType(Symbol[] params, _):
-		assert params.length == 0: qualifier.type();
-		return Apply(pos, qualifier);
-            default:
-                return qualifier;
-	    }
-        default:
+        } else if (stable instanceof Type.SingleType) {
+            Type.SingleType singleType = (Type.SingleType)stable;
+            Type prefix = singleType.pre;
+            Symbol member = singleType.sym;
+            Tree qualifier = mkRef(pos, prefix, member);
+            Type qualifierType = qualifier.type();
+            if (qualifierType instanceof Type.MethodType) {
+                Symbol[] params = ((Type.MethodType)qualifierType).vparams;
+                assert params.length == 0: qualifier.type();
+                return Apply(pos, qualifier);
+            }
+            return qualifier;
+        } else {
             throw Debug.abort("illegal case", stable);
         }
     }
@@ -427,16 +430,19 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
         return TypeApply(fn.pos, fn, targs);
     }
     public TypeApply TypeApply(int pos, Tree fn, Tree[] targs) {
-        switch (fn.type()) {
-        case Type.OverloadedType(_, _):
+        Type fnType = fn.type();
+        if (fnType instanceof Type.OverloadedType) {
             // TreeGen only builds trees, names must already be resolved
-            throw Debug.abort("unresolved name", fn + " - " + fn.type);
-        case Type.PolyType(Symbol[] tparams, Type restpe):
+            throw Debug.abort("unresolved name", fn + " - " + fn.type());
+        } else if (fnType instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)fnType;
+            Symbol[] tparams = polyType.tparams;
+            Type restpe = polyType.result;
             global.nextPhase();
             restpe = restpe.subst(tparams, Tree.typeOf(targs));
             global.prevPhase();
             return (TypeApply)make.TypeApply(pos, fn, targs).setType(restpe);
-        default:
+        } else {
             throw Debug.abort("illegal case", fn + " - " + fn.type());
         }
     }
@@ -446,13 +452,14 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
 
     /** Builds an Apply node with given function and arguments. */
     public Apply Apply(int pos, Tree fn, Tree[] vargs) {
-        switch (fn.type()) {
-        case Type.OverloadedType(_, _):
+        Type fnType = fn.type();
+        if (fnType instanceof Type.OverloadedType) {
             // TreeGen only builds trees, names must already be resolved
             throw Debug.abort("unresolved name", fn + " - " + fn.type());
-        case Type.MethodType(Symbol[] vparams, Type restpe):
+        } else if (fnType instanceof Type.MethodType) {
+            Type restpe = ((Type.MethodType)fnType).result;
             return (Apply)make.Apply(pos, fn, vargs).setType(restpe);
-        default:
+        } else {
             throw Debug.abort("illegal case", fn + " - " + fn.type());
         }
     }
@@ -538,9 +545,12 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
         New tree = make.New(pos, init);
         tree.setType(init.type());
         // after AddConstructor use type of Create node
-        switch (init) {
-        case Apply(Select(Tree qual, _), _):
-            if (qual instanceof Tree.Create) tree.setType(qual.type());
+        if (init instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)init;
+            if (apply.fun instanceof Tree.Select) {
+                Tree qual = ((Tree.Select)apply.fun).qualifier;
+                if (qual instanceof Tree.Create) tree.setType(qual.type());
+            }
         }
         return tree;
     }
@@ -585,12 +595,11 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
 
     /** Builds a Create node with given type. */
     public Create Create(int pos, Type type) {
-        switch (type) {
-        case TypeRef(Type prefix, Symbol clasz, Type[] targs):
-            return Create(pos, mkQualifier(pos, prefix), clasz, targs);
-        default:
-            throw Debug.abort("illegal case", type);
+        if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            return Create(pos, mkQualifier(pos, typeRef.pre), typeRef.sym, typeRef.args);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     //########################################################################
@@ -601,14 +610,14 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
         boolean copy = false;
         int length = 0;
         for (int i = 0; i < trees.length; i++) {
-            switch (trees[i]) {
-            case Empty:
+            if (trees[i] == Tree.Empty) {
                 copy = true;
                 length -= 1;
                 continue;
-            case Block(Tree[] stats, Tree value):
+            } else if (trees[i] instanceof Tree.Block) {
+                Tree.Block block = (Tree.Block)trees[i];
                 copy = true;
-                length += stats.length + 1;
+                length += block.stats.length + 1;
                 continue;
             }
             length += 1;
@@ -616,12 +625,13 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
         if (!copy) return trees;
         Tree[] clone = new Tree[length];
         for (int i = 0, o = 0; i < trees.length; i++) {
-            switch (trees[i]) {
-            case Empty:
+            if (trees[i] == Tree.Empty) {
                 continue;
-            case Block(Tree[] stats, Tree value):
-                for (int j = 0; j < stats.length; j++) clone[o++] = stats[j];
-                clone[o++] = value;
+            } else if (trees[i] instanceof Tree.Block) {
+                Tree.Block block = (Tree.Block)trees[i];
+                for (int j = 0; j < block.stats.length; j++)
+                    clone[o++] = block.stats[j];
+                clone[o++] = block.expr;
                 continue;
             }
             clone[o++] = trees[i];
@@ -692,14 +702,14 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
 
     /** Builds an expression with given statement and value. */
     public Tree mkBlock(int pos, Tree stat, Tree value) {
-        switch (stat) {
-        case Empty:
+        if (stat == Tree.Empty) {
             return value;
-        case Block(Tree[] block_stats, Tree block_value):
-            Tree[] stats = Tree.cloneArray(block_stats, 1);
-            stats[block_stats.length] = block_value;
+        } else if (stat instanceof Tree.Block) {
+            Tree.Block block = (Tree.Block)stat;
+            Tree[] stats = Tree.cloneArray(block.stats, 1);
+            stats[block.stats.length] = block.expr;
             return Block(stat.pos, stats, value);
-        default:
+        } else {
             return Block(pos, new Tree[]{stat}, value);
         }
     }
@@ -730,19 +740,19 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
     /** Builds a Block node with given statements and value. */
     public Block Block(int pos, Tree[] stats, Tree value) {
         inline:
-        switch (value) {
-        case Block(Tree[] value_stats, Tree value_value):
+        if (value instanceof Tree.Block) {
+            Tree.Block valueBlock = (Tree.Block)value;
             int count = 0;
-            for (int i = 0; i < value_stats.length; i++) {
-                if (value_stats[i].definesSymbol()) break inline;
-                if (value_stats[i] != Tree.Empty) count++;
+            for (int i = 0; i < valueBlock.stats.length; i++) {
+                if (valueBlock.stats[i].definesSymbol()) break inline;
+                if (valueBlock.stats[i] != Tree.Empty) count++;
             }
             Tree[] array = Tree.cloneArray(stats, count);
-            for (int i = 0, j = stats.length; i < value_stats.length; i++) {
-                if (value_stats[i] != Tree.Empty) array[j++] = value_stats[i];
+            for (int i = 0, j = stats.length; i < valueBlock.stats.length; i++) {
+                if (valueBlock.stats[i] != Tree.Empty) array[j++] = valueBlock.stats[i];
             }
             stats = array;
-            value = value_value;
+            value = valueBlock.expr;
         }
         Block tree = make.Block(pos, stats, value);
         tree.setType(value.type());
@@ -981,11 +991,12 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
         global.prevPhase();
         ValDef[][] treess = Tree.ValDef_EMPTY_ARRAY_ARRAY;
         while (true) {
-            switch (type) {
-            case PolyType(_, Type result):
-                type = result;
+            if (type instanceof Type.PolyType) {
+                type = ((Type.PolyType)type).result;
                 continue;
-            case MethodType(Symbol[] vparams, Type result):
+            } else if (type instanceof Type.MethodType) {
+                Type.MethodType methodType = (Type.MethodType)type;
+                Symbol[] vparams = methodType.vparams;
                 ValDef[] trees = new ValDef[vparams.length];
                 for (int i = 0; i < vparams.length; i++)
                     trees[i] = mkParam(vparams[i]);
@@ -993,9 +1004,9 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
                 for (int i = 0; i < treess.length; i++) array[i] = treess[i];
                 array[treess.length] = trees;
                 treess = array;
-                type = result;
+                type = methodType.result;
                 continue;
-            default:
+            } else {
                 return treess;
             }
         }
@@ -1074,13 +1085,13 @@ public class TreeGen implements Kinds, Modifiers, TypeTags {
 	Global.instance.prevPhase();
         Tree[] constrs = new Tree[parents.length];
         for (int i = 0; i < constrs.length; i++) {
-            switch (parents[i]) {
-            case TypeRef(Type prefix, Symbol parent, Type[] targs):
+            if (parents[i] instanceof Type.TypeRef) {
+                Type.TypeRef parentType = (Type.TypeRef)parents[i];
                 constrs[i] = mkApplyT_(
-                    mkPrimaryConstructorRef(clazz.pos, prefix, parent),
-                    targs);
+                    mkPrimaryConstructorRef(clazz.pos, parentType.pre, parentType.sym),
+                    parentType.args);
                 continue;
-            default:
+            } else {
                 throw Debug.abort("invalid type", parents[i]);
             }
         }

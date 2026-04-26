@@ -131,14 +131,12 @@ public class TailCallPhase extends Phase {
 
         /** Transforms the given tree. */
         public Tree transform(Tree tree) {
-            switch (tree) {
-
-            case DefDef(_, _, _, _, _, Tree rhs):
+            if (tree instanceof Tree.DefDef) {
+                Tree rhs = ((Tree.DefDef)tree).rhs;
                 Context oldCtx = ctx;
 
                 ctx = new Context();
 
-                //assert method == null: Debug.show(method) + " -- " + tree;
                 ctx.method = tree.symbol();
                 ctx.tailPosition = true;
 
@@ -146,10 +144,10 @@ public class TailCallPhase extends Phase {
                     ctx.label = ctx.method.newLabel(ctx.method.pos, ctx.method.name);
                     ctx.types = Type.EMPTY_ARRAY;
                     Type type = ctx.method.type();
-                    switch (type) {
-                    case PolyType(Symbol[] tparams, Type result):
-                        ctx.types = Symbol.type(tparams);
-                        type = result;
+                    if (type instanceof Type.PolyType) {
+                        Type.PolyType polyType = (Type.PolyType)type;
+                        ctx.types = Symbol.type(polyType.tparams);
+                        type = polyType.result;
                     }
                     ctx.label.setInfo(type.cloneType(ctx.method, ctx.label));
                     rhs = transform(rhs);
@@ -161,119 +159,145 @@ public class TailCallPhase extends Phase {
                 } else {
                     assert !ctx.method.isMethodFinal()
                         : "Final method: " + ctx.method.simpleName();
-                    // non-final method
                     ctx.tailPosition = false;
                     tree = gen.DefDef(tree.symbol(), transform(rhs));
                 }
                 ctx = oldCtx;
                 return tree;
-
-            case Block(Tree[] stats, Tree value):
+            }
+            if (tree instanceof Tree.Block) {
+                Tree.Block block = (Tree.Block)tree;
                 boolean oldPosition = ctx.tailPosition;
-                ctx.tailPosition = false;  stats = transform(stats);
+                ctx.tailPosition = false;
+                Tree[] stats = transform(block.stats);
                 ctx.tailPosition = oldPosition;
-                return gen.Block(tree.pos, stats, transform(value));
+                return gen.Block(tree.pos, stats, transform(block.expr));
+            }
+            if (tree instanceof Tree.If) {
+                Tree.If ifTree = (Tree.If)tree;
+                Tree thenp = transform(ifTree.thenp);
+                Tree elsep = transform(ifTree.elsep);
+                return gen.If(tree.pos, ifTree.cond, thenp, elsep);
+            }
+            if (tree instanceof Tree.Switch) {
+                Tree.Switch switchTree = (Tree.Switch)tree;
+                Tree[] bodies = transform(switchTree.bodies);
+                Tree otherwise = transform(switchTree.otherwise);
+                return gen.Switch(tree.pos,
+                                  switchTree.test,
+                                  switchTree.tags,
+                                  bodies,
+                                  otherwise,
+                                  tree.type());
+            }
+            if (tree instanceof Tree.Apply) {
+                Tree.Apply apply = (Tree.Apply)tree;
+                Tree fun = apply.fun;
+                Tree[] vargs = apply.args;
 
+                if (fun instanceof Tree.Select) {
+                    Tree.Select select = (Tree.Select)fun;
+                    if (select.selector == scalac.util.Names._match) {
+                        Tree newTree =
+                            global.make.Apply(tree.pos, fun, transform(vargs));
+                        newTree.setType(tree.getType());
+                        return newTree;
+                    }
+                }
 
-            case If(Tree cond, Tree thenp, Tree elsep):
-                Type type = tree.type();
-                thenp = transform(thenp);
-                elsep = transform(elsep);
-                return gen.If(tree.pos, cond, thenp, elsep);
+                if (fun instanceof Tree.TypeApply) {
+                    Tree.TypeApply typeApply = (Tree.TypeApply)fun;
+                    if (ctx.method != Symbol.NONE && ctx.tailPosition) {
+                        Tree[] targs = typeApply.args;
+                        assert targs != null : "Null type arguments " + tree;
+                        assert ctx.types != null : "Null types " + tree;
 
-            case Switch(Tree test, int[] tags, Tree[] bodies, Tree otherwise):
-                Type type = tree.type();
-                bodies = transform(bodies);
-                otherwise = transform(otherwise);
-                return gen.Switch(tree.pos, test, tags, bodies,otherwise,type);
-
-            // handle pattern matches explicitly
-	    case Apply(Select(_, scalac.util.Names._match), Tree[] args):
-		Tree newTree = global.make.Apply(tree.pos, ((Tree.Apply)tree).fun, transform(args));
-		newTree.setType(tree.getType());
-		return newTree;
-
-            case Apply(TypeApply(Tree fun, Tree[] targs), Tree[] vargs):
-		if (ctx.method != Symbol.NONE && ctx.tailPosition) {
-		    assert targs != null : "Null type arguments " + tree;
-		    assert ctx.types != null : "Null types " + tree;
-
-		    if (!Type.isSameAs(Tree.typeOf(targs), ctx.types) |
-                        !ctx.tailPosition)
+                        if (!Type.isSameAs(Tree.typeOf(targs), ctx.types)
+                            || !ctx.tailPosition) {
+                            return tree;
+                        }
+                        return transform(tree,
+                                         typeApply.fun,
+                                         transform(vargs, false));
+                    } else {
                         return tree;
-		    return transform(tree, fun, transform(vargs, false));
-		} else
-		    return tree;
-
-            case Apply(Tree fun, Tree[] vargs):
+                    }
+                }
                 if (ctx.tailPosition)
                     return transform(tree, fun, transform(vargs, false));
-                else
+                else {
                     return gen.mkApply_V(fun, transform(vargs, false));
-
-	    case Visitor(Tree.CaseDef[] cases):
-		Tree newTree = global.make.Visitor(tree.pos, super.transform(cases));
-		newTree.setType(tree.getType());
-		return newTree;
-
-	    case CaseDef(Tree pattern, Tree guard, Tree body):
-		return gen.CaseDef(pattern, guard, transform(body));
-
-	    case Typed(Tree expr, Tree type):
-		return gen.Typed(transform(expr), type);
-
-            case ClassDef(_, _, _, _, _, Tree.Template impl):
-                Symbol impl_symbol = getSymbolFor(impl);
-                Tree[] body = transform(impl.body);
-                return gen.ClassDef(getSymbolFor(tree), impl.parents, impl_symbol, body);
-
-            case PackageDef(_, _):
-            case LabelDef(_, _, _):
-            case Return(_):
-                return super.transform(tree);
-
-
-            case Empty:
-            case ValDef(_, _, _, _):
-            case Assign(_, _):
-            case New(_):
-            case Super(_, _):
-            case This(_):
-            case Select(_, _):
-            case Ident(_):
-            case Literal(_):
-            case TypeTerm():
-	    case AbsTypeDef(_, _, _, _):
-	    case AliasTypeDef(_, _, _, _):
-	    case Import(_, _):
-	    case Function(_, _):
-                return tree;
-
-            default:
-                throw Debug.abort("illegal case", tree);
+                }
             }
+            if (tree instanceof Tree.Visitor) {
+                Tree.Visitor visitor = (Tree.Visitor)tree;
+                Tree newTree =
+                    global.make.Visitor(tree.pos, super.transform(visitor.cases));
+                newTree.setType(tree.getType());
+                return newTree;
+            }
+            if (tree instanceof Tree.CaseDef) {
+                Tree.CaseDef caseDef = (Tree.CaseDef)tree;
+                return gen.CaseDef(caseDef.pat,
+                                   caseDef.guard,
+                                   transform(caseDef.body));
+            }
+            if (tree instanceof Tree.Typed) {
+                Tree.Typed typed = (Tree.Typed)tree;
+                return gen.Typed(transform(typed.expr), typed.tpe);
+            }
+            if (tree instanceof Tree.ClassDef) {
+                Tree.ClassDef classDef = (Tree.ClassDef)tree;
+                Tree.Template impl = classDef.impl;
+                Symbol implSymbol = getSymbolFor(impl);
+                Tree[] body = transform(impl.body);
+                return gen.ClassDef(getSymbolFor(tree),
+                                    impl.parents,
+                                    implSymbol,
+                                    body);
+            }
+            if (tree instanceof Tree.PackageDef
+                || tree instanceof Tree.LabelDef
+                || tree instanceof Tree.Return) {
+                return super.transform(tree);
+            }
+            if (tree == Tree.Empty
+                || tree instanceof Tree.ValDef
+                || tree instanceof Tree.Assign
+                || tree instanceof Tree.New
+                || tree instanceof Tree.Super
+                || tree instanceof Tree.This
+                || tree instanceof Tree.Select
+                || tree instanceof Tree.Ident
+                || tree instanceof Tree.Literal
+                || tree instanceof Tree.TypeTerm
+                || tree instanceof Tree.AbsTypeDef
+                || tree instanceof Tree.AliasTypeDef
+                || tree instanceof Tree.Import
+                || tree instanceof Tree.Function) {
+                return tree;
+            }
+            throw Debug.abort("illegal case", tree);
         }
 
         /** Transforms the given function call. */
         private Tree transform(Tree tree, Tree fun, Tree[] vargs) {
             if (fun.symbol() != ctx.method)
-		return tree;
-            switch (fun) {
-            case Select(Tree qual, _):
+                return tree;
+            if (fun instanceof Tree.Select) {
+                Tree qual = ((Tree.Select)fun).qualifier;
                 if (!isReferenceToThis(qual, ctx.method.owner()))
-		    return tree;
+                    return tree;
                 global.log("Applying tail call recursion elimination for " +
                            ctx.method.enclClass().simpleName() + "." + ctx.method.simpleName());
                 return gen.Apply(tree.pos, gen.Ident(qual.pos, ctx.label), vargs);
-
-            case Ident(_):
+            }
+            if (fun instanceof Tree.Ident) {
                 global.log("Applying tail call recursion elimination for function " +
                            ctx.method.enclClass().simpleName() + "." + ctx.method.simpleName());
                 return gen.Apply(tree.pos, gen.Ident(fun.pos, ctx.label), vargs);
-
-            default:
-                throw Debug.abort("illegal case", fun);
             }
+            throw Debug.abort("illegal case", fun);
         }
 
         /**
@@ -281,13 +305,11 @@ public class TailCallPhase extends Phase {
          * given class.
          */
         private boolean isReferenceToThis(Tree tree, Symbol clasz) {
-            switch (tree) {
-            case This(_):
+            if (tree instanceof Tree.This) {
                 assert tree.symbol() == clasz: tree +" -- "+ Debug.show(clasz);
                 return true;
-            default:
-                return false;
             }
+            return false;
         }
 
     };

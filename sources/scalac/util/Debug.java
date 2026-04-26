@@ -112,6 +112,9 @@ public class Debug extends scala.tools.util.debug.Debug {
     public static String show(Object a) {
         return scala.tools.util.debug.Debug.show(a);
     }
+    public static String toString(Object a) {
+        return show(a);
+    }
     public static String show(Object a, Object b) {
         return scala.tools.util.debug.Debug.show(a, b);
     }
@@ -172,7 +175,7 @@ public class Debug extends scala.tools.util.debug.Debug {
 }
 
 /** This class implements a debugger for symbols. */
-public class SymbolDebugger implements Debugger {
+class SymbolDebugger implements Debugger {
 
     //########################################################################
     // Public Constants
@@ -215,7 +218,7 @@ public class SymbolDebugger implements Debugger {
 }
 
 /** This class implements a debugger for scopes. */
-public class ScopeDebugger implements Debugger {
+class ScopeDebugger implements Debugger {
 
     //########################################################################
     // Public Constants
