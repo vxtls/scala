@@ -14,11 +14,10 @@ import scala.runtime.RunTime;
 import scala.Type;
 import scala.Array;
 
-public public class TypeDouble extends BasicType {
+public class TypeDouble extends BasicType {
     private final scala.Double ZERO = RunTime.box_dvalue(0.0);
     public Array newArray(int size) {
         return RunTime.box_darray(new double[size]);
     }
     public Object defaultValue() { return ZERO; }
 };
-

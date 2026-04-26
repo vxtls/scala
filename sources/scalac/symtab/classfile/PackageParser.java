@@ -24,8 +24,6 @@ import scalac.symtab.Type;
 import scalac.util.Name;
 import scalac.util.Debug;
 
-import scalac.symtab.SymbolNameWriter;
-
 /**
  * This class implements a package member loader. It can be used to
  * complete package class symbols.
@@ -83,7 +81,6 @@ public class PackageParser extends SymbolLoader {
         assert root.isRoot() || root.isPackage(): Debug.show(root);
         Symbol peckage = root.isRoot() ? root : root.moduleClass();
         preInitialize(peckage, true);
-
         // create JVM and source members
         Scope members = new Scope();
         for (Iterator i = sources.entrySet().iterator(); i.hasNext(); ) {
@@ -91,10 +88,10 @@ public class PackageParser extends SymbolLoader {
             String name = (String)entry.getKey();
             AbstractFile sfile = (AbstractFile)entry.getValue();
             AbstractFile cfile = (AbstractFile)classes.remove(name);
-	    if (global.separate && cfile != null) {
+            if (global.separate && cfile != null) {
                 if (cfile.lastModified() > sfile.lastModified()) {
-		    classes.put(name, cfile);
-		    continue;
+                    classes.put(name, cfile);
+                    continue;
                 }
             }
             packages.remove(name);
@@ -106,7 +103,6 @@ public class PackageParser extends SymbolLoader {
         for (Iterator i = classes.entrySet().iterator(); i.hasNext(); ) {
             HashMap.Entry entry = (HashMap.Entry)i.next();
             String name = (String)entry.getKey();
-	    //assert !types.containsKey(name) : types.get(name);
             AbstractFile cfile = (AbstractFile)entry.getValue();
             packages.remove(name);
             Name classname = Name.fromString(name).toTypeName();

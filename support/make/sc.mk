@@ -103,7 +103,9 @@ SC_LOOKUP		 = $(if $($(target)_$(1)),$($(target)_$(1)),$($(1)))
 
 sc		:
 	@[ -d "$(sc_OUTPUTDIR)" ] || $(MKDIR) -p "$(sc_OUTPUTDIR)"
-	$(strip $(sc))
+	@if [ -n "$(strip $(sc_FILES))" ]; then \
+	    $(strip $(sc)); \
+	fi
 
 .PHONY		: sc
 

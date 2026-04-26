@@ -314,6 +314,8 @@ public abstract class RunTime {
     public static int farray_length(float  [] xs) { return xs.length; }
     public static int darray_length(double [] xs) { return xs.length; }
     public static int oarray_length(Object [] xs) { return xs.length; }
+    /** @meta method [?T](scala.Array[?T]) scala.Int; */
+    public static int array_length(Array xs) { return xs.length(); }
 
     public static boolean zarray_get(boolean[] xs, int i) { return xs[i]; }
     public static byte    barray_get(byte   [] xs, int i) { return xs[i]; }
@@ -324,6 +326,8 @@ public abstract class RunTime {
     public static float   farray_get(float  [] xs, int i) { return xs[i]; }
     public static double  darray_get(double [] xs, int i) { return xs[i]; }
     public static Object  oarray_get(Object [] xs, int i) { return xs[i]; }
+    /** @meta method [?T](scala.Array[?T], scala.Int) scala.Any; */
+    public static Object  array_get(Array xs, int i) { return xs.apply(i); }
 
     public static void zarray_set(boolean[] xs, int i, boolean x) { xs[i] = x;}
     public static void barray_set(byte   [] xs, int i, byte    x) { xs[i] = x;}
@@ -334,6 +338,8 @@ public abstract class RunTime {
     public static void farray_set(float  [] xs, int i, float   x) { xs[i] = x;}
     public static void darray_set(double [] xs, int i, double  x) { xs[i] = x;}
     public static void oarray_set(Object [] xs, int i, Object  x) { xs[i] = x;}
+    /** @meta method [?T](scala.Array[?T], scala.Int, scala.Any) scala.Unit; */
+    public static void array_set(Array xs, int i, Object x) { xs.update(i, x); }
 
     //########################################################################
 }

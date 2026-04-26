@@ -61,7 +61,7 @@ class HttpServletPro(in: HttpInputStream, info: HashMap[String,String], servletC
       val s2 =repertoire.concat(".").concat(s1).concat("$class");
       var servlet1 = Class.forName(s2);
       */
-      Console.println("Getting class "+servletClassName);
+      scala.Console.println("Getting class "+servletClassName);
       val servlet1 = Class.forName( servletClassName );
       var servletInstance = servlet1.newInstance().asInstanceOf[ScalaServlet];
       servletInstance.doGet(out, info);

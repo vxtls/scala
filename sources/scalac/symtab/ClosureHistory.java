@@ -53,26 +53,25 @@ public class ClosureHistory extends History {
 
     /** Adds all parents of given type to given parent table. */
     private static void addParents(TreeMap/*<Symbol,Type>*/ table, Type type) {
-        switch (type) {
-        case ErrorType: case NoType:
+        if (type == Type.ErrorType || type == Type.NoType) {
             return;
-        case TypeRef(_, Symbol symbol, _):
+        } else if (type instanceof Type.TypeRef) {
+            Symbol symbol = ((Type.TypeRef)type).sym;
             Type.Map map = Type.getThisTypeMap(symbol, type);
             Type[] closure = symbol.closure();
             for (int i = 0; i < closure.length; i++)
                 table.put(closure[i].symbol(), map.apply(closure[i]));
             return;
-        case CompoundType(Type[] parents, _):
+        } else if (type instanceof Type.CompoundType) {
+            Type[] parents = ((Type.CompoundType)type).parts;
             for (int i = 0; i < parents.length; i++)
                 addParents(table, parents[i]);
             return;
-	case SingleType(_, _):
-	case ThisType(_):
-	    addParents(table, type.singleDeref());
-	    return;
-        default:
-            throw Debug.abort("illegal case", type);
+        } else if (type instanceof Type.SingleType || type instanceof Type.ThisType) {
+            addParents(table, type.singleDeref());
+            return;
         }
+        throw Debug.abort("illegal case", type);
     }
 
     //########################################################################

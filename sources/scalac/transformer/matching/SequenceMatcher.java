@@ -2,7 +2,7 @@ package scalac.transformer.matching ;
 
 import scalac.*;
 import scalac.ast.Tree;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 //import scala.compiler.printer.TextTreePrinter ; // DEBUGGING\
     //import scala.compiler.printer.XMLAutomPrinter ; // DEBUGGING\
@@ -99,7 +99,7 @@ public class SequenceMatcher extends PatternTool {
         if( defaultCase == null )
             defaultCase = cf.ThrowMatchError( cf.pos, _m.resultType );
 
-        this.cf = new CodeFactory( unit, _m.pos );
+        this.cf = new CodeFactory( unit, _m.pos, _m.owner );
 
         Type seqType = pat[ 0 ].getType();
         Type elementType = cf.getElemType_Sequence( seqType );

@@ -35,7 +35,7 @@ class HttpHandler(client: Socket, mapping: PartialFunction[String,String]) exten
   client  Input Stream, ceci nous facilte lire et parser les requetes HTTP*/
 
   def getProcessor(httpIn: HttpInputStream): HttpProcessor = {
-    Console.println("HttpHandler.getProcessor");
+    scala.Console.println("HttpHandler.getProcessor");
     var value = 0;
     var infoString = " " ;
     var info:HashMap[String, String] = null;
@@ -76,7 +76,7 @@ class HttpHandler(client: Socket, mapping: PartialFunction[String,String]) exten
 	error= exept.toProcessor;}
     }
 
-    Console.println("value = "+value);
+    scala.Console.println("value = "+value);
 
     if(value == 1)
       return srv ;
