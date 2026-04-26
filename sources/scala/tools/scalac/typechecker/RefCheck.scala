@@ -830,8 +830,7 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
       .setInfo(defs.ANY_HASHCODE.getType());
     clazz.info().members().enter(hashCodeSym);
     val fields: Array[Tree] = caseFields(clazz);
-    val name: Name = if (globl.target == scalac_Global.TARGET_MSIL) Names.GetType
-                     else Names.getClass;
+    val name: Name = Names.getClass;
     val getClassMethod = getNullaryMemberMethod(clazz.getType(), name);
     val addMethod = getUnaryMemberMethod(defs.int_TYPE(), Names.ADD, defs.int_TYPE());
     val mulMethod = getUnaryMemberMethod(defs.int_TYPE(), Names.MUL, defs.int_TYPE());
@@ -880,12 +879,10 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
       ts.append(caseElementMethod(clazz));
       ts.append(caseArityMethod(clazz));
       ts.append(gen.mkTagMethod(clazz));
-      if (global.target != Global.TARGET_MSIL)
-        ts.append(getTypeMethod(clazz));
+      ts.append(getTypeMethod(clazz));
     } else if ((clazz.flags & ABSTRACT) == 0) {
       ts.append(gen.mkTagMethod(clazz));
-      if (global.target != Global.TARGET_MSIL)
-        ts.append(getTypeMethod(clazz));
+      ts.append(getTypeMethod(clazz));
     }
     if (clazz.isModuleClass() && clazz.isSubClass(defs.SERIALIZABLE_CLASS)) {
       // If you serialize a singleton and then deserialize it twice,
@@ -1185,4 +1182,3 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
     super.transform(trees);
 
 }}
-

@@ -30,7 +30,6 @@ import scala.tools.util.SourceReader;
 import scala.tools.util.Reporter;
 
 import scalac.ast.*;
-import scalac.ast.parser.*;
 import scalac.ast.printer.*;
 import scalac.atree.ATreePrinter;
 import scalac.backend.Primitives;
@@ -39,7 +38,6 @@ import scalac.symtab.*;
 // !!! >>> Interpreter stuff
 import scalac.symtab.Definitions;
 import scalac.symtab.classfile.PackageParser;
-import scalac.symtab.classfile.CLRPackageParser;
 import scalac.typechecker.AnalyzerPhase;
 import scalac.typechecker.Infer;
 import scalac.util.*;
@@ -107,7 +105,7 @@ public abstract class Global {
 
     /** the tree generator
      */
-    public final TreeGen treeGen;
+    public TreeGen treeGen;
 
     /** the global tree printer
      */
@@ -117,6 +115,7 @@ public abstract class Global {
     /** documentation comments of symbols
      */
     public final Map/*<Symbol, String>*/ mapSymbolComment = new HashMap();
+    public final Map/*<Tree, String>*/ mapTreeComment = mapSymbolComment;
 
     /** attributes of symbols
      */
@@ -163,13 +162,11 @@ public abstract class Global {
      */
     public static final String TARGET_INT;
     public static final String TARGET_JVM;
-    public static final String TARGET_MSIL;
     public static final String TARGET_JVMFROMICODE;
 
     public static final String[] TARGETS = new String[] {
         TARGET_INT          = "int",
         TARGET_JVM          = "jvm",
-        TARGET_MSIL         = "msil",
 	TARGET_JVMFROMICODE = "jvmfromicode"
     };
 
@@ -270,11 +267,11 @@ public abstract class Global {
             this.treePrinter = newTextTreePrinter(writer);
         }
         this.make = new DefaultTreeFactory();
+        this.treeGen = new TreeGen(this, this.make);
         this.PHASE = args.phases;
         // if (!optimize) PHASE.remove(args.phases.OPTIMIZE);
         // TODO: Enable TailCall for other backends when they handle LabelDefs
         if (!runTimeTypes) args.phases.TYPESASVALUES.addSkipFlag();
-        if (target != TARGET_MSIL) args.phases.GENMSIL.addSkipFlag();
         if (target != TARGET_JVM) args.phases.GENJVM.addSkipFlag();
 	if (target != TARGET_JVMFROMICODE) {
 	    args.phases.ICODE.addSkipFlag();
@@ -339,9 +336,7 @@ public abstract class Global {
 
     /** Returns the root symbol loader. */
     public SymbolLoader getRootLoader() {
-        return target == TARGET_MSIL
-            ? new CLRPackageParser(this, classPath.getRoot())
-            : new PackageParser(this, classPath.getRoot());
+        return new PackageParser(this, classPath.getRoot());
     }
 
     /** the top-level compilation process
@@ -534,13 +529,14 @@ public abstract class Global {
     private void fix2(CompilationUnit unit) {
         imports.clear();
         for (int i = 0; i < unit.body.length; i++) {
-            switch (unit.body[i]) {
-            case ModuleDef(_, _, _, Tree.Template impl):
-                Symbol symbol = unit.body[i].symbol();
-                if (!symbol.name.toString().startsWith(CONSOLE_S)) break;
+            Tree tree = unit.body[i];
+            if (tree instanceof Tree.ModuleDef) {
+                Tree.Template impl = ((Tree.ModuleDef)tree).impl;
+                Symbol symbol = tree.symbol();
+                if (!symbol.name.toString().startsWith(CONSOLE_S)) continue;
                 console = symbol;
-                if (impl.body.length <= 0) break;
-                imports.add(unit.body[i].symbol());
+                if (impl.body.length <= 0) continue;
+                imports.add(tree.symbol());
                 Tree last = impl.body[impl.body.length - 1];
                 if (last != Tree.Empty && last.isTerm()) {
                     impl.body[impl.body.length - 1] =
@@ -557,23 +553,21 @@ public abstract class Global {
                 for (int j = 0; j < impl.body.length; j++)
                     fix2(body, impl.body[j]);
                 impl.body = body.toArray();
-                break;
             }
         }
     }
 
     private void fix2(TreeList body, Tree tree) {
         body.append(tree);
-        switch (tree) {
-        case PatDef(_, _, _): // !!! impossible (removed by analyzer)
+        if (tree instanceof Tree.PatDef) { // !!! impossible (removed by analyzer)
             assert false : Debug.show(tree);
             return;
-        case ClassDef(_, _, _, _, _, _):
-        case PackageDef(_, _):
-        case ModuleDef(_, _, _, _):
-        case DefDef(_, _, _, _, _, _):
-        case AbsTypeDef(_, _, _, _):
-        case AliasTypeDef(_, _, _, _):
+        } else if (tree instanceof Tree.ClassDef
+                   || tree instanceof Tree.PackageDef
+                   || tree instanceof Tree.ModuleDef
+                   || tree instanceof Tree.DefDef
+                   || tree instanceof Tree.AbsTypeDef
+                   || tree instanceof Tree.AliasTypeDef) {
             if (!mustShow(tree.symbol())) return;
             body.append(
                 treeGen.Apply(tree.pos,
@@ -583,7 +577,7 @@ public abstract class Global {
                     new Tree[] {
                         treeGen.mkStringLit(tree.pos, show(tree.symbol()))}));
             return;
-        case ValDef(_, _, _, _):
+        } else if (tree instanceof Tree.ValDef) {
             if (!mustShow(tree.symbol())) return;
             body.append(
                 treeGen.Apply(tree.pos,
@@ -594,9 +588,8 @@ public abstract class Global {
                         treeGen.mkStringLit(tree.pos, show(tree.symbol())),
                         treeGen.Ident(tree.pos, tree.symbol())}));
             return;
-        default:
-            return;
         }
+        return;
     }
 
     private boolean mustShow(Symbol symbol) {

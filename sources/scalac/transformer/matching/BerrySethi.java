@@ -7,7 +7,7 @@ import scalac.ApplicationError ;
 import scalac.ast.Tree ;
 import scalac.ast.TreeInfo ;
 import scalac.util.Name ;
-import Tree.* ;
+import scalac.ast.Tree.* ;
 
 import java.util.* ;
 
@@ -59,28 +59,31 @@ class BerrySethi {
             //System.out.print("<nullable>");
             //DEBUG.print( pat );
             //System.out.println("</nullable>");
-            switch( pat ) {
-            case Apply(_, _):
+            if (pat instanceof Apply) {
                   return false;
-            case Sequence( Tree[] trees ):
+            }
+            if (pat instanceof Sequence) {
+                  Tree[] trees = ((Sequence)pat).trees;
                   return (trees.length == 0) || nullable( trees );
 		  //case Subsequence( Tree[] trees ):
                   //return
-            case Bind(Name n, Tree t):
+            }
+            if (pat instanceof Bind) {
+                  Tree t = ((Bind)pat).rhs;
                   /*
                      if( isStar( n ) ) // generated for star/plus(?)
                      return true;
                   */
                   return nullable( t );
-            case Alternative(Tree[] choices):
+            }
+            if (pat instanceof Alternative) {
+                  Tree[] choices = ((Alternative)pat).trees;
                   boolean result = false;
                   for( int i = 0; i < choices.length && !result; i++ )
                         result = result || nullable( choices[ i ] );
                   return result;
-            default:
-                  return false;
-
             }
+            return false;
       }
 
 
@@ -88,8 +91,8 @@ class BerrySethi {
        *  @param pat the sequence pattern.
        */
       boolean nullableSequence( Tree pat ) {
-            switch( pat ) {
-            case Sequence( Tree[] pats ):
+            if (pat instanceof Sequence) {
+                  Tree[] pats = ((Sequence)pat).trees;
                   return nullable( pats );
             }
             return false;
@@ -113,38 +116,42 @@ class BerrySethi {
             //System.out.print("<compFirst>");
             //DEBUG.print( pat );
             //System.out.println("</compFirst>");
-            switch( pat ) {
-            case Sequence( Tree[] trees ):
+            if (pat instanceof Sequence) {
+                  Tree[] trees = ((Sequence)pat).trees;
 		return compFirst( trees );
-            case Typed(_,_):
-            case Select(_,_):
-            case Apply(_, _):
+            }
+            if (pat instanceof Typed || pat instanceof Select || pat instanceof Apply) {
                   TreeSet tmp = new TreeSet();
                   tmp.add( (Integer) posMap.get( pat )); // singleton set
                   return tmp;
-            case Literal( _ ):
+            }
+            if (pat instanceof Literal) {
                   TreeSet tmp = new TreeSet();
                   tmp.add( (Integer) posMap.get( pat )); // singleton set
                   return tmp;
 		  //case Subsequence( Tree[] trees ):
                   //return compFirst( trees );
-            case Alternative( Tree[] trees ):
+            }
+            if (pat instanceof Alternative) {
+                  Tree[] trees = ((Alternative)pat).trees;
                   TreeSet tmp = new TreeSet();
                   for( int i = 0; i < trees.length; i++ ) {
                         tmp.addAll( compFirst( trees[ i ] ));
                   }
                   return tmp;
-            case Bind( _, Tree tree ):
+            }
+            if (pat instanceof Bind) {
+                  Tree tree = ((Bind)pat).rhs;
                   return compFirst( tree );
-            case Ident( Name name ):
+            }
+            if (pat instanceof Ident) {
                   //if( name != Name.fromString("_") )
                   //    throw new ApplicationError("unexpected pattern");
                   TreeSet tmp = new TreeSet();
                   tmp.add( (Integer) posMap.get( pat )); // singleton set
                   return tmp;
-            default:
-                  throw new ApplicationError("unexpected pattern");
             }
+            throw new ApplicationError("unexpected pattern");
       }
 
 
@@ -155,29 +162,31 @@ class BerrySethi {
             //System.out.print("<last>");
             //DEBUG.print( pat );
             //System.out.println("</compLast>");
-            switch( pat ) {
-            case Sequence( _ ):
-            case Apply(_, _):
+            if (pat instanceof Sequence || pat instanceof Apply) {
                   TreeSet tmp = new TreeSet();
                   tmp.add( (Integer) posMap.get( pat )); // singleton set
                   return tmp;
-            case Literal( _ ):
+            }
+            if (pat instanceof Literal) {
                   TreeSet tmp = new TreeSet();
                   tmp.add( (Integer) posMap.get( pat )); // singleton set
                   return tmp;
 		  //case Subsequence( Tree[] trees ):
                   //return compLast( trees );
-            case Alternative( Tree[] trees ):
+            }
+            if (pat instanceof Alternative) {
+                  Tree[] trees = ((Alternative)pat).trees;
                   TreeSet tmp = new TreeSet();
                   for( int i = 0; i < trees.length; i++ ) {
-                        tmp.addAll( compLast( trees ));
+                        tmp.addAll( compLast( trees[ i ] ));
                   }
                   return tmp;
-            case Bind( _, Tree tree ):
-                  return compLast( tree );
-            default:
-                  throw new ApplicationError("unexpected pattern");
             }
+            if (pat instanceof Bind) {
+                  Tree tree = ((Bind)pat).rhs;
+                  return compLast( tree );
+            }
+            throw new ApplicationError("unexpected pattern");
       }
 
 
@@ -223,7 +232,7 @@ class BerrySethi {
             while( nullable(tmp) && (i >= 0 )) {
                   tmp = pats[ i ];
                   result.addAll( compLast( tmp ));
-                  i++;
+                  i--;
             }
             return result;
       }
@@ -266,8 +275,8 @@ class BerrySethi {
        */
       TreeSet compFollow1( TreeSet fol, Tree pat ) {
 	  //System.out.println("compFollow1("+fol+","+pat+")");
-            switch( pat ) {
-            case Sequence( Tree[] trees ):
+            if (pat instanceof Sequence) {
+                  Tree[] trees = ((Sequence)pat).trees;
                   TreeSet first = null;
                   int i = trees.length;
                   if( i > 0 ) { // is nonempty
@@ -282,15 +291,20 @@ class BerrySethi {
                   }
                   if( null == first ) first = new TreeSet();
                   return first;
-
-            case Alternative( Tree[] choices ):
+            }
+            if (pat instanceof Alternative) {
+                  Tree[] choices = ((Alternative)pat).trees;
                   TreeSet first = new TreeSet();
                   for( int i = choices.length - 1; i >= 0; --i ) {
                         first.addAll( compFollow1( fol, choices[ i ] ));
                   }
                   return first;
+            }
+            if (pat instanceof Bind) {
+                  Name n = ((Bind)pat).name;
+                  Tree t = ((Bind)pat).rhs;
 
-            case Bind( Name n, Tree t ):  // == can also be star
+                  Integer p = (Integer) this.posMap.get( pat );
 
                   TreeSet first = compFirst( t );
                   //System.out.print("BIND" + first);
@@ -303,8 +317,9 @@ class BerrySethi {
 
                   // continue to compute follow sets with adjusted fol
                   return compFollow1( fol, t );
-
-            case Ident( Name n ):
+            }
+            if (pat instanceof Ident) {
+                  Name n = ((Ident)pat).name;
                   if ((pat.symbol() != null )
                       && pat.symbol().isPrimaryConstructor()) {
                         // same as Apply
@@ -338,20 +353,17 @@ class BerrySethi {
                   //System.out.println("Ident("+n+",...) first:"+first);
                   //System.out.println("Ident("+n+",...) follow:"+tset);
                   return first;
-
-            case Apply(_, _):
-            case Literal( _ ):
-            case Typed(_,_):
-            case Select(_,_):
+            }
+            if (pat instanceof Apply || pat instanceof Literal ||
+                pat instanceof Typed || pat instanceof Select) {
                   Integer pos = (Integer) this.posMap.get( pat );
                   TreeSet tset = (TreeSet) fol.clone();
                   this.follow.put( pos, tset );
                   TreeSet first = new TreeSet();
                   first.add( pos );
                   return first;
-            default:
-                  throw new ApplicationError("unexpected pattern: "+pat.getClass());
             }
+            throw new ApplicationError("unexpected pattern: "+pat.getClass());
       }
 
       /** called at the leaves of the regexp
@@ -362,8 +374,9 @@ class BerrySethi {
             if( label != Label.DefaultLabel ) {
                 /*
                 if( this.labels.contains( label ) ) {
-                    switch(label) {
-                    case TreeLabel(Apply(_, Tree[] args)):
+                    if (label instanceof Label.TreeLabel &&
+                        ((Label.TreeLabel) label).pat instanceof Apply) {
+                        Tree[] args = ((Apply) ((Label.TreeLabel) label).pat).args;
                         if( args.length > 0 ) {
                             unit.warning(pat.pos, "if this pattern in nondeterminism, it will not compile correctly");
                         }
@@ -389,34 +402,36 @@ class BerrySethi {
 
       // todo: replace global variable pos with acc
       void traverse( Tree pat ) {
-            switch( pat ) {
-
+            if (pat instanceof Apply || pat instanceof Typed || pat instanceof Select) {
                   // (is tree automaton stuff, more than Berry-Sethi)
-            case Apply( _, _ ):
-            case Typed( _, _ ):
-            case Select( _, _ ):
                   Label label = new Label.TreeLabel( pat );
                   seenLabel( pat, label ) ;
 
                   return ;
-
-            case Literal( _ ):
+            }
+            if (pat instanceof Literal) {
                   Label label = new Label.SimpleLabel( (Literal) pat );
                   seenLabel( pat, label ) ;
 
                   return ;
-
-            case Sequence( Tree[] trees ):
+            }
+            if (pat instanceof Sequence) {
+                  Tree[] trees = ((Sequence)pat).trees;
                   for( int i = 0; i < trees.length; i++ ) {
                         traverse( trees[ i ] );
                   }
                   return ;
-            case Alternative(Tree[] choices):
+            }
+            if (pat instanceof Alternative) {
+                  Tree[] choices = ((Alternative)pat).trees;
                   for( int i = 0; i < choices.length; i++ ) {
                         traverse( choices[ i ] );
                   }
                   return ;
-            case Bind(Name name, Tree body):
+            }
+            if (pat instanceof Bind) {
+                  Name name = ((Bind)pat).name;
+                  Tree body = ((Bind)pat).rhs;
                   recVars.put( pat.symbol(), Boolean.TRUE );
                   if( !isStar( name ) )
                         {
@@ -427,8 +442,8 @@ class BerrySethi {
                   else
                         traverse( body );
                   return ;
-
-            case Ident(Name name):
+            }
+            if (pat instanceof Ident) {
                   if ((pat.symbol() != null )
                       && pat.symbol().isPrimaryConstructor()) {
                         // same as Apply
@@ -451,9 +466,8 @@ class BerrySethi {
                   //else throw new ApplicationError("cannot handle this: "+name);
                   //            case Apply( _, _ ):
                   //throw new ApplicationError("cannot handle this");
-            default:
-                  throw new ApplicationError("this is not a pattern");
             }
+            throw new ApplicationError("this is not a pattern");
       }
 
 
@@ -477,12 +491,10 @@ class BerrySethi {
             int dest = destI.intValue() ;
             Vector arrows; //, revArrows;
             //Label revLabel = new Label.Pair( srcI, label );
-            switch( label ) {
-            case DefaultLabel:
+            if (label == Label.DefaultLabel) {
                   arrows = defaultq[ src ];
                   //revArrows = defaultqRev[ dest ];
-                  break;
-            default:
+            } else {
                   arrows = (Vector) deltaq[ src ].get( label );
                   if( arrows == null )
                         deltaq[ src ].put( label,
@@ -569,8 +581,8 @@ class BerrySethi {
             //System.out.println( "enter automatonFrom("+pat+","+finalTag+")"); // UNIT TEST
             //System.out.println( pat );
             //System.out.println( nullableSequence( pat )); // UNIT TEST
-            switch( pat ) {
-            case Sequence( Tree[] subexpr ):
+            if (pat instanceof Sequence) {
+                  Tree[] subexpr = ((Sequence)pat).trees;
                   initialize( subexpr );
 
 
@@ -639,8 +651,7 @@ class BerrySethi {
             for( Iterator it = this.posMap.keySet().iterator();
                  it.hasNext(); ) {
                   Tree t = (Tree) it.next();
-                  switch(t) {
-                  case Literal( _ ):
+                  if (t instanceof Literal) {
                         System.out.print( "(" + t.toString() + " -> ");
                         String s2 = ((Integer) posMap.get(t)).toString();
                         System.out.print( s2 +") ");

@@ -40,7 +40,6 @@ public abstract class CompilerPhases {
     public final PhaseDescriptor MAKEBOXINGEXPLICIT;
     public final PhaseDescriptor ERASURE;
     public final PhaseDescriptor ICODE;
-    public final PhaseDescriptor GENMSIL;
     public final PhaseDescriptor GENJVM;
     public final PhaseDescriptor GENJVMFROMICODE;
     public final PhaseDescriptor TERMINAL;
@@ -69,7 +68,6 @@ public abstract class CompilerPhases {
     protected Class EXPANDMIXIN_PHASE() { return scalac.transformer.ExpandMixinsPhase.class; }
     protected Class ERASURE_PHASE() { return scalac.transformer.ErasurePhase.class; }
     protected Class ICODE_PHASE() { return scalac.util.EmptyPhase.class; } // No java version
-    protected Class GENMSIL_PHASE() { return scalac.backend.msil.GenMSILPhase.class; }
     protected Class GENJVM_PHASE() { return scalac.backend.jvm.GenJVMPhase.class; }
     protected Class GENJVMFROMICODE_PHASE() { return scalac.util.EmptyPhase.class; } // No java version
 
@@ -175,11 +173,6 @@ public abstract class CompilerPhases {
                 "generate icode",
                 "generated icode",
                 ICODE_PHASE()),
-            this.GENMSIL = new PhaseDescriptor(
-                "genmsil",
-                "generate MSIL code",
-                "generated MSIL code",
-                GENMSIL_PHASE()),
             this.GENJVM = new PhaseDescriptor(
                 "genjvm",
                 "generate JVM bytecodes",

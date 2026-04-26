@@ -38,10 +38,12 @@ object Main {
 
       for( val c <- theConfig ) c match {
         case EngineConfig(list) =>
-          for( val conn <- list ) conn match {
-            case HttpConnectorConfig(port,map) =>
-              Console.println("starting http connector at "+port);
-              new http.HttpConnector(port, map).start(); //@todo
+          list.foreach {
+            (conn: ConnectorConfig) => conn match {
+              case HttpConnectorConfig(port,map) =>
+                Console.println("starting http connector at "+port);
+                new http.HttpConnector(port, map).start(); //@todo
+            }
           }
       }
       //Console.println("starting http connector at 8000");

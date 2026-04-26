@@ -128,8 +128,15 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
   def loadCode(clasz: Symbol, mixinOnly: boolean): unit = {
     assert(clasz.isClass() && !clasz.isModuleClass(), Debug.show(clasz));
     if (clasz.isExternal()) {
+      // FunctionN traits never declare an explicit self type. If they were
+      // first loaded from classfiles, their unpickled thisSym can retain stale
+      // type parameter symbols and break instanceType substitution.
+      if (clasz.thisSym() != clasz)
+        clasz.setTypeOfThis(clasz.getType());
       try {
         global.compileLate(global.getSourceFile(clasz), mixinOnly);
+        if (clasz.thisSym() != clasz)
+          clasz.setTypeOfThis(clasz.getType());
       } catch {
         case exception: java.io.IOException =>
           if (global.debug) exception.printStackTrace();
@@ -1627,12 +1634,12 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 	  val v = infer.bestView(tree.getType(), pt, Names.EMPTY);
 	  if (v != null) return applyView(v, tree, mode, pt);
 	  // todo: remove
- 	  val coerceMeth: Symbol = tree.getType().lookup(Names.coerce);
+ 	  val coerceMeth: Symbol = infer.coerceMethod(tree.getType(), pt);
  	  if (coerceMeth != Symbol.NONE) {
  	    val coerceType = infer.checkAccessible(
  	      tree.pos, coerceMeth, tree.getType().memberType(coerceMeth),
  	      tree, tree.getType());
- 	    val tree1 = make.Select(tree.pos, tree, Names.coerce)
+ 	    val tree1 = make.Select(tree.pos, tree, coerceMeth.name)
  	    .setSymbol(coerceMeth)
  	    .setType(coerceType);
 	    return adapt(tree1, mode, pt);

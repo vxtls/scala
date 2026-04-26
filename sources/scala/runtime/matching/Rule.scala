@@ -101,4 +101,3 @@ case class AnyTreeRule( n:TreeNT ) extends TRule {
 case class AnyNodeRule( n:TreeNT, h:HedgeNT ) extends TRule {
 }
 case class HedgeRule( n:HedgeNT, t:TreeNT, h:HedgeNT ) extends HRule;
-

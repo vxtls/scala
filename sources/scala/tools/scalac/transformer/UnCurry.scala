@@ -330,12 +330,18 @@ class UnCurry(global: scalac_Global, descr: UnCurryPhase) extends OwnerTransform
                      sym2 + ": " + type2 + sym2.locationString() + " have same types after " + phase);
       }
 
+      def explicitOverride(sym1: Symbol, sym2: Symbol): boolean =
+        sym1.owner() != sym2.owner() &&
+        (((sym1.flags & OVERRIDE) != 0 && sym1.owner().isSubClass(sym2.owner())) ||
+         ((sym2.flags & OVERRIDE) != 0 && sym2.owner().isSubClass(sym1.owner())));
+
       val newtype1: Type = descr.uncurry(type1);
       val newtype2: Type = descr.uncurry(type2);
       if (sym1.owner() != sym2.owner() &&
           (newtype1.overrides(newtype2) || newtype2.overrides(newtype1)))
         conflictError("uncurry")
-      else if (erasureConflict(newtype1, newtype2))
+      else if (!explicitOverride(sym1, sym2) &&
+               erasureConflict(newtype1, newtype2))
         conflictError("erasure")
     }
 

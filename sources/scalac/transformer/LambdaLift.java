@@ -14,7 +14,7 @@ import scalac.*;
 import scalac.util.*;
 import scalac.ast.*;
 import scalac.symtab.*;
-import Tree.*;
+import scalac.ast.Tree.*;
 
 /** A lambda lifting transformer
  *
@@ -202,21 +202,25 @@ public class LambdaLift extends OwnerTransformer
 	private Type.Map traverseTypeMap = new Type.Map() {
 	    public Type apply(Type tp) {
 		if (global.debug) global.log("traverse " + tp);//debug
-	        switch (tp) {
-		case TypeRef(NoPrefix, Symbol sym, Type[] targs):
-		    if (isLocal(sym, currentOwner) &&
-			sym.kind == TYPE &&
-			!excluded.contains(sym))
-			markFree(sym, currentOwner);
-		    break;
-		case PolyType(Symbol[] tparams, Type restp):
+	        if (tp instanceof Type.TypeRef) {
+                    Type.TypeRef typeRef = (Type.TypeRef)tp;
+                    if (typeRef.pre instanceof Type.ThisType) {
+		        Symbol sym = typeRef.sym;
+		        if (isLocal(sym, currentOwner) &&
+			    sym.kind == TYPE &&
+			    !excluded.contains(sym))
+			    markFree(sym, currentOwner);
+                    }
+	        } else if (tp instanceof Type.PolyType) {
+                    Type.PolyType polyType = (Type.PolyType)tp;
+                    Symbol[] tparams = polyType.tparams;
 		    for (int i = 0; i < tparams.length; i++)
 			excluded = excluded.incl(tparams[i]);
 		    Type tp1 = super.map(tp);
 		    for (int i = 0; i < tparams.length; i++)
 			excluded = excluded.excl(tparams[i]);
 		    return tp1;
-		}
+	        }
 		return map(tp);
 	    }
         };
@@ -226,48 +230,65 @@ public class LambdaLift extends OwnerTransformer
 	    assert tree.type != null : tree;
 	    traverseTypeMap.apply(tree.type.widen());
 	    Symbol sym = tree.symbol();
-	    switch(tree) {
-	    case ClassDef(_, _, _, _, _, _):
-	    case DefDef(_, _, _, _, _, _):
+	    if (tree instanceof ClassDef || tree instanceof DefDef) {
 		if (sym.isLocal()) {
 		    renamable = renamable.incl(sym);
 		}
 		return super.transform(tree);
-
-	    case AbsTypeDef(int mods, Name name, Tree rhs, Tree lobound):
+            }
+	    if (tree instanceof AbsTypeDef) {
+                AbsTypeDef absTypeDef = (AbsTypeDef)tree;
 		// ignore type definition as owner.
 		// reason: it might be in a refinement
 		// todo: handle type parameters?
 		return copy.AbsTypeDef(
 		    tree, sym,
-		    transform(rhs, currentOwner),
-		    transform(lobound, currentOwner));
-
-	    case AliasTypeDef(int mods, Name name, AbsTypeDef[] tparams, Tree rhs):
+		    transform(absTypeDef.rhs, currentOwner),
+		    transform(absTypeDef.lobound, currentOwner));
+            }
+	    if (tree instanceof AliasTypeDef) {
+                AliasTypeDef aliasTypeDef = (AliasTypeDef)tree;
 		// ignore type definition as owner.
 		// reason: it might be in a refinement
 		// todo: handle type parameters?
 		return copy.AliasTypeDef(
 		    tree, sym,
-		    transform(tparams, currentOwner),
-		    transform(rhs, currentOwner));
-
-	    case Ident(_):
-		if (isLocal(sym, currentOwner)) {
-		    if (sym.isMethod()) {
-			Symbol f = enclFun(currentOwner);
-			if (f.name.length() > 0) // it is not a template function {
-			    putCall(f, sym);
-		    } else if (sym.kind == VAL || sym.kind == TYPE) {
-			markFree(sym, currentOwner);
-		    }
+		    transform(aliasTypeDef.tparams, currentOwner),
+		    transform(aliasTypeDef.rhs, currentOwner));
+            }
+		    if (tree instanceof Ident) {
+			if (isLocal(sym, currentOwner)) {
+			    if (sym.isMethod()) {
+				Symbol f = enclFun(currentOwner);
+				if (f.name.length() > 0) // it is not a template function {
+				    putCall(f, sym);
+			    } else if (sym.kind == VAL || sym.kind == TYPE) {
+				markFree(sym, currentOwner);
+			    }
+			}
+			return tree;
+	            }
+		    if (tree instanceof Bind) {
+			transform(((Bind)tree).rhs);
+			return tree;
+	            }
+		    if (tree instanceof Alternative) {
+			transform(((Alternative)tree).trees);
+			return tree;
+	            }
+		    if (tree instanceof CaseDef) {
+			CaseDef caseDef = (CaseDef)tree;
+			transform(caseDef.pat);
+			transform(caseDef.guard);
+			transform(caseDef.body);
+			return tree;
+	            }
+		    if (tree instanceof Visitor) {
+			transform(((Visitor)tree).cases);
+			return tree;
+	            }
+		    return super.transform(tree);
 		}
-		return tree;
-
-	    default:
-		return super.transform(tree);
-	    }
-	}
 
 	/** Propagate free fariables from all called functions.
 	 */
@@ -349,13 +370,20 @@ public class LambdaLift extends OwnerTransformer
 	//System.out.print(tree.type + " --> ");//DEBUG
 	tree.type = descr.transform(tree.type, currentOwner);
 	//System.out.println(tree.type);//DEBUG
-        switch (tree) {
-	case Block(Tree[] stats, Tree value):
+        if (tree instanceof Block) {
+            Block block = (Block)tree;
+            Tree[] stats = block.stats;
 	    for (int i = 0; i < stats.length; i++)
 		liftSymbol(stats[i]);
-	    return copy.Block(tree, transform(stats), transform(value));
-
-	case ClassDef(int mods, _, AbsTypeDef[] tparams, ValDef[][] vparams, Tree tpe, Template impl):
+	    return copy.Block(tree, transform(stats), transform(block.expr));
+        }
+	if (tree instanceof ClassDef) {
+            ClassDef classDef = (ClassDef)tree;
+            int mods = classDef.mods;
+            AbsTypeDef[] tparams = classDef.tparams;
+            ValDef[][] vparams = classDef.vparams;
+            Tree tpe = classDef.tpe;
+            Template impl = classDef.impl;
 	    Symbol sym = tree.symbol();
 	    if ((mods & LIFTED) != 0) {
 		((ClassDef) tree).mods &= ~LIFTED;
@@ -377,8 +405,14 @@ public class LambdaLift extends OwnerTransformer
 		    transform(tpe, sym),
 		    transform(impl, sym));
 	    }
-
-	case DefDef(int mods, _, AbsTypeDef[] tparams, ValDef[][] vparams, Tree tpe, Tree rhs):
+        }
+	if (tree instanceof DefDef) {
+            DefDef defDef = (DefDef)tree;
+            int mods = defDef.mods;
+            AbsTypeDef[] tparams = defDef.tparams;
+            ValDef[][] vparams = defDef.vparams;
+            Tree tpe = defDef.tpe;
+            Tree rhs = defDef.rhs;
 	    Symbol sym = tree.symbol();
 	    if ((mods & LIFTED) != 0) {
 		((DefDef) tree).mods &= ~LIFTED;
@@ -398,68 +432,75 @@ public class LambdaLift extends OwnerTransformer
 		    transform(tparams, sym), transform(vparams, sym), transform(tpe, sym),
 		    transform(rhs, sym));
 	    }
-
-	case AbsTypeDef(int mods, Name name, Tree rhs, Tree lobound):
+        }
+	if (tree instanceof AbsTypeDef) {
+            AbsTypeDef absTypeDef = (AbsTypeDef)tree;
 	    // ignore type definition as owner.
 	    // reason: it might be in a refinement
 	    // todo: handle type parameters?
 	    return copy.AbsTypeDef(
 		tree, tree.symbol(),
-		transform(rhs, currentOwner),
-		transform(lobound, currentOwner));
-
-	case AliasTypeDef(int mods, Name name, AbsTypeDef[] tparams, Tree rhs):
+		transform(absTypeDef.rhs, currentOwner),
+		transform(absTypeDef.lobound, currentOwner));
+        }
+	if (tree instanceof AliasTypeDef) {
+            AliasTypeDef aliasTypeDef = (AliasTypeDef)tree;
 	    // ignore type definition as owner.
 	    // reason: it might be in a refinement
 	    // todo: handle type parameters?
 	    return copy.AliasTypeDef(
 		tree, tree.symbol(),
-		transform(tparams, currentOwner),
-		transform(rhs, currentOwner));
-
-	case ValDef(_, _, _, Tree rhs):
+		transform(aliasTypeDef.tparams, currentOwner),
+		transform(aliasTypeDef.rhs, currentOwner));
+        }
+	if (tree instanceof ValDef) {
+            ValDef valDef = (ValDef)tree;
+            Tree rhs = valDef.rhs;
 	    Symbol sym = tree.symbol();
 	    rhs = transform(rhs, sym);
 	    if ((sym.flags & CAPTURED) != 0) {
 		assert sym.isLocal();
-                switch (sym.nextType()) {
-                case TypeRef(_, Symbol clasz, Type[] args):
-                    Tree constr = gen.mkPrimaryConstructorGlobalRef(rhs.pos, clasz);
-                    rhs = gen.New(gen.mkApplyTV(constr, args, new Tree[]{rhs}));
-                    break;
-                default:
+                if (sym.nextType() instanceof Type.TypeRef) {
+                    Type.TypeRef typeRef = (Type.TypeRef)sym.nextType();
+                    Tree constr = gen.mkPrimaryConstructorGlobalRef(rhs.pos, typeRef.sym);
+                    rhs = gen.New(gen.mkApplyTV(constr, typeRef.args, new Tree[]{rhs}));
+                } else {
                     throw Debug.abort("illegal case", sym.nextType());
                 }
 	    }
 	    return gen.ValDef(sym, rhs);
-
-	case Sequence(Tree[] args):
-              throw new ApplicationError("this should not happen");
-              /* // moved this to Uncurry
+        }
+	if (tree instanceof Sequence) {
+            Tree[] args = ((Sequence)tree).trees;
 	    Tree tree1 = gen.mkNewList(tree.pos, tree.type.typeArgs()[0], transform(args));
 	    //new scalac.ast.printer.TextTreePrinter().print("TUPLE: ").print(tree).print("\n ==> \n").print(tree1).println().end();//DEBUG
 	    return tree1;
-              */
-
-        case Return(Block(Tree[] stats, Tree value)):
-            return transform(
-                gen.Block(stats, gen.Return(tree.pos, tree.symbol(), value)));
-
-	case Return(Tree expr):
+        }
+	if (tree instanceof Return) {
+            Tree expr = ((Return)tree).expr;
+            if (expr instanceof Block) {
+                Block block = (Block)expr;
+                return transform(
+                    gen.Block(block.stats, gen.Return(tree.pos, tree.symbol(), block.expr)));
+            }
 	    if (tree.symbol() != currentOwner.enclMethod()) {
 		unit.error(tree.pos, "non-local return not yet implemented");
 	    }
 	    return super.transform(tree);
-	case Apply(Tree fn, Tree[] args):
+        }
+	if (tree instanceof Apply) {
+            Apply apply = (Apply)tree;
+            Tree fn = apply.fun;
+            Tree[] args = apply.args;
 	    Symbol fsym = TreeInfo.methSymbol(fn);
 	    Tree fn1 = transform(fn);
-	    switch (fn1) {
-	    case TypeApply(Tree fn2, Tree[] targs):
+	    if (fn1 instanceof TypeApply) {
+                TypeApply typeApply = (TypeApply)fn1;
+                Tree fn2 = typeApply.fun;
+                Tree[] targs = typeApply.args;
                 if (args.length == 1 && fn2.symbol() == definitions.PREDEF_ARRAY()) {
-                      throw new ApplicationError("this should not happen");
-                      /* // this moved to UnCurry
-                    switch (args[0]) {
-                    case Sequence(Tree[] items):
+                    if (args[0] instanceof Sequence) {
+                        Tree[] items = ((Sequence)args[0]).trees;
                         assert targs.length == 1: tree;
                         Tree array = gen.mkNewArray(
                             args[0].pos,
@@ -467,19 +508,17 @@ public class LambdaLift extends OwnerTransformer
                             transform(items),
                             currentOwner);
                         // fn2 may be like "{ println("hello"); Predef}.Array"
-                        switch (fn2) {
-                        case Select(Tree qualifier, _):
+                        if (fn2 instanceof Select) {
+                            Tree qualifier = ((Select)fn2).qualifier;
                             return gen.mkBlock(args[0].pos, qualifier, array);
-                        default:
+                        } else {
                             throw Debug.abort("illegal case", fn2);
                         }
                     }
-                      */
                 }
 		fn1 = copy.TypeApply(
 		    fn1, fn2, addFreeArgs(tree.pos, get(free.ftvs, fsym), targs, true));
-		break;
-	    default:
+	    } else {
  		Tree[] targs = addFreeArgs(
 		    tree.pos, get(free.ftvs, fsym), Tree.EMPTY_ARRAY, true);
 		if (targs.length > 0)
@@ -488,21 +527,48 @@ public class LambdaLift extends OwnerTransformer
 	    Tree[] args1 = transform(args);
 	    return copy.Apply(
 		tree, fn1, addFreeArgs(tree.pos, get(free.fvs, fsym), args1, false));
-
-	case Ident(_):
-	    Symbol sym = tree.symbol();
+        }
+		if (tree instanceof Ident) {
+	            Name name = ((Ident)tree).name;
+		    Symbol sym = tree.symbol();
 	    if (isLocal(sym, currentOwner) &&
 		(sym.kind == TYPE || (sym.kind == VAL && !sym.isMethod()))) {
 		sym = descr.proxy(sym, currentOwner);
 	    }
-	    Tree tree1 = gen.mkLocalRef(tree.pos, sym);
-	    if ((sym.flags & CAPTURED) != 0) return gen.Select(tree1, definitions.REF_ELEM());
-	    else return tree1;
-
-	default:
-	    return super.transform(tree);
-        }
-    }
+	    Tree tree1 = (sym.owner().kind == CLASS)
+		? gen.mkLocalRef(tree.pos, sym)
+		: copy.Ident(tree, sym).setType(sym.nextType());
+	    if (name != sym.name) {
+		if (tree1 instanceof Ident) ((Ident)tree1).name = sym.name;
+		else ((Select)tree1).selector = sym.name;
+	    }
+		    if ((sym.flags & CAPTURED) != 0) return gen.Select(tree1, definitions.REF_ELEM());
+		    else return tree1;
+	        }
+		if (tree instanceof Bind) {
+		    Bind bind = (Bind)tree;
+		    bind.rhs = transform(bind.rhs);
+		    return tree;
+	        }
+		if (tree instanceof Alternative) {
+		    Alternative alternative = (Alternative)tree;
+		    alternative.trees = transform(alternative.trees);
+		    return tree;
+	        }
+		if (tree instanceof CaseDef) {
+		    CaseDef caseDef = (CaseDef)tree;
+		    caseDef.pat = transform(caseDef.pat);
+		    caseDef.guard = transform(caseDef.guard);
+		    caseDef.body = transform(caseDef.body);
+		    return tree;
+	        }
+		if (tree instanceof Visitor) {
+		    Visitor visitor = (Visitor)tree;
+		    visitor.cases = transform(visitor.cases);
+		    return tree;
+	        }
+		return super.transform(tree);
+	    }
 
     Symbol[] ftvsParams(Symbol owner) {
 	Symbol[] freevars = get(free.ftvs, owner).toArray();
@@ -559,8 +625,7 @@ public class LambdaLift extends OwnerTransformer
      *  owner = currentMember
      */
     void liftSymbol(Tree tree) {
-	switch (tree) {
-	case ClassDef(_, _, _, _, _, _):
+	if (tree instanceof ClassDef) {
 	    ((ClassDef) tree).mods |= LIFTED;
 	    Symbol sym = tree.symbol();
             sym.flags |= LIFTED;
@@ -569,9 +634,9 @@ public class LambdaLift extends OwnerTransformer
 	    liftSymbol(
 		sym, get(free.ftvs, constr).toArray(),
 		ftvsParams(constr), fvsParams(constr));
-	    break;
-
-	case DefDef(_, _, _, _, _, _):
+	    return;
+        }
+	if (tree instanceof DefDef) {
 	    ((DefDef) tree).mods |= LIFTED;
 	    Symbol sym = tree.symbol();
             sym.flags |= LIFTED | PRIVATE;
@@ -579,10 +644,9 @@ public class LambdaLift extends OwnerTransformer
 	    liftSymbol(
 		sym, get(free.ftvs, sym).toArray(),
 		ftvsParams(sym), fvsParams(sym));
-            break;
-
-        case ValDef(_, _, _, _):
-        case LabelDef(_, _, _):
+            return;
+        }
+        if (tree instanceof ValDef || tree instanceof LabelDef) {
             Symbol sym = tree.symbol();
 	    assert sym.isLocal() : sym;
             // This is to fix the owner of y from x to f in this example:
@@ -591,9 +655,7 @@ public class LambdaLift extends OwnerTransformer
                 assert isClassMember(sym.owner().owner()): Debug.show(tree, sym);
                 sym.setOwner(sym.owner().owner());
             }
-            break;
-
-	}
+        }
     }
     // where
         private boolean isClassMember(Symbol sym) {
@@ -632,36 +694,43 @@ public class LambdaLift extends OwnerTransformer
 
     Type addTypeParams(Type tp, Symbol[] oldtparams, Symbol[] newtparams) {
 	if (newtparams.length == 0) return tp;
-	switch (tp) {
-	case MethodType(_, _):
+	if (tp instanceof Type.MethodType) {
 	    return Type.PolyType(
 		newtparams,
 		Type.getSubst(oldtparams, newtparams, true).apply(tp));
-	case PolyType(Symbol[] tparams, Type restpe):
+        }
+	if (tp instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)tp;
+            Symbol[] tparams = polyType.tparams;
+            Type restpe = polyType.result;
 	    Symbol[] tparams1 = new Symbol[tparams.length + newtparams.length];
 	    System.arraycopy(tparams, 0, tparams1, 0, tparams.length);
 	    System.arraycopy(newtparams, 0, tparams1, tparams.length, newtparams.length);
 	    return Type.PolyType(
 		tparams1,
 		Type.getSubst(oldtparams, newtparams, true).apply(restpe));
-	default:
-	    throw new ApplicationError("illegal type: " + tp);
 	}
+	throw new ApplicationError("illegal type: " + tp);
     }
 
     Type addParams(Type tp, Symbol[] newparams) {
 	if (newparams.length == 0) return tp;
-	switch (tp) {
-	case MethodType(Symbol[] params, Type restpe):
+	if (tp instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)tp;
+            Symbol[] params = methodType.vparams;
+            Type restpe = methodType.result;
 	    Symbol[] params1 = new Symbol[params.length + newparams.length];
 	    System.arraycopy(params, 0, params1, 0, params.length);
 	    System.arraycopy(newparams, 0, params1, params.length, newparams.length);
 	    return Type.MethodType(params1, restpe);
-	case PolyType(Symbol[] tparams, Type restpe):
+        }
+	if (tp instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)tp;
+            Symbol[] tparams = polyType.tparams;
+            Type restpe = polyType.result;
 	    return Type.PolyType(tparams, addParams(restpe, newparams));
-	default:
-	    throw new ApplicationError("illegal type: " + tp);
 	}
+	throw new ApplicationError("illegal type: " + tp);
     }
 
     AbsTypeDef[] addTypeParams(AbsTypeDef[] tparams, Symbol[] newtparams) {

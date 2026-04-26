@@ -1,7 +1,6 @@
 package scalac.transformer.matching ;
 
-import scalac.symtab.Symbol;
-import scalac.symtab.Type;
+import scalac.symtab.*;
 
 /** 2do: factor common things of LeftTracerInScala and RightTracerInScala
  */
@@ -19,4 +18,3 @@ public class TracerInScala extends Autom2Scala {
     }
 
 }
-

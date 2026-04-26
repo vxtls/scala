@@ -8,86 +8,72 @@
 
 package scalac.atree;
 
-import scalac.util.Debug;
-
 /** This class represents a type kind. */
 public class ATypeKind {
 
     //########################################################################
     // Public Cases
 
+    private final String name;
+
+    private ATypeKind(String name) {
+        this.name = name;
+    }
+
     /** The unit value */
-    public case UNIT;
+    public static final ATypeKind UNIT = new ATypeKind("UNIT");
 
     /** A boolean value */
-    public case BOOL;
+    public static final ATypeKind BOOL = new ATypeKind("BOOL");
 
     /** A 1-byte unsigned integer */
-    public case U1;
+    public static final ATypeKind U1 = new ATypeKind("U1");
 
     /** A 2-byte unsigned integer */
-    public case U2;
+    public static final ATypeKind U2 = new ATypeKind("U2");
 
     /** A 4-byte unsigned integer */
-    public case U4;
+    public static final ATypeKind U4 = new ATypeKind("U4");
 
     /** An 8-byte unsigned integer */
-    public case U8;
+    public static final ATypeKind U8 = new ATypeKind("U8");
 
     /** A 1-byte signed integer */
-    public case I1;
+    public static final ATypeKind I1 = new ATypeKind("I1");
 
     /** A 2-byte signed integer */
-    public case I2;
+    public static final ATypeKind I2 = new ATypeKind("I2");
 
     /** A 4-byte signed integer */
-    public case I4;
+    public static final ATypeKind I4 = new ATypeKind("I4");
 
     /** An 8-byte signed integer */
-    public case I8;
+    public static final ATypeKind I8 = new ATypeKind("I8");
 
     /** A 4-byte floating point number */
-    public case R4;
+    public static final ATypeKind R4 = new ATypeKind("R4");
 
     /** An 8-byte floating point number */
-    public case R8;
+    public static final ATypeKind R8 = new ATypeKind("R8");
 
     /** An object reference */
-    public case REF;
+    public static final ATypeKind REF = new ATypeKind("REF");
 
     /** A string reference */
-    public case STR;
+    public static final ATypeKind STR = new ATypeKind("STR");
 
     /** The null reference */
-    public case NULL;
+    public static final ATypeKind NULL = new ATypeKind("NULL");
 
     /** The zero value */
-    public case ZERO;
+    public static final ATypeKind ZERO = new ATypeKind("ZERO");
 
     //########################################################################
     // Public Methods
 
     /** Returns a string representation of this type kind. */
     public String toString() {
-        switch (this) {
-        case UNIT: return "UNIT";
-        case BOOL: return "BOOL";
-        case U1  : return "U1";
-        case U2  : return "U2";
-        case U4  : return "U4";
-        case U8  : return "U8";
-        case I1  : return "I1";
-        case I2  : return "I2";
-        case I4  : return "I4";
-        case I8  : return "I8";
-        case R4  : return "R4";
-        case R8  : return "R8";
-        case REF : return "REF";
-        case STR : return "STR";
-        case NULL: return "NULL";
-        case ZERO: return "ZERO";
-        default  : throw Debug.abort("unknown case", this);
-        }
+        return name;
     }
 
     //########################################################################
