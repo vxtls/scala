@@ -818,7 +818,7 @@ class TextTreePrinter(global0: scalac_Global, out0: PrintWriter)
         while (i.hasNext()) {
           val member = i.next();
           if (member.isTypeAlias() || member.isAbstractType())
-            types.add(member);
+            types.add(types.size(), member);
         }
       }
     }

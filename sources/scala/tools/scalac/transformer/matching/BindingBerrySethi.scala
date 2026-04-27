@@ -55,8 +55,8 @@ class BindingBerrySethi(unit:CompilationUnit) extends BerrySethi(unit) {
       if (revArrows == null)
         deltaqRev(dest).put(revLabel, {revArrows = new Vector(); revArrows} );
     }
-    arrows.add(destI);
-    revArrows.add(srcI);
+    arrows.addElement(destI);
+    revArrows.addElement(srcI);
   }
 
   override def seenLabel(pat: Tree, label: Label): Unit = {
@@ -174,4 +174,3 @@ class BindingBerrySethi(unit:CompilationUnit) extends BerrySethi(unit) {
 }
 
 }
-

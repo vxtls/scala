@@ -1060,7 +1060,7 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
   def enterParams(vparams: Array[Array[Tree.ValDef]]): Array[Array[Symbol]] = {
     val vparamSyms = new Array[Array[Symbol]](vparams.length);
     var i = 0; while (i < vparams.length) {
-      vparamSyms(i) = enterParams(vparams(i));
+      vparamSyms(i) = enterParams[Tree.ValDef](vparams(i));
       i = i + 1
     }
     vparamSyms

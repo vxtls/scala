@@ -614,7 +614,7 @@ package scala.tools.scaladoc {
                                                   false,
                                                   null);
 
-                    found.add(result)
+                    found.addLast(result)
                   }
                 }
                 if (member.symbol.isPackage() || member.symbol.isPackageClass() || member.symbol.isModule())
@@ -634,7 +634,7 @@ package scala.tools.scaladoc {
                                                   adaptedType,
                                                   true,
                                                   adaptedTparams);
-                    found.add(result)
+                    found.addLast(result)
                   }
                 }
               }
@@ -687,4 +687,3 @@ package scala.tools.scaladoc {
     printIso(t, u);
   }
   */
-

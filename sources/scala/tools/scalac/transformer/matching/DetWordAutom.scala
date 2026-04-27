@@ -424,7 +424,7 @@ class DetWordAutom  {
     while(it.hasNext()) {
       val ndstateSet = it.next().asInstanceOf[TreeSet];
       if( ndstateSet.contains( ndstate ))
-	v.add( ndstateSet );
+	v.addElement( ndstateSet );
     }
     return v;
   }

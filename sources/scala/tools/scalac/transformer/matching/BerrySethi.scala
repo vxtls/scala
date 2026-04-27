@@ -497,7 +497,7 @@ class BerrySethi(val unit: CompilationUnit ) {
        revArrows = new Vector() );
        */
     }
-    arrows.add( destI );
+    arrows.addElement( destI );
     //revArrows.add( srcI );
   }
 

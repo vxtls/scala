@@ -51,7 +51,7 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
   /** extract variables from a pattern */
   def getVariables(tree: Tree, vars: ArrayList): unit = tree match {
     case Tree$Ident(name) =>
-      if (name.isVariable() && name != Names.PATTERN_WILDCARD) vars.add(name);
+      if (name.isVariable() && name != Names.PATTERN_WILDCARD) vars.add(vars.size(), name);
 
     case Tree$Typed(expr, _) =>
       getVariables(expr, vars);
@@ -71,7 +71,7 @@ class DeSugarize(make: TreeFactory, copy: TreeCopier, gen: TreeGen, infer: scala
     case Tree$Literal( _ ) =>
 
     case Tree$Bind(name, t) =>
-      if (name.isVariable() && name != Names.PATTERN_WILDCARD) vars.add(name);
+      if (name.isVariable() && name != Names.PATTERN_WILDCARD) vars.add(vars.size(), name);
       getVariables(t, vars);
 
     case Tree$Alternative(ts) =>

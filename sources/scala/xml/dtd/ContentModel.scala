@@ -54,9 +54,10 @@ object ContentModel extends WordExp  {
   private def toString(rs: Seq[RegExp], sb: StringBuffer, sep: Char): Unit = {
 
     val it = rs.elements;
-    val fst = it.next;
+    val fst: RegExp = it.next;
     toString(fst, sb);
-    for(val z <- it) {
+    while (it.hasNext) {
+      val z: RegExp = it.next;
       sb.append( sep );
       toString( z, sb );
     }
