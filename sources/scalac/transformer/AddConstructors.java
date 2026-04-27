@@ -129,8 +129,9 @@ public class AddConstructors extends GenTransformer {
      * @return
      */
     private Tree transform(Tree tree, boolean inNew) {
-	switch (tree) {
-	case ClassDef(_, _, _, _, _, Template impl):
+	if (tree instanceof Tree.ClassDef) {
+            Tree.ClassDef classDef = (Tree.ClassDef)tree;
+            Template impl = classDef.impl;
             Symbol clasz = tree.symbol();
 
 	    if (clasz.isInterface())
@@ -149,18 +150,19 @@ public class AddConstructors extends GenTransformer {
 	    for (int i = 0; i < impl.body.length; i++) {
                 Tree member = impl.body[i];
 		if (member.definesSymbol() && member.symbol().owner()!=local) {
-		    switch (member) {
-		    case ValDef(_, _, _, Tree rhs):
+		    if (member instanceof Tree.ValDef) {
+                        Tree rhs = ((Tree.ValDef)member).rhs;
                         // move initialization code into initializer
                         Symbol field = member.symbol();
-			if (rhs == Tree.Empty) break;
-                        member = gen.ValDef(field, Tree.Empty);
-                        Tree assign = gen.Assign(
-                            gen.Select(gen.This(member.pos, clasz),field),rhs);
-                        if (rhs.hasSymbol() && rhs.symbol().isParameter()) {
-                            constrBody.add(assign);
-                        } else {
-                            constrBody2.add(assign);
+			if (rhs != Tree.Empty) {
+                            member = gen.ValDef(field, Tree.Empty);
+                            Tree assign = gen.Assign(
+                                gen.Select(gen.This(member.pos, clasz),field),rhs);
+                            if (rhs.hasSymbol() && rhs.symbol().isParameter()) {
+                                constrBody.add(assign);
+                            } else {
+                                constrBody2.add(assign);
+                            }
                         }
 		    }
 		    classBody.add(member);
@@ -172,24 +174,21 @@ public class AddConstructors extends GenTransformer {
 
 	    // inline the call to the super constructor
             for (int i = 0; i < impl.parents.length; i++) {
-                switch (impl.parents[i]) {
-                case Apply(TypeApply(Tree fun, Tree[] targs), Tree[] args):
+                Tree parent = impl.parents[i];
+                if (parent instanceof Tree.Apply) {
+                    Tree.Apply apply = (Tree.Apply)parent;
+                    Tree fun = apply.fun;
+                    Tree[] args = apply.args;
+                    if (fun instanceof Tree.TypeApply) {
+                        fun = ((Tree.TypeApply)fun).fun;
+                    }
                     assert fun.symbol().isConstructor(): impl.parents[i];
                     if (fun.symbol().constructorClass().isInterface()) continue;
                     int pos = impl.parents[i].pos;
                     Tree superConstr = gen.Select
                         (gen.Super(pos, clasz), getInitializer(fun.symbol()));
                     constrBody.add(gen.mkApply_V(superConstr, args));
-                    break;
-                case Apply(Tree fun, Tree[] args):
-                    assert fun.symbol().isConstructor(): impl.parents[i];
-                    if (fun.symbol().constructorClass().isInterface()) continue;
-                    int pos = impl.parents[i].pos;
-                    Tree superConstr = gen.Select
-                        (gen.Super(pos, clasz), getInitializer(fun.symbol()));
-                    constrBody.add(gen.mkApply_V(superConstr, args));
-                    break;
-                default:
+                } else {
                     throw Debug.abort("illegal case", impl.parents[i]);
                 }
             }
@@ -209,7 +208,8 @@ public class AddConstructors extends GenTransformer {
 	    // the constructor references with the new ones
 	    return gen.ClassDef(clasz, transform(newBody));
 
-        case DefDef(_, _, _, _, _, Tree rhs):
+        } else if (tree instanceof Tree.DefDef) {
+            Tree rhs = ((Tree.DefDef)tree).rhs;
             if (!tree.symbol().isConstructor()) return super.transform(tree);
             // replace constructor by initializer
             Symbol constructor = tree.symbol();
@@ -230,8 +230,7 @@ public class AddConstructors extends GenTransformer {
             rhs = gen.mkUnitBlock(rhs);
             return gen.DefDef(initializer, rhs);
 
-        case ValDef(_, _, _, _):
-        case LabelDef(_, _, _):
+        } else if (tree instanceof Tree.ValDef || tree instanceof Tree.LabelDef) {
             Symbol symbol = tree.symbol();
             if (symbol.owner().isConstructor()) {
                 // update symbols like x in these examples
@@ -242,19 +241,25 @@ public class AddConstructors extends GenTransformer {
             }
             return super.transform(tree);
 
-        case New(Tree init):
-            return gen.New(transform(init, true));
+        } else if (tree instanceof Tree.New) {
+            return gen.New(transform(((Tree.New)tree).init, true));
 
- 	case TypeApply(Tree fun, Tree[] args):
+        } else if (tree instanceof Tree.TypeApply) {
+            Tree.TypeApply typeApply = (Tree.TypeApply)tree;
+            Tree fun = typeApply.fun;
+            Tree[] args = typeApply.args;
             if (!fun.symbol().isConstructor()) return super.transform(tree);
             if (!inNew) return transform(fun);
             assert fun instanceof Tree.Ident: tree;
             return transform(tree, fun.symbol(), transform(args));
 
- 	case Apply(Tree fun, Tree[] args):
+        } else if (tree instanceof Tree.Apply) {
+            Tree.Apply apply = (Tree.Apply)tree;
+            Tree fun = apply.fun;
+            Tree[] args = apply.args;
             return gen.Apply(transform(fun, inNew), transform(args));
 
-        case Ident(_):
+        } else if (tree instanceof Tree.Ident) {
             Symbol symbol = tree.symbol();
             if (inNew) return transform(tree, symbol, Tree.EMPTY_ARRAY);
             if (symbol.isConstructor()) {
@@ -267,12 +272,10 @@ public class AddConstructors extends GenTransformer {
             }
             return gen.Ident(tree.pos, symbol);
 
-        case TypeTerm():
+        } else if (tree instanceof Tree.TypeTerm) {
             return gen.TypeTerm(tree.pos, subst.apply(tree.getType()));
-
-        default:
-            return super.transform(tree);
-	} // switch(tree)
+        }
+        return super.transform(tree);
 
     } // transform()
 

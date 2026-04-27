@@ -175,7 +175,6 @@ public class Primitives {
     private final Definitions definitions;
     private final Map/*<Symbol,Primitive>*/ primitives;
     private final SymbolNameWriter jreNameWriter;
-    private final SymbolNameWriter clrNameWriter;
 
     public final Symbol RUNTIME;
 
@@ -319,7 +318,6 @@ public class Primitives {
         this.definitions = global.definitions;
         this.primitives = new HashMap();
         this.jreNameWriter = new SymbolNameWriter().setClassSeparator('$');
-        this.clrNameWriter = new SymbolNameWriter();
         this.RUNTIME = definitions.getModule("scala.runtime.RunTime");
         this.NEW_ZARRAY = getUniqueTerm(RUNTIME, ZARRAY_N);
         this.NEW_BARRAY = getUniqueTerm(RUNTIME, BARRAY_N);
@@ -821,8 +819,9 @@ public class Primitives {
         boolean unary = false;
         boolean concat = false;
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].type()) {
-            case MethodType(Symbol[] vparams, _):
+            Type altType = alts[i].type();
+            if (altType instanceof Type.MethodType) {
+                Symbol[] vparams = ((Type.MethodType)altType).vparams;
                 assert vparams.length == 1: alts[i].type();
                 if (vparams[0].type().isSameAs(definitions.STRING_TYPE())) {
                     addPrimitive(alts[i], Primitive.CONCAT);
@@ -832,13 +831,11 @@ public class Primitives {
                     addPrimitive(alts[i], Primitive.ADD);
                     count--;
                 }
-                break;
-            case PolyType(Symbol[] tparams, _):
+            } else if (altType instanceof Type.PolyType) {
                 addPrimitive(alts[i], Primitive.POS);
                 assert !unary;
                 unary = true;
-                break;
-            default:
+            } else {
                 throw Debug.abort("illegal case" , alts[i].type());
             }
         }
@@ -852,17 +849,15 @@ public class Primitives {
         Symbol[] alts = symbol.alternativeSymbols();
         boolean unary = false;
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].type()) {
-            case MethodType(_, _):
+            Type altType = alts[i].type();
+            if (altType instanceof Type.MethodType) {
                 addPrimitive(alts[i], Primitive.SUB);
                 count--;
-                break;
-            case PolyType(_, _):
+            } else if (altType instanceof Type.PolyType) {
                 addPrimitive(alts[i], Primitive.NEG);
                 assert !unary;
                 unary = true;
-                break;
-            default:
+            } else {
                 throw Debug.abort("illegal case" , alts[i].type());
             }
         }
@@ -884,22 +879,33 @@ public class Primitives {
         int cnt = 0;
         loop:
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].info()) {
-            case MethodType(Symbol[] vparams, _):
+            Type altInfo = alts[i].info();
+            if (altInfo instanceof Type.MethodType) {
+                Symbol[] vparams = ((Type.MethodType)altInfo).vparams;
                 for (int j = 0; j < vparams.length; j++) {
                     if (!isValueType(vparams[j].info()))
                         continue loop;
                 }
                 addPrimitive(alts[i], primitive);
                 cnt++;
-                break;
             }
         }
         assert cnt == count : "" + cnt + " != " + count;
     }
 
     private boolean isValueType(Type t) {
-        return t.isSubType(definitions.ANYVAL_TYPE());
+        if (t instanceof Type.UnboxedType) return true;
+        Symbol symbol = t.symbol();
+        return symbol == definitions.ANYVAL_CLASS ||
+            symbol == definitions.UNIT_CLASS ||
+            symbol == definitions.BOOLEAN_CLASS ||
+            symbol == definitions.BYTE_CLASS ||
+            symbol == definitions.SHORT_CLASS ||
+            symbol == definitions.CHAR_CLASS ||
+            symbol == definitions.INT_CLASS ||
+            symbol == definitions.LONG_CLASS ||
+            symbol == definitions.FLOAT_CLASS ||
+            symbol == definitions.DOUBLE_CLASS;
     }
 
     private void addPrimitive(Symbol symbol, Primitive primitive) {
@@ -944,14 +950,11 @@ public class Primitives {
 
     /** Return box method for values of the given type. */
     public Symbol getBoxValueSymbol(Type type) {
-        switch (type) {
-        case UnboxedType(int kind):
-            return getBoxValueSymbol(kind);
-        case UnboxedArrayType(Type elemtp):
-            return getBoxArraySymbol(elemtp);
-        default:
-            throw Debug.abort("illegal case", type);
-        }
+        if (type instanceof Type.UnboxedType)
+            return getBoxValueSymbol(((Type.UnboxedType)type).tag);
+        if (type instanceof Type.UnboxedArrayType)
+            return getBoxArraySymbol(((Type.UnboxedArrayType)type).elemtp);
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return box method for values of the given kind. */
@@ -972,12 +975,9 @@ public class Primitives {
 
     /** Return box method for arrays of elements of the given type. */
     public Symbol getBoxArraySymbol(Type type) {
-        switch (type) {
-        case UnboxedType(int kind):
-            return getBoxArraySymbol(kind);
-        default:
-            return BOX_OARRAY;
-        }
+        if (type instanceof Type.UnboxedType)
+            return getBoxArraySymbol(((Type.UnboxedType)type).tag);
+        return BOX_OARRAY;
     }
 
     /** Return box method for arrays of elements of the given kind. */
@@ -1000,14 +1000,11 @@ public class Primitives {
 
     /** Return unbox method returning values of the given type. */
     public Symbol getUnboxValueSymbol(Type type) {
-        switch (type) {
-        case UnboxedType(int kind):
-            return getUnboxValueSymbol(kind);
-        case UnboxedArrayType(Type elemtp):
-            return getUnboxArraySymbol(elemtp);
-        default:
-            throw Debug.abort("illegal case", type);
-        }
+        if (type instanceof Type.UnboxedType)
+            return getUnboxValueSymbol(((Type.UnboxedType)type).tag);
+        if (type instanceof Type.UnboxedArrayType)
+            return getUnboxArraySymbol(((Type.UnboxedArrayType)type).elemtp);
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return unbox method returning values of the given kind. */
@@ -1028,12 +1025,9 @@ public class Primitives {
 
     /** Return unbox method returning arrays of elements of the given type. */
     public Symbol getUnboxArraySymbol(Type type) {
-        switch (type) {
-        case UnboxedType(int kind):
-            return getUnboxArraySymbol(kind);
-        default:
-            return UNBOX_OARRAY;
-        }
+        if (type instanceof Type.UnboxedType)
+            return getUnboxArraySymbol(((Type.UnboxedType)type).tag);
+        return UNBOX_OARRAY;
     }
 
     /** Return unbox method returning arrays of elements of the given kind. */
@@ -1056,32 +1050,23 @@ public class Primitives {
 
     /** Return conversion method for given types. */
     public Symbol getConvertSymbol(Type from, Type to) {
-        switch (from) {
-        case UnboxedType(int kind):
-            return getConvertSymbol(kind, to);
-        default:
-            throw Debug.abort("illegal case", from);
-        }
+        if (from instanceof Type.UnboxedType)
+            return getConvertSymbol(((Type.UnboxedType)from).tag, to);
+        throw Debug.abort("illegal case", from);
     }
 
     /** Return conversion method for given type and type kind. */
     public Symbol getConvertSymbol(Type from, int to) {
-        switch (from) {
-        case UnboxedType(int kind):
-            return getConvertSymbol(kind, to);
-        default:
-            throw Debug.abort("illegal case", from);
-        }
+        if (from instanceof Type.UnboxedType)
+            return getConvertSymbol(((Type.UnboxedType)from).tag, to);
+        throw Debug.abort("illegal case", from);
     }
 
     /** Return conversion method for given type kind and type. */
     public Symbol getConvertSymbol(int from, Type to) {
-        switch (to) {
-        case UnboxedType(int kind):
-            return getConvertSymbol(from, kind);
-        default:
-            throw Debug.abort("illegal case", to);
-        }
+        if (to instanceof Type.UnboxedType)
+            return getConvertSymbol(from, ((Type.UnboxedType)to).tag);
+        throw Debug.abort("illegal case", to);
     }
 
     /** Return conversion method for given kind types. */
@@ -1166,14 +1151,13 @@ public class Primitives {
 
     /** Return length method for arrays of the given type. */
     public Symbol getArrayLengthSymbol(Type type) {
-        switch (type) {
-        case UnboxedArrayType(UnboxedType(int kind)):
-            return getArrayLengthSymbol(kind);
-        case UnboxedArrayType(_):
+        if (type instanceof Type.UnboxedArrayType) {
+            Type elemtp = ((Type.UnboxedArrayType)type).elemtp;
+            if (elemtp instanceof Type.UnboxedType)
+                return getArrayLengthSymbol(((Type.UnboxedType)elemtp).tag);
             return OARRAY_LENGTH;
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return length method for arrays of elements of the given kind. */
@@ -1193,14 +1177,13 @@ public class Primitives {
 
     /** Return get method for arrays of the given type. */
     public Symbol getArrayGetSymbol(Type type) {
-        switch (type) {
-        case UnboxedArrayType(UnboxedType(int kind)):
-            return getArrayGetSymbol(kind);
-        case UnboxedArrayType(_):
+        if (type instanceof Type.UnboxedArrayType) {
+            Type elemtp = ((Type.UnboxedArrayType)type).elemtp;
+            if (elemtp instanceof Type.UnboxedType)
+                return getArrayGetSymbol(((Type.UnboxedType)elemtp).tag);
             return OARRAY_GET;
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return get method for arrays of elements of the given kind. */
@@ -1220,14 +1203,13 @@ public class Primitives {
 
     /** Return set method for arrays of the given type. */
     public Symbol getArraySetSymbol(Type type) {
-        switch (type) {
-        case UnboxedArrayType(UnboxedType(int kind)):
-            return getArraySetSymbol(kind);
-        case UnboxedArrayType(_):
+        if (type instanceof Type.UnboxedArrayType) {
+            Type elemtp = ((Type.UnboxedArrayType)type).elemtp;
+            if (elemtp instanceof Type.UnboxedType)
+                return getArraySetSymbol(((Type.UnboxedType)elemtp).tag);
             return OARRAY_SET;
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /** Return set method for arrays of elements of the given kind. */
@@ -1250,18 +1232,18 @@ public class Primitives {
 
     /* Return name to use in "Class.forName(<name>)" for the given type. */
     public String getNameForClassForName(Type type) {
-        switch (type) {
-        case TypeRef(_, Symbol symbol, _):
-            return getNameForClassForName(symbol);
-        case UnboxedType(int kind):
-            return getNameForClassForName(kind);
-        case UnboxedArrayType(TypeRef(_, Symbol symbol, _)):
-            return "[L" + getNameForClassForName(symbol) + ";";
-        case UnboxedArrayType(Type elemtp):
+        if (type instanceof Type.TypeRef) {
+            return getNameForClassForName(((Type.TypeRef)type).sym);
+        } else if (type instanceof Type.UnboxedType) {
+            return getNameForClassForName(((Type.UnboxedType)type).tag);
+        } else if (type instanceof Type.UnboxedArrayType) {
+            Type elemtp = ((Type.UnboxedArrayType)type).elemtp;
+            if (elemtp instanceof Type.TypeRef) {
+                return "[L" + getNameForClassForName(((Type.TypeRef)elemtp).sym) + ";";
+            }
             return "[" + getNameForClassForName(elemtp);
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }
 
     /* Return name to use in "Class.forName(<name>)" for the given symbol. */
@@ -1293,12 +1275,5 @@ public class Primitives {
         String suffix = clasz.isModuleClass() && !clasz.isJava() ? "$" : "";
         return jreNameWriter.toString(clasz, suffix);
     }
-
-    /** Return the CLR name of given class. */
-    public String getCLRClassName(Symbol clasz) {
-        assert clasz.isClassType(): Debug.show(clasz);
-        return clrNameWriter.toString(clasz);
-    }
-
     //########################################################################
 }

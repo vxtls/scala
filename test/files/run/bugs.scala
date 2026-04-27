@@ -3,9 +3,6 @@
 //############################################################################
 // $Id$
 
-//############################################################################
-// serves as an entry point with the MSIL backend
-
 object TestMain {
   def main(args: Array[String]): Unit = {
     Test.main(args);

@@ -9,49 +9,61 @@
 package meta.java;
 
 /** A representation for Java types. */
-public class Type {
+public abstract class Type {
 
     //########################################################################
     // Public Constants
 
     /** The Java primitive type void */
-    public static final Type VOID    = Primitive("void");
+    public static final Primitive VOID    = Primitive("void");
 
     /** The Java primitive type boolean */
-    public static final Type BOOLEAN = Primitive("boolean");
+    public static final Primitive BOOLEAN = Primitive("boolean");
 
     /** The Java primitive type byte */
-    public static final Type BYTE    = Primitive("byte");
+    public static final Primitive BYTE    = Primitive("byte");
 
     /** The Java primitive type short */
-    public static final Type SHORT   = Primitive("short");
+    public static final Primitive SHORT   = Primitive("short");
 
     /** The Java primitive type char */
-    public static final Type CHAR    = Primitive("char");
+    public static final Primitive CHAR    = Primitive("char");
 
     /** The Java primitive type int */
-    public static final Type INT     = Primitive("int");
+    public static final Primitive INT     = Primitive("int");
 
     /** The Java primitive type long */
-    public static final Type LONG    = Primitive("long");
+    public static final Primitive LONG    = Primitive("long");
 
     /** The Java primitive type float */
-    public static final Type FLOAT   = Primitive("float");
+    public static final Primitive FLOAT   = Primitive("float");
 
     /** The Java primitive type double */
-    public static final Type DOUBLE  = Primitive("double");
+    public static final Primitive DOUBLE  = Primitive("double");
 
     //########################################################################
-    // Public Cases
+    // Public Constructors
 
-    /** A primitive type */
-    public case Primitive(String name);
+    protected Type() {
+    }
 
-    /** A reference type (the owner may be null) */
-    public case Reference(String owner, String name);
+    //########################################################################
+    // Public Factories
 
-    /** An array type */
-    public case Array(Type item);
+    /** Creates a primitive type. */
+    public static Primitive Primitive(String name) {
+        return new Primitive(name);
+    }
+
+    /** Creates a reference type (the owner may be null). */
+    public static Reference Reference(String owner, String name) {
+        return new Reference(owner, name);
+    }
+
+    /** Creates an array type. */
+    public static Array Array(Type item) {
+        return new Array(item);
+    }
 
     //########################################################################
     // Public Methods
@@ -68,40 +80,39 @@ public class Type {
 
     /** Returns the type's (possibly fully qualified) name. */
     public String getName(boolean qualified) {
-        switch (this) {
-        case Primitive(String name):
-            return name;
-        case Reference(String owner, String name):
-            return qualified && owner != null ? owner + "." + name : name;
-        case Array(Type item):
-            return item.getName(qualified) + "[]";
-        default:
-            throw new Error("illegal case: " + getName(true));
+        if (this instanceof Primitive) {
+            return ((Primitive)this).name;
         }
+        if (this instanceof Reference) {
+            Reference type = (Reference)this;
+            return qualified && type.owner != null ? type.owner + "." + type.name : type.name;
+        }
+        if (this instanceof Array) {
+            return ((Array)this).item.getName(qualified) + "[]";
+        }
+        throw new Error("illegal case: " + getName(true));
     }
 
     /** Returns the type's owner (its package or enclosing type). */
     public String getOwner() {
-        switch (this) {
-        case Primitive(_):
+        if (this instanceof Primitive) {
             return null;
-        case Reference(String owner, _):
-            return owner;
-        case Array(Type item):
-            return item.getOwner();
-        default:
-            throw new Error("illegal case: " + getName(true));
         }
+        if (this instanceof Reference) {
+            return ((Reference)this).owner;
+        }
+        if (this instanceof Array) {
+            return ((Array)this).item.getOwner();
+        }
+        throw new Error("illegal case: " + getName(true));
     }
 
     /** If this is an array type, returns the type of the elements. */
     public Type getItemType() {
-        switch (this) {
-        case Array(Type item):
-            return item;
-        default:
-            throw new Error("not an array type: " + getName(true));
+        if (this instanceof Array) {
+            return ((Array)this).item;
         }
+        throw new Error("not an array type: " + getName(true));
     }
 
     /** Returns the base type of this type. */
@@ -111,22 +122,12 @@ public class Type {
 
     /** Returns true if this is a primitive type. */
     public boolean isPrimitive() {
-        switch (this) {
-        case Primitive(_):
-            return true;
-        default:
-            return false;
-        }
+        return this instanceof Primitive;
     }
 
     /** Returns true if this is an array type. */
     public boolean isArray() {
-        switch (this) {
-        case Array(_):
-            return true;
-        default:
-            return false;
-        }
+        return this instanceof Array;
     }
 
     /**
@@ -134,18 +135,47 @@ public class Type {
      * with the given bounds and whose elements are of this type.
      */
     public String newArray(String bounds) {
-        switch (this) {
-        case Array(Type item):
-            return item.newArray(bounds + "[]");
-        default:
-            return this + bounds;
+        if (this instanceof Array) {
+            return ((Array)this).item.newArray(bounds + "[]");
         }
+        return this + bounds;
     }
-
 
     /** Returns the string representation of this type. */
     public String toString() {
         return getName();
+    }
+
+    //########################################################################
+    // Public Classes
+
+    /** A primitive type. */
+    public static class Primitive extends Type {
+        public final String name;
+
+        private Primitive(String name) {
+            this.name = name;
+        }
+    }
+
+    /** A reference type. */
+    public static class Reference extends Type {
+        public final String owner;
+        public final String name;
+
+        private Reference(String owner, String name) {
+            this.owner = owner;
+            this.name = name;
+        }
+    }
+
+    /** An array type. */
+    public static class Array extends Type {
+        public final Type item;
+
+        private Array(Type item) {
+            this.item = item;
+        }
     }
 
     //########################################################################

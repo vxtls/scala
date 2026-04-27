@@ -1659,13 +1659,6 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
             case _ =>
           }
 	  val v = infer.bestView(tree.getType(), pt, Names.EMPTY);
-          // Convert views of delegate types to closures wrapped around
-          // the expression's apply method.
-	  if(global.target == scalac_Global.TARGET_MSIL &&
-               v != null && isDelegateForwardView(tree.getType(), pt)) {
-	    val meth: Symbol = tree.symbol().lookup(Names.apply);
-	    return adapt(gen.Select(tree, meth), mode, pt);
-	  }
 	  if (v != null) return applyView(v, tree, mode, pt);
 	  // todo: remove
  	  val coerceMeth: Symbol = tree.getType().lookup(Names.coerce);
@@ -2138,8 +2131,36 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 	}
 	argtypes
 
-      case Type.OverloadedType(alts, alttypes) if (alts.length == 1) =>
-        transformArgs(pos, alts(0), tparams, alttypes(0), argMode, args, pt)
+      case Type.OverloadedType(alts, alttypes) =>
+        if (alts.length == 1)
+          transformArgs(pos, alts(0), tparams, alttypes(0), argMode, args, pt)
+        else {
+          var best = -1;
+          var ambiguous = false;
+          if (pt != Type.AnyType) {
+            var i = 0; while (i < alttypes.length) {
+              alttypes(i) match {
+                case Type$MethodType(_, restp) =>
+                  if (infer.isCompatible(restp, pt)) {
+                    if (best < 0) best = i
+                    else ambiguous = true
+                  }
+                case _ =>
+              }
+              i = i + 1
+            }
+          }
+          if (best >= 0 && !ambiguous)
+            transformArgs(pos, alts(best), tparams, alttypes(best), argMode, args, pt)
+          else {
+            var i = 0; while (i < args.length) {
+              args(i) = transform(args(i), argMode, Type.AnyType);
+              argtypes(i) = args(i).getType().deconst();
+              i = i + 1
+            }
+            argtypes
+          }
+        }
 
       case _ =>
 	var i = 0; while (i < args.length) {
@@ -2938,19 +2959,6 @@ class Analyzer(global: scalac_Global, descr: AnalyzerPhase) extends Transformer(
 	      case Type$MethodType(params, restp) => {
                 if ((mode & PATTERNmode) != 0)
 	          return copy.Apply(tree, fn1, args).setType(restp);
-                if(global.target == scalac_Global.TARGET_MSIL) {
-                  fn1 match {
-                    case Tree.Select(qual, name) =>
-                      if (qual.getType().isSubType(definitions.DELEGATE_TYPE())
-                          && (name == Names.PLUSEQ || name == Names.MINUSEQ)) {
-                            val n = if (name == Names.PLUSEQ) Names.PLUS else Names.MINUS;
-                            val fun = make.Select(fn1.pos, qual, n);
-                            val rhs = copy.Apply(tree, fun, args);
-                            return transform(make.Assign(fn1.pos, qual, rhs));
-                          }
-                    case _ =>
-                  }
-                }
 	        val formals = infer.formalTypes(params, args.length);
                 if (formals.length == args.length) {
 	            var i = 0; while (i < args.length) {

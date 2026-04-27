@@ -181,41 +181,54 @@ public class SymbolCloner {
     /** The type mapper Type.Map */
     private final Type.Map mapper = new TypeMapper();
     private class TypeMapper extends Type.Map { public Type apply(Type type) {
-        switch (type) {
-        case ErrorType:
-        case NoType:
-        case NoPrefix:
+        if (type == Type.ErrorType || type == Type.NoType || type == Type.NoPrefix) {
             return type;
-        case ThisType(Symbol symbol):
+        } else if (type instanceof Type.ThisType) {
+            Symbol symbol = ((Type.ThisType)type).sym;
             Symbol clone = (Symbol)clones.get(symbol);
             if (clone == null) return type;
             return Type.ThisType(clone);
-        case SingleType(Type prefix, Symbol symbol):
+        } else if (type instanceof Type.SingleType) {
+            Type.SingleType singleType = (Type.SingleType)type;
+            Type prefix = singleType.pre;
+            Symbol symbol = singleType.sym;
             Symbol clone = (Symbol)clones.get(symbol);
             if (clone == null) return map(type);
             return Type.singleType(apply(prefix), clone);
-        case ConstantType(_, _):
+        } else if (type instanceof Type.ConstantType) {
             return map(type);
-        case TypeRef(Type prefix, Symbol symbol, Type[] args):
+        } else if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            Type prefix = typeRef.pre;
+            Symbol symbol = typeRef.sym;
+            Type[] args = typeRef.args;
             Symbol clone = (Symbol)clones.get(symbol);
             if (clone == null) return map(type);
             return Type.typeRef(apply(prefix), clone, map(args));
-        case CompoundType(Type[] parts, Scope members):
+        } else if (type instanceof Type.CompoundType) {
+            Type.CompoundType compoundType = (Type.CompoundType)type;
+            Type[] parts = compoundType.parts;
+            Scope members = compoundType.members;
             Symbol clone = (Symbol)clones.get(type.symbol());
             // !!! if (clone == null) return map(type);
             if (clone == null) clone = type.symbol();
             return Type.compoundType(map(parts), members, clone);
-        case MethodType(Symbol[] vparams, Type result):
+        } else if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            Symbol[] vparams = methodType.vparams;
+            Type result = methodType.result;
             return Type.MethodType(vparams, apply(result));
-        case PolyType(Symbol[] tparams, Type result):
+        } else if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)type;
+            Symbol[] tparams = polyType.tparams;
+            Type result = polyType.result;
             return Type.PolyType(tparams, apply(result));
-        case UnboxedType(_):
+        } else if (type instanceof Type.UnboxedType) {
             return type;
-        case UnboxedArrayType(_):
+        } else if (type instanceof Type.UnboxedArrayType) {
             return map(type);
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }}
 
     //########################################################################
@@ -224,19 +237,26 @@ public class SymbolCloner {
     /** The type cloner Type.Map */
     private final Type.Map cloner = new TypeCloner();
     private class TypeCloner extends TypeMapper { public Type apply(Type type){
-        switch (type) {
-        case CompoundType(Type[] parts, Scope members):
+        if (type instanceof Type.CompoundType) {
+            Type.CompoundType compoundType = (Type.CompoundType)type;
+            Type[] parts = compoundType.parts;
+            Scope members = compoundType.members;
             Symbol clone = /* !!! getCompoundClone */(type.symbol());
             return Type.compoundType(map(parts), /* !!! cloneScope */(members), clone);
-        case MethodType(Symbol[] vparams, Type result):
+        } else if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            Symbol[] vparams = methodType.vparams;
+            Type result = methodType.result;
             Symbol[] clones = cloneSymbols(vparams);
             return Type.MethodType(clones, apply(result));
-        case PolyType(Symbol[] tparams, Type result):
+        } else if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)type;
+            Symbol[] tparams = polyType.tparams;
+            Type result = polyType.result;
             Symbol[] clones = cloneSymbols(tparams);
             return Type.PolyType(clones, apply(result));
-        default:
-            return super.apply(type);
         }
+        return super.apply(type);
     }}
 
     //########################################################################

@@ -89,30 +89,18 @@ public class TreeNode {
     }
 
     public boolean hasSymbol() {
-        switch (symbol) {
-        case TreeSymbol.HasSym(_, _):
-            return true;
-        default:
-            return false;
-        }
+        return symbol instanceof TreeSymbol.HasSym;
     }
 
     public boolean definesSymbol() {
-        switch (symbol) {
-        case TreeSymbol.HasSym(_, true):
-            return true;
-        default:
-            return false;
-        }
+        return symbol instanceof TreeSymbol.HasSym &&
+            ((TreeSymbol.HasSym)symbol).isDef;
     }
 
     public TreeField getSymbol() {
-        switch (symbol) {
-        case TreeSymbol.HasSym(TreeField field, _):
-            return field;
-        default:
-            return null;
-        }
+        return symbol instanceof TreeSymbol.HasSym
+            ? ((TreeSymbol.HasSym)symbol).field
+            : null;
     }
 
     public boolean hasLinkedFields() {
@@ -152,6 +140,47 @@ public class TreeNode {
             printDecl(writer, null, false);
         }
         return writer.print(":").space();
+    }
+
+    public TreeField getTestField() {
+        if (fields == null) return null;
+        for (int i = 0; i < fields.length; i++) {
+            Type type = fields[i].type;
+            if (type instanceof TreeType.Name &&
+                ((TreeType.Name)type).kind == TreeKind.Test) {
+                return fields[i];
+            }
+        }
+        return null;
+    }
+
+    public JavaWriter printInstanceTest(JavaWriter writer, String value) {
+        if (fields == null) {
+            return writer.print(value).print(" == Tree.").print(name);
+        }
+        return writer.print(value).print(" instanceof ").print(name);
+    }
+
+    public JavaWriter printExtractor(JavaWriter writer, String value,
+        boolean withoutLinkedFields)
+    {
+        if (fields == null) return writer;
+        writer.print(name).print(" node = (").print(name).print(")")
+            .print(value).println(";");
+        TreeField[] fields = getFields(withoutLinkedFields);
+        for (int i = 0; i < fields.length; i++) {
+            fields[i].print(writer, true).print(" = node.").print(fields[i].name)
+                .println(";");
+        }
+        return writer;
+    }
+
+    public JavaWriter printFieldDecls(JavaWriter writer) {
+        if (fields == null) return writer;
+        for (int i = 0; i < fields.length; i++) {
+            fields[i].print(writer.print("public "), true).println(";");
+        }
+        return writer;
     }
 
     public JavaWriter printNew(JavaWriter writer, boolean withSymbol) {
