@@ -39,6 +39,10 @@ public class ATreeTyper {
         this.definitions = definitions;
     }
 
+    public ATreeTyper(Global global) {
+        this(global, global.definitions);
+    }
+
     //########################################################################
     // Public Methods - Typing code
 
@@ -51,40 +55,39 @@ public class ATreeTyper {
 
     /** Returns the type of the given code. */
     public Type type(ACode code) {
-        switch (code) {
-        case Void:
-            return definitions.void_TYPE();
-        case This(Symbol clasz):
-            return clasz.thisType();
-        case Constant(AConstant constant):
-            return type(constant);
-        case Load(ALocation location):
-            return type(location);
-        case Store(_, _):
+        if (code == ACode.Void) {
+            return definitions.UNIT_TYPE();
+        } else if (code instanceof ACode.This) {
+            return ((ACode.This) code).clasz.thisType();
+        } else if (code instanceof ACode.Constant) {
+            return type(((ACode.Constant) code).constant);
+        } else if (code instanceof ACode.Load) {
+            return type(((ACode.Load) code).location);
+        } else if (code instanceof ACode.Store) {
             return Type.NoType;
-        case Apply(AFunction function, Type[] targs, _):
-            return apply(type(function), targs).resultType();
-        case IsAs(_, Type type, boolean cast):
-            return cast ? type : definitions.boolean_TYPE();
-        case If(_, ACode success, ACode failure):
-            return Type.lub(new Type[]{type(success), type(failure)});
-        case Switch(_, _, ACode[] bodies):
-            return Type.lub(type(bodies));
-        case Synchronized(_, ACode value):
-            return type(value);
-        case Block(_, _, ACode value):
-            return type(value);
-        case Label(Symbol label, _, _):
-            return label.type().resultType();
-        case Goto(_, _):
+        } else if (code instanceof ACode.Apply) {
+            ACode.Apply applyCode = (ACode.Apply) code;
+            return apply(type(applyCode.function), applyCode.targs).resultType();
+        } else if (code instanceof ACode.IsAs) {
+            ACode.IsAs isAs = (ACode.IsAs) code;
+            return isAs.cast ? isAs.type : definitions.BOOLEAN_TYPE();
+        } else if (code instanceof ACode.If) {
+            ACode.If ifCode = (ACode.If) code;
+            return Type.lub(new Type[]{type(ifCode.success), type(ifCode.failure)});
+        } else if (code instanceof ACode.Switch) {
+            return Type.lub(type(((ACode.Switch) code).bodies));
+        } else if (code instanceof ACode.Synchronized) {
+            return type(((ACode.Synchronized) code).value);
+        } else if (code instanceof ACode.Block) {
+            return type(((ACode.Block) code).value);
+        } else if (code instanceof ACode.Label) {
+            return ((ACode.Label) code).label.type().resultType();
+        } else if (code instanceof ACode.Goto ||
+                   code instanceof ACode.Return ||
+                   code instanceof ACode.Throw ||
+                   code instanceof ACode.Drop) {
             return Type.NoType;
-        case Return(_, _):
-            return Type.NoType;
-        case Throw(_):
-            return Type.NoType;
-        case Drop(_, _):
-            return Type.NoType;
-        default:
+        } else {
             throw Debug.abort("unknown case", code);
         }
     }
@@ -94,18 +97,19 @@ public class ATreeTyper {
 
     /** Returns the type of the given value location. */
     public Type type(ALocation location) {
-        switch (location) {
-        case Module(Symbol module):
-            return module.thisType();
-        case Field(Void, Symbol field, _):
-            return field.owner().thisType().memberStabilizedType(field);
-        case Field(ACode object, Symbol field, _):
-            return type(object).memberStabilizedType(field);
-        case Local(Symbol local, _):
-            return local.type();
-        case ArrayItem(ACode array, _):
-            return getArrayElementType(type(array));
-        default:
+        if (location instanceof ALocation.Module) {
+            return ((ALocation.Module) location).module.thisType();
+        } else if (location instanceof ALocation.Field) {
+            ALocation.Field field = (ALocation.Field) location;
+            if (field.object == ACode.Void) {
+                return field.field.owner().thisType().memberStabilizedType(field.field);
+            }
+            return type(field.object).memberStabilizedType(field.field);
+        } else if (location instanceof ALocation.Local) {
+            return ((ALocation.Local) location).local.type();
+        } else if (location instanceof ALocation.ArrayItem) {
+            return getArrayElementType(type(((ALocation.ArrayItem) location).array));
+        } else {
             throw Debug.abort("unknown case", location);
         }
     }
@@ -115,22 +119,23 @@ public class ATreeTyper {
 
     /** Returns the type of the given function reference. */
     public Type type(AFunction function) {
-        switch (function) {
-        case Method(Void, Symbol method, AInvokeStyle style):
-            Type type = method.owner().thisType().memberStabilizedType(method);
-            if (style ==  AInvokeStyle.New) {
-                assert method.isInitializer(): function;
-                Symbol[] tparams = method.owner().typeParams();
-                if (tparams.length != 0) type = Type.PolyType(tparams, type);
+        if (function instanceof AFunction.Method) {
+            AFunction.Method method = (AFunction.Method) function;
+            if (method.object == ACode.Void) {
+                Type type = method.method.owner().thisType().memberStabilizedType(method.method);
+                if (method.style ==  AInvokeStyle.New) {
+                    assert method.method.isInitializer(): function;
+                    Symbol[] tparams = method.method.owner().typeParams();
+                    if (tparams.length != 0) type = Type.PolyType(tparams, type);
+                }
+                return type;
             }
-            return type;
-        case Method(ACode object, Symbol method, _):
-            return type(object).memberStabilizedType(method);
-        case Primitive(APrimitive primitive):
-            return type(primitive);
-        case NewArray(Type element):
-            return definitions.array_TYPE(element);
-        default:
+            return type(method.object).memberStabilizedType(method.method);
+        } else if (function instanceof AFunction.Primitive) {
+            return type(((AFunction.Primitive) function).primitive);
+        } else if (function instanceof AFunction.NewArray) {
+            return definitions.ARRAY_TYPE(((AFunction.NewArray) function).element);
+        } else {
             throw Debug.abort("unknown case", function);
         }
     }
@@ -140,36 +145,37 @@ public class ATreeTyper {
 
     /** Returns the type of the given primitive. */
     public Type type(APrimitive primitive) {
-        switch (primitive) {
-        case Negation(ATypeKind kind):
-            Type type = type(kind);
+        if (primitive instanceof APrimitive.Negation) {
+            Type type = type(((APrimitive.Negation) primitive).kind);
             return getMethodType(type, type);
-        case Test(_, ATypeKind kind, true):
-            Type type = type(kind);
-            return getMethodType(type, type(ATypeKind.BOOL));
-        case Test(_, ATypeKind kind, false):
-            Type type = type(kind);
-            return getMethodType(type, type, type(ATypeKind.BOOL));
-        case Comparison(_, ATypeKind kind):
-            Type type = type(kind);
+        } else if (primitive instanceof APrimitive.Test) {
+            APrimitive.Test test = (APrimitive.Test) primitive;
+            Type type = type(test.kind);
+            return test.zero
+                ? getMethodType(type, type(ATypeKind.BOOL))
+                : getMethodType(type, type, type(ATypeKind.BOOL));
+        } else if (primitive instanceof APrimitive.Comparison) {
+            Type type = type(((APrimitive.Comparison) primitive).kind);
             return getMethodType(type, type, type(ATypeKind.I4));
-        case Arithmetic(_, ATypeKind kind):
-            Type type = type(kind);
+        } else if (primitive instanceof APrimitive.Arithmetic) {
+            Type type = type(((APrimitive.Arithmetic) primitive).kind);
             return getMethodType(type, type, type);
-        case Logical(_, ATypeKind kind):
-            Type type = type(kind);
+        } else if (primitive instanceof APrimitive.Logical) {
+            Type type = type(((APrimitive.Logical) primitive).kind);
             return getMethodType(type, type, type);
-        case Shift(_, ATypeKind kind):
-            Type type = type(kind);
+        } else if (primitive instanceof APrimitive.Shift) {
+            Type type = type(((APrimitive.Shift) primitive).kind);
             return getMethodType(type, type(ATypeKind.I4), type);
-        case Conversion(ATypeKind src, ATypeKind dst):
-            return getMethodType(type(src), type(dst));
-        case ArrayLength(ATypeKind kind):
-            Type type = definitions.array_TYPE(type(kind));
+        } else if (primitive instanceof APrimitive.Conversion) {
+            APrimitive.Conversion conversion = (APrimitive.Conversion) primitive;
+            return getMethodType(type(conversion.src), type(conversion.dst));
+        } else if (primitive instanceof APrimitive.ArrayLength) {
+            Type type = definitions.ARRAY_TYPE(type(((APrimitive.ArrayLength) primitive).kind));
             return getMethodType(type, type(ATypeKind.I4));
-        case StringConcat(ATypeKind lf, ATypeKind rg):
-            return getMethodType(type(lf), type(rg), type(ATypeKind.STR));
-        default:
+        } else if (primitive instanceof APrimitive.StringConcat) {
+            APrimitive.StringConcat concat = (APrimitive.StringConcat) primitive;
+            return getMethodType(type(concat.lf), type(concat.rg), type(ATypeKind.STR));
+        } else {
             throw Debug.abort("unknown case", primitive);
         }
     }
@@ -186,22 +192,20 @@ public class ATreeTyper {
 
     /** Returns the base type of the given constant. */
     public Type basetype(AConstant constant) {
-        switch (constant) {
-        case UNIT      : return definitions.void_TYPE(); // !!! -> UNIT_TYPE()
-        case BOOLEAN(_): return definitions.boolean_TYPE();
-        case BYTE(_)   : return definitions.byte_TYPE();
-        case SHORT(_)  : return definitions.short_TYPE();
-        case CHAR(_)   : return definitions.char_TYPE();
-        case INT(_)    : return definitions.int_TYPE();
-        case LONG(_)   : return definitions.long_TYPE();
-        case FLOAT(_)  : return definitions.float_TYPE();
-        case DOUBLE(_) : return definitions.double_TYPE();
-        case SYMBOL_NAME(_):
-        case STRING(_) : return definitions.STRING_TYPE();
-        case NULL      : return definitions.ALLREF_TYPE();
-        case ZERO      : return definitions.ALL_TYPE();
-        default        : throw Debug.abort("unknown case", constant);
-        }
+        if (constant == AConstant.UNIT) return definitions.UNIT_TYPE();
+        if (constant instanceof AConstant.BooleanValue) return definitions.BOOLEAN_TYPE();
+        if (constant instanceof AConstant.ByteValue) return definitions.BYTE_TYPE();
+        if (constant instanceof AConstant.ShortValue) return definitions.SHORT_TYPE();
+        if (constant instanceof AConstant.CharValue) return definitions.CHAR_TYPE();
+        if (constant instanceof AConstant.IntValue) return definitions.INT_TYPE();
+        if (constant instanceof AConstant.LongValue) return definitions.LONG_TYPE();
+        if (constant instanceof AConstant.FloatValue) return definitions.FLOAT_TYPE();
+        if (constant instanceof AConstant.DoubleValue) return definitions.DOUBLE_TYPE();
+        if (constant instanceof AConstant.StringValue) return definitions.STRING_TYPE();
+        if (constant instanceof AConstant.SymbolNameValue) return definitions.STRING_TYPE();
+        if (constant == AConstant.NULL) return definitions.ALLREF_TYPE();
+        if (constant == AConstant.ZERO) return definitions.ALL_TYPE();
+        throw Debug.abort("unknown case", constant);
     }
 
     //########################################################################
@@ -209,56 +213,54 @@ public class ATreeTyper {
 
     /** Returns the type of the given type kind. */
     public Type type(ATypeKind kind) {
-        switch (kind) {
-        case UNIT: return definitions.void_TYPE(); // !!! -> UNIT_TYPE()
-        case BOOL: return definitions.boolean_TYPE();
+        if (kind == ATypeKind.UNIT) return definitions.UNIT_TYPE();
+        if (kind == ATypeKind.BOOL) return definitions.BOOLEAN_TYPE();
  // !!! case U1  : return ?;
-        case U2  : return definitions.char_TYPE();
+        if (kind == ATypeKind.U2) return definitions.CHAR_TYPE();
  // !!! case U4  : return ?;
  // !!! case U8  : return ?;
-        case I1  : return definitions.byte_TYPE();
-        case I2  : return definitions.short_TYPE();
-        case I4  : return definitions.int_TYPE();
-        case I8  : return definitions.long_TYPE();
-        case R4  : return definitions.float_TYPE();
-        case R8  : return definitions.double_TYPE();
-        case REF : return definitions.ANYREF_TYPE();
-        case STR : return definitions.STRING_TYPE();
-        case NULL: return definitions.ALLREF_TYPE();
-        case ZERO: return definitions.ALL_TYPE();
-        default  : throw Debug.abort("unknown case", kind);
-        }
+        if (kind == ATypeKind.I1) return definitions.BYTE_TYPE();
+        if (kind == ATypeKind.I2) return definitions.SHORT_TYPE();
+        if (kind == ATypeKind.I4) return definitions.INT_TYPE();
+        if (kind == ATypeKind.I8) return definitions.LONG_TYPE();
+        if (kind == ATypeKind.R4) return definitions.FLOAT_TYPE();
+        if (kind == ATypeKind.R8) return definitions.DOUBLE_TYPE();
+        if (kind == ATypeKind.REF) return definitions.ANYREF_TYPE();
+        if (kind == ATypeKind.STR) return definitions.STRING_TYPE();
+        if (kind == ATypeKind.NULL) return definitions.ALLREF_TYPE();
+        if (kind == ATypeKind.ZERO) return definitions.ALL_TYPE();
+        throw Debug.abort("unknown case", kind);
     }
 
     //########################################################################
     // Public Methods - Aliases for scala
 
     public Type[] computeType(ACode[] codes) {
-	return type(codes);
+        return type(codes);
     }
 
     public Type computeType(ACode code) {
-	return type(code);
+        return type(code);
     }
 
     public Type computeType(ALocation location) {
-	return type(location);
+        return type(location);
     }
 
     public Type computeType(AFunction function) {
-	return type(function);
+        return type(function);
     }
 
     public Type computeType(APrimitive primitive) {
-	return type(primitive);
+        return type(primitive);
     }
 
     public Type computeType(AConstant constant) {
-	return type(constant);
+        return type(constant);
     }
 
     public Type computeType(ATypeKind kind) {
-	return type(kind);
+        return type(kind);
     }
 
     //########################################################################
@@ -266,10 +268,10 @@ public class ATreeTyper {
 
     /** Returns the application of given arguments to given type. */
     private Type apply(Type type, Type[] targs) {
-        switch (type) {
-        case PolyType(Symbol[] tparams, Type result):
-            return result.subst(tparams, targs);
-        default:
+        if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType) type;
+            return polyType.result.subst(polyType.tparams, targs);
+        } else {
             assert targs.length == 0: type + " -- " + Debug.show(targs);
             return type;
         }
@@ -277,13 +279,13 @@ public class ATreeTyper {
 
     /** Returns the element type of the given array type. */
     public Type getArrayElementType(Type type) { // !!! public / private
-        switch (type) {
-        case TypeRef(_, Symbol symbol, Type[] args):
-            assert symbol == definitions.ARRAY_CLASS && args.length == 1: type;
-            return args[0];
-        case UnboxedArrayType(Type element):
-            return element;
-        default:
+        if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef) type;
+            assert typeRef.sym == definitions.ARRAY_CLASS && typeRef.args.length == 1: type;
+            return typeRef.args[0];
+        } else if (type instanceof Type.UnboxedArrayType) {
+            return ((Type.UnboxedArrayType) type).elemtp;
+        } else {
             throw Debug.abort("non-array type", type);
         }
     }
@@ -303,7 +305,7 @@ public class ATreeTyper {
         Symbol[] tparams = new Symbol[targs.length];
         for (int i = 0; i < tparams.length; i++) {
             Name name = Name.fromString("v" + i);
-            tparams[i] = Symbol.NONE.newTerm( // !!! should be newVParam
+            tparams[i] = ((Symbol)Symbol.NONE).newTerm( // !!! should be newVParam
                 Position.NOPOS, Modifiers.PARAM, name);
             tparams[i].setType(targs[i]);
         }

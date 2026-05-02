@@ -30,6 +30,9 @@ public class Definitions {
     /** The root class */
     public final Symbol ROOT_CLASS;
 
+    /** The java package */
+    public final Symbol JAVA;
+
     /** The java.lang package */
     public final Symbol JAVALANG;
 
@@ -250,9 +253,6 @@ public class Definitions {
     // attributes
 
     public final Symbol SCALA_SERIALIZABLE_CONSTR;
-    public final Symbol SCALA_TRANSIENT_CONSTR;
-    public final Symbol SCALA_VOLATILE_CONSTR;
-    public final Symbol SCALA_CLONEABLE_CONSTR;
 
     //########################################################################
     // Public Fields & Methods - Scala primitive types
@@ -305,12 +305,12 @@ public class Definitions {
     /** Returns the primitive array type of given element type. */
     public final Type array_TYPE(Type element) {
         Type type = array_TYPE.type().resultType();
-        switch (type) {
-        case TypeRef(Type prefix, Symbol clasz, _):
-            return Type.typeRef(prefix, clasz, new Type[]{element});
-        case UnboxedArrayType(_):
+        if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            return Type.typeRef(typeRef.pre, typeRef.sym, new Type[]{element});
+        } else if (type instanceof Type.UnboxedArrayType) {
             return Type.UnboxedArrayType(element);
-        default:
+        } else {
             throw Debug.abort("illegal case", type);
         }
     }
@@ -337,7 +337,6 @@ public class Definitions {
     /** Some java.lang.Object methods */
     public final Symbol OBJECT_EQ;
     public final Symbol OBJECT_NE;
-    public final Symbol OBJECT_CLONE;
     public final Symbol OBJECT_SYNCHRONIZED;
 
     /** Some java.lang.String methods */
@@ -739,10 +738,8 @@ public class Definitions {
         return JAVAREFARRAYTYPE_JAVAREFARRAYTYPE;
     }
 
-    // MSIL delegate types
-    public final Symbol DELEGATE_CLASS;
-    public final Type   DELEGATE_TYPE() {
-        return DELEGATE_CLASS != null ? DELEGATE_CLASS.staticType() : null;
+    public final Type DELEGATE_TYPE() {
+        return null;
     }
 
     //########################################################################
@@ -775,13 +772,12 @@ public class Definitions {
         // create attributed tree typer
         atyper = new ATreeTyper(global, this);
 
-        final boolean forMSIL = global.target == Global.TARGET_MSIL;
-
         // the root class
         ROOT_CLASS = ClassSymbol.newRootClass(global);
 
         // the java, java.lang and scala packages
-        JAVALANG = getModule(forMSIL ? "System" : "java.lang");
+        JAVA = getModule("java");
+        JAVALANG = getModule("java.lang");
         SCALA = getModule("scala");
 
         // the top and bottom classes
@@ -793,12 +789,9 @@ public class Definitions {
         ALL_CLASS = newClass(SCALA_CLASS, Names.All, Modifiers.ABSTRACT | Modifiers.FINAL);
 
         // the java classes
-        OBJECT_CLASS = getClass(forMSIL ? "System.Object" : "java.lang.Object");
-	STRING_CLASS = getClass(forMSIL ? "System.String" : "java.lang.String");
-        THROWABLE_CLASS =
-            getClass(forMSIL ? "System.Exception" : "java.lang.Throwable");
-        // .NET delegate class
-        DELEGATE_CLASS = forMSIL ? getClass("System.MulticastDelegate") : null;
+        OBJECT_CLASS = getClass("java.lang.Object");
+	STRING_CLASS = getClass("java.lang.String");
+        THROWABLE_CLASS = getClass("java.lang.Throwable");
 
         // the scala value classes
         UNIT_CLASS = getClass("scala.Unit");
@@ -843,12 +836,6 @@ public class Definitions {
         MATCHERROR = getModule("scala.MatchError");
 
         SCALA_SERIALIZABLE_CONSTR = getClass("scala.serializable")
-            .primaryConstructor();
-        SCALA_TRANSIENT_CONSTR = getClass("scala.transient")
-            .primaryConstructor();
-        SCALA_VOLATILE_CONSTR = getClass("scala.volatile")
-            .primaryConstructor();
-        SCALA_CLONEABLE_CONSTR = getClass("scala.cloneable")
             .primaryConstructor();
 
         // initialize generated classes and aliases
@@ -938,98 +925,9 @@ public class Definitions {
                     new Symbol[] {OBJECT_SYNCHRONIZED_VPARAM},
                     OBJECT_SYNCHRONIZED_TPARAM.type())));
 
-	if (forMSIL) {
-	    OBJECT_CLONE = newMethod(OBJECT_CLASS, Names.clone, Modifiers.PROTECTED);
-	    initMethod(OBJECT_CLONE, Type.EMPTY_ARRAY, ANYREF_TYPE());
-
-	    Symbol WAIT0 = newMethod(OBJECT_CLASS, Names.wait, Modifiers.FINAL);
-	    initMethod(WAIT0, Type.EMPTY_ARRAY, UNIT_TYPE());
-
-	    Symbol WAIT1 = newMethod(OBJECT_CLASS, Names.wait, Modifiers.FINAL);
-	    initMethod(WAIT1, new Type[]{LONG_TYPE()}, UNIT_TYPE());
-
-	    Symbol WAIT2 = newMethod(OBJECT_CLASS, Names.wait, Modifiers.FINAL);
-	    initMethod(WAIT2, new Type[]{LONG_TYPE(), INT_TYPE()}, UNIT_TYPE());
-
-	    Symbol NOTIFY =
-		newMethod(OBJECT_CLASS, Names.notify, Modifiers.FINAL);
-	    initMethod(NOTIFY, Type.EMPTY_ARRAY, UNIT_TYPE());
-
-	    Symbol NOTIFY_ALL =
-		newMethod(OBJECT_CLASS, Names.notifyAll, Modifiers.FINAL);
-	    initMethod(NOTIFY_ALL, Type.EMPTY_ARRAY, UNIT_TYPE());
-	} else {
-            OBJECT_CLONE = null;
-        }
-
         // add members to java.lang.String
         STRING_PLUS = newMethod(STRING_CLASS, Names.PLUS, Modifiers.FINAL);
         initMethod(STRING_PLUS, new Type[]{ANY_TYPE()}, STRING_TYPE());
-
-	if (forMSIL) {
-	    Symbol s = newMethod(STRING_CLASS, Name.fromString("length"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("compareTo"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("charAt"), 0);
-	    initMethod(s, new Type[] {INT_TYPE()}, CHAR_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("concat"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE()}, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("indexOf"), 0);
-	    initMethod(s, new Type[] {INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("indexOf"), 0);
-	    initMethod(s, new Type[] {INT_TYPE(), INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("indexOf"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("indexOf"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE(), INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("lastIndexOf"), 0);
-	    initMethod(s, new Type[] {INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("lastIndexOf"), 0);
-	    initMethod(s, new Type[] {INT_TYPE(), INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("lastIndexOf"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("lastIndexOf"), 0);
-	    initMethod(s, new Type[] {STRING_TYPE(), INT_TYPE()}, INT_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("toLowerCase"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("toUpperCase"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("startsWith"), 0);
-	    initMethod(s, new Type[]{STRING_TYPE()}, BOOLEAN_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("endsWith"), 0);
-	    initMethod(s, new Type[]{STRING_TYPE()}, BOOLEAN_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("substring"), 0);
-	    initMethod(s, new Type[]{INT_TYPE()}, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("substring"), 0);
-	    initMethod(s, new Type[]{INT_TYPE(), INT_TYPE()}, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("intern"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("replace"), 0);
-	    initMethod(s, new Type[]{CHAR_TYPE(), CHAR_TYPE()}, STRING_TYPE());
-
-	    s = newMethod(STRING_CLASS, Name.fromString("toCharArray"), 0);
-	    initMethod(s, Type.EMPTY_ARRAY, array_TYPE(CHAR_TYPE()));
-	}
 
         // add members to java.lang.Throwable
         THROWABLE_THROW =
@@ -1062,8 +960,9 @@ public class Definitions {
         Name name = Name.fromString(fullname.substring(i, fullname.length()));
         Symbol sym = scope.lookup(name);
         if (!sym.isModule()) {
-            switch (sym.type()) {
-            case OverloadedType(Symbol[] alts, Type[] alttypes):
+            Type symType = sym.type();
+            if (symType instanceof Type.OverloadedType) {
+                Symbol[] alts = ((Type.OverloadedType)symType).alts;
                 for (int k = 0; k < alts.length; k++)
                     if ((sym = alts[k]).isModule()) break;
             }
@@ -1089,8 +988,7 @@ public class Definitions {
     }
 
     private Symbol getJVMClass(String fullname) {
-        return Global.instance.target == Global.TARGET_MSIL ? null :
-            getClass(fullname);
+        return getClass(fullname);
     }
 
     //########################################################################
@@ -1178,11 +1076,16 @@ public class Definitions {
         assert sym.isTerm(): Debug.show(clasz, name, vargs, sym);
         Symbol[] alts = sym.alternativeSymbols();
         for (int i = 0; i < alts.length; i++) {
-            switch (alts[i].type()) {
-            case PolyType(_, MethodType(Symbol[] vparams, _)):
-                if (Type.isSameAs(Symbol.type(vparams), vargs)) return alts[i];
+            Type altType = alts[i].type();
+            if (altType instanceof Type.PolyType) {
+                Type result = ((Type.PolyType)altType).result;
+                if (result instanceof Type.MethodType) {
+                    Symbol[] vparams = ((Type.MethodType)result).vparams;
+                    if (Type.isSameAs(Symbol.type(vparams), vargs)) return alts[i];
+                }
                 continue;
-            case MethodType(Symbol[] vparams, _):
+            } else if (altType instanceof Type.MethodType) {
+                Symbol[] vparams = ((Type.MethodType)altType).vparams;
                 if (Type.isSameAs(Symbol.type(vparams), vargs)) return alts[i];
                 continue;
             }

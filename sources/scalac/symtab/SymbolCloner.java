@@ -8,8 +8,9 @@
 
 package scalac.symtab;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Iterator;
+import java.util.HashMap;
 
 import scalac.util.Debug;
 
@@ -62,6 +63,17 @@ public class SymbolCloner {
         Symbol oldowner = symbol.owner();
         Object newowner = clones.get(oldowner);
         if (newowner == null) newowner = owners.get(oldowner);
+        if (newowner == null && oldowner.isConstructor()) {
+            for (Iterator it = owners.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry entry = (Map.Entry)it.next();
+                Symbol owner = (Symbol)entry.getKey();
+                if (owner.isConstructor() &&
+                    owner.constructorClass() == oldowner.constructorClass()) {
+                    newowner = entry.getValue();
+                    break;
+                }
+            }
+        }
         assert newowner != null : Debug.show(symbol);
         return (Symbol)newowner;
     }
@@ -181,41 +193,45 @@ public class SymbolCloner {
     /** The type mapper Type.Map */
     private final Type.Map mapper = new TypeMapper();
     private class TypeMapper extends Type.Map { public Type apply(Type type) {
-        switch (type) {
-        case ErrorType:
-        case NoType:
-        case NoPrefix:
+        if (type == Type.ErrorType ||
+            type == Type.NoType ||
+            type == Type.NoPrefix) {
             return type;
-        case ThisType(Symbol symbol):
-            Symbol clone = (Symbol)clones.get(symbol);
+        } else if (type instanceof Type.ThisType) {
+            Type.ThisType thisType = (Type.ThisType)type;
+            Symbol clone = (Symbol)clones.get(thisType.sym);
             if (clone == null) return type;
             return Type.ThisType(clone);
-        case SingleType(Type prefix, Symbol symbol):
-            Symbol clone = (Symbol)clones.get(symbol);
+        } else if (type instanceof Type.SingleType) {
+            Type.SingleType singleType = (Type.SingleType)type;
+            Symbol clone = (Symbol)clones.get(singleType.sym);
             if (clone == null) return map(type);
-            return Type.singleType(apply(prefix), clone);
-        case ConstantType(_, _):
+            return Type.singleType(apply(singleType.pre), clone);
+        } else if (type instanceof Type.ConstantType) {
             return map(type);
-        case TypeRef(Type prefix, Symbol symbol, Type[] args):
-            Symbol clone = (Symbol)clones.get(symbol);
+        } else if (type instanceof Type.TypeRef) {
+            Type.TypeRef typeRef = (Type.TypeRef)type;
+            Symbol clone = (Symbol)clones.get(typeRef.sym);
             if (clone == null) return map(type);
-            return Type.typeRef(apply(prefix), clone, map(args));
-        case CompoundType(Type[] parts, Scope members):
+            return Type.typeRef(apply(typeRef.pre), clone, map(typeRef.args));
+        } else if (type instanceof Type.CompoundType) {
+            Type.CompoundType compoundType = (Type.CompoundType)type;
             Symbol clone = (Symbol)clones.get(type.symbol());
             // !!! if (clone == null) return map(type);
             if (clone == null) clone = type.symbol();
-            return Type.compoundType(map(parts), members, clone);
-        case MethodType(Symbol[] vparams, Type result):
-            return Type.MethodType(vparams, apply(result));
-        case PolyType(Symbol[] tparams, Type result):
-            return Type.PolyType(tparams, apply(result));
-        case UnboxedType(_):
+            return Type.compoundType(map(compoundType.parts), compoundType.members, clone);
+        } else if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            return Type.MethodType(methodType.vparams, apply(methodType.result));
+        } else if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)type;
+            return Type.PolyType(polyType.tparams, apply(polyType.result));
+        } else if (type instanceof Type.UnboxedType) {
             return type;
-        case UnboxedArrayType(_):
+        } else if (type instanceof Type.UnboxedArrayType) {
             return map(type);
-        default:
-            throw Debug.abort("illegal case", type);
         }
+        throw Debug.abort("illegal case", type);
     }}
 
     //########################################################################
@@ -224,19 +240,23 @@ public class SymbolCloner {
     /** The type cloner Type.Map */
     private final Type.Map cloner = new TypeCloner();
     private class TypeCloner extends TypeMapper { public Type apply(Type type){
-        switch (type) {
-        case CompoundType(Type[] parts, Scope members):
+        if (type instanceof Type.CompoundType) {
+            Type.CompoundType compoundType = (Type.CompoundType)type;
             Symbol clone = /* !!! getCompoundClone */(type.symbol());
-            return Type.compoundType(map(parts), /* !!! cloneScope */(members), clone);
-        case MethodType(Symbol[] vparams, Type result):
-            Symbol[] clones = cloneSymbols(vparams);
-            return Type.MethodType(clones, apply(result));
-        case PolyType(Symbol[] tparams, Type result):
-            Symbol[] clones = cloneSymbols(tparams);
-            return Type.PolyType(clones, apply(result));
-        default:
-            return super.apply(type);
+            return Type.compoundType(
+                map(compoundType.parts),
+                /* !!! cloneScope */(compoundType.members),
+                clone);
+        } else if (type instanceof Type.MethodType) {
+            Type.MethodType methodType = (Type.MethodType)type;
+            Symbol[] clones = cloneSymbols(methodType.vparams);
+            return Type.MethodType(clones, apply(methodType.result));
+        } else if (type instanceof Type.PolyType) {
+            Type.PolyType polyType = (Type.PolyType)type;
+            Symbol[] clones = cloneSymbols(polyType.tparams);
+            return Type.PolyType(clones, apply(polyType.result));
         }
+        return super.apply(type);
     }}
 
     //########################################################################

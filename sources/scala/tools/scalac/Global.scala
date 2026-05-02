@@ -12,7 +12,6 @@ import java.io.PrintWriter;
 import scalac.{CompilationUnit, CompilerCommand, Global => scalac_Global};
 import scalac.ast.printer.TreePrinter;
 import scalac.backend.jvm.GenJVM;
-import scalac.backend.msil.GenMSIL;
 import scalac.symtab.Symbol;
 import scalac.util.Debug;
 
@@ -54,8 +53,6 @@ class Global(args: CompilerCommand, timer: Timer, interpret: Boolean) extends sc
   override def dump(units: Array[CompilationUnit]): Unit = {
     if (target == scalac_Global.TARGET_JVM) {
       GenJVM.translate(this, units);
-    } else if (target == scalac_Global.TARGET_MSIL) {
-      GenMSIL.translate(this, units);
     } else if (target == scalac_Global.TARGET_JVMFROMICODE) {
       GenJVMFromICode.translate(this, units);
     }

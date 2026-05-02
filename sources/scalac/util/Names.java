@@ -158,6 +158,13 @@ public class Names {
     public static final Name Try = Name.fromString("Try");
     public static final Name Tuple = Name.fromString("Tuple");
     public static final Name Type = Name.fromString("Type");
+    public static final Name toByte = Name.fromString("toByte");
+    public static final Name toShort = Name.fromString("toShort");
+    public static final Name toChar = Name.fromString("toChar");
+    public static final Name toInt = Name.fromString("toInt");
+    public static final Name toLong = Name.fromString("toLong");
+    public static final Name toFloat = Name.fromString("toFloat");
+    public static final Name toDouble = Name.fromString("toDouble");
     public static final Name Tuple2 = Name.fromString("Tuple2");
     public static final Name Unit = Name.fromString("Unit");
     public static final Name While = Name.fromString("While");
@@ -172,6 +179,11 @@ public class Names {
     public static final Name cast = Name.fromString("cast");
     public static final Name clone = Name.fromString("clone");
     public static final Name coerce = Name.fromString("coerce");
+    public static final Name coerceToDouble = Name.fromString("coerceToDouble");
+    public static final Name coerceToFloat = Name.fromString("coerceToFloat");
+    public static final Name coerceToLong = Name.fromString("coerceToLong");
+    public static final Name coerceToInt = Name.fromString("coerceToInt");
+    public static final Name coerceToShort = Name.fromString("coerceToShort");
     public static final Name defaultValue = Name.fromString("defaultValue");
     public static final Name elem = Name.fromString("elem");
     public static final Name elements = Name.fromString("elements");

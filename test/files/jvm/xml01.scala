@@ -182,7 +182,7 @@ object Test {
     // test unicode escapes backslash u
 
   Console println ("attribute value normalization");
-  val xmlAttrValueNorm = "<personne id='p0003' nom='&#x015e;ahingöz' />";
+  val xmlAttrValueNorm = "<personne id='p0003' nom='&#x015e;ahing\u00f6z' />";
     {
       val isrcA       = new InputSource( new StringReader(xmlAttrValueNorm) );
       val parsedxmlA  = XML.load(isrcA);

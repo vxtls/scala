@@ -9,16 +9,46 @@
 package meta.scalac.ast;
 
 /** This class describes the symbol stored in some tree nodes. */
-public class TreeSymbol {
+public abstract class TreeSymbol {
 
     //########################################################################
-    // Public Cases
+    // Public Constants
 
     /** Indicates the absence of symbol. */
-    public case NoSym;
+    public static final TreeSymbol NoSym = new NoSymValue();
+
+    //########################################################################
+    // Public Constructors
+
+    protected TreeSymbol() {
+    }
+
+    //########################################################################
+    // Public Factories
 
     /** Indicates the presence of a symbol. */
-    public case HasSym(TreeField field, boolean isDef);
+    public static HasSym HasSym(TreeField field, boolean isDef) {
+        return new HasSym(field, isDef);
+    }
+
+    //########################################################################
+    // Public Classes
+
+    private static final class NoSymValue extends TreeSymbol {
+        private NoSymValue() {
+        }
+    }
+
+    /** Indicates the presence of a symbol. */
+    public static final class HasSym extends TreeSymbol {
+        public final TreeField field;
+        public final boolean isDef;
+
+        private HasSym(TreeField field, boolean isDef) {
+            this.field = field;
+            this.isDef = isDef;
+        }
+    }
 
     //########################################################################
 }

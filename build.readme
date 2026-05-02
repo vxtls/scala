@@ -50,26 +50,16 @@ In some cases, parts of the build process should be disabled for debug reasons:
 
 BUILDING NEW SCALA
 
-The 'build' target builds all the Scala library and tools. It is composed of the
-following sub-targets:
-  - 'build.pico.nslib':
-      Builds the Java files in Scala (runtime, tools and scala root) with PiCo.
-      When both a Java file in sources and a Scala file in newsources exist, the
-      Java file is not compiled (it is considered to have been superseeded by the
-      Scala file).
-  - 'build.osc.nstools':
-      Builds NSC with an existing Scalac (found in path of property
-      'ostools.jar').
-  - 'build.nsc.nslib':
-      Builds the new Scala library with the compiler built at target
-      'build.osc.nstools'. Depends on 'build.osc.nstools' & 'build.pico.nslib'.
-      If files should not be compiled at that stage, they can be specified in the
-      'build.support/nsc.nslib.excludes'
-  - 'build.nsc.nstools':
-      Builds NSC with the compiler built at target 'build.osc.nstools'. Depends
-      on 'build.osc.nstools' & 'build.pico.nslib'. If files should not be
-      compiled at that stage, they can be specified in the
-      'build.support/nsc.nstools.excludes'
+The supported bootstrap pipeline is make-based and Java-8-only.
+
+  - 'make boot.all':
+      Builds the bootstrap compiler using the checked-in Java 8 sources.
+  - 'make all':
+      Builds the bootstrap compiler, library and tools.
+  - 'ant build':
+      Delegates to 'make all' for compatibility with older workflows.
+
+The historical Pico/MSIL Ant build graph is no longer supported.
 
 CONSTRUCTING A DISTRIBUTION
 

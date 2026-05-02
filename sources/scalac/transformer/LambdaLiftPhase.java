@@ -1,6 +1,6 @@
 /*     ____ ____  ____ ____  ______                                     *\
 **    / __// __ \/ __// __ \/ ____/    SOcos COmpiles Scala             **
-**  __\_ \/ /_/ / /__/ /_/ /\_ \       (c) 2002-2005, LAMP/EPFL         **
+**  __\_ \/ /_/ / /__/ /_/ /\_ \       (c) 2002, LAMP/EPFL              **
 ** /_____/\____/\___/\____/____/                                        **
 \*                                                                      */
 
@@ -8,13 +8,10 @@
 
 package scalac.transformer;
 
-//import java.util.ArrayList;
-
 import scalac.*;
-import scalac.parser.*;
+import scalac.util.*;
 import scalac.symtab.*;
-import scalac.util.ArrayApply;
-
+import java.util.ArrayList;
 
 public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
 
@@ -23,20 +20,11 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
         super(global, descriptor);
     }
 
-    /** Applies this phase to the given compilation unit.
-     *
-     *  @param unit
-     */
+    /** Applies this phase to the given compilation unit. */
     public void apply(CompilationUnit unit) {
         new LambdaLift(global, this).apply(unit);
     }
 
-    /** ...
-     *
-     *  @param sym
-     *  @param tp
-     *  @return
-     */
     public Type transformInfo(Symbol sym, Type tp) {
 	/*
         if (global.debug)
@@ -44,12 +32,9 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
 	*/
         Type tp1 = tp;
         if (sym != Symbol.NONE) {
-            switch (tp) {
-            case MethodType(_, _):
-            case PolyType(_, _):
+            if (tp instanceof Type.MethodType || tp instanceof Type.PolyType) {
                 tp1 = transform(tp, sym);
-                break;
-            default:
+            } else {
                 if (sym.kind == CLASS)
                     tp1 = transform(tp, sym);
                 else
@@ -62,10 +47,6 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
     }
 
     /** Add proxies as type arguments for propagated type parameters.
-     *
-     *  @param tp
-     *  @param owner
-     *  @return
      */
     Type transform(Type tp, Symbol owner) {
         return transformTypeMap.setOwner(owner).apply(tp);
@@ -79,23 +60,21 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
         Type.Map setOwner(Symbol owner) { this.owner = owner; return this; }
 
         public Type apply(Type tp) {
-            switch (tp) {
-            case TypeRef(Type pre, Symbol sym, Type[] targs):
+            if (tp instanceof Type.TypeRef) {
+                Type.TypeRef typeRef = (Type.TypeRef)tp;
+                Type pre = typeRef.pre;
+                Symbol sym = typeRef.sym;
+                Type[] targs = typeRef.args;
                 if (sym.kind == CLASS) {
-                    switch (pre) {
-                    case NoPrefix:
-                        pre = sym.owner().enclClass().thisType();
-                        tp = Type.typeRef(pre, sym, targs);
+                    if (pre instanceof Type.ThisType) {
+                        Symbol s = ((Type.ThisType)pre).sym;
+                        if (s == Symbol.NONE) {
+                            pre = sym.owner().enclClass().thisType();
+                            tp = Type.typeRef(pre, sym, targs);
+                        }
                     }
                 }
-                switch (pre) {
-                case NoPrefix:
-                    if (LambdaLift.isLocal(sym, owner)) {
-                        assert targs.length == 0;
-                        return proxy(sym, owner).type();
-                    }
-                    break;
-                case ThisType(_):
+                if (pre instanceof Type.ThisType) {
                     if (sym.kind == CLASS &&
 			sym.primaryConstructor().isUpdatedAt(LambdaLiftPhase.this)) {
                         Symbol[] tparams = sym.primaryConstructor().nextInfo().typeParams();
@@ -104,8 +83,7 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
                             i--;
                         if (i < tparams.length) {
                             if (global.debug)
-                                global.log("adding proxies for " + sym +
-                                           ": " + ArrayApply.toString(tparams));
+                                global.log("adding proxies for " + sym + ": " + ArrayApply.toString(tparams));
 
                             Type[] targs1 = new Type[tparams.length];
                             System.arraycopy(map(targs), 0, targs1, 0, targs.length);
@@ -115,9 +93,11 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
                             }
                             return Type.typeRef(pre, sym, targs1);
                         }
+                    } else if (LambdaLift.isLocal(sym, owner)) {
+                        assert targs.length == 0;
+                        return proxy(sym, owner).type();
                     }
                 }
-                break;
 /*
             case PolyType(Symbol[] tparams, _):
                 if (tparams.length != 0) {
@@ -139,15 +119,10 @@ public class LambdaLiftPhase extends Phase implements Kinds, Modifiers {
 
     /** Return closest enclosing (type)parameter that has same name as `fv',
      *  or `fv' itself if this is the closest definition.
-     *
-     *  @param fv
-     *  @param owner
-     *  @return
      */
     Symbol proxy(Symbol fv, Symbol owner) {
         if (global.debug)
-            global.log("proxy " + fv + " of " + fv.owner() +
-                       " in " + LambdaLift.enclFun(owner));
+            global.log("proxy " + fv + " of " + fv.owner() + " in " + LambdaLift.enclFun(owner));
         Symbol o = owner;
         while (o.kind != NONE) {
             if (global.debug)

@@ -122,11 +122,11 @@ public class AClass extends ARepository {
 
     /** Returns the parent types of this class. */
     public Type[] parents() {
-        switch (symbol.info()) {
-        case CompoundType(Type[] parts, _):
-            return parts;
-        default:
-            throw Debug.abort("illegal case", symbol.info());
+        Type info = symbol.info();
+        if (info instanceof Type.CompoundType) {
+            return ((Type.CompoundType) info).parts;
+        } else {
+            throw Debug.abort("illegal case", info);
         }
     }
 

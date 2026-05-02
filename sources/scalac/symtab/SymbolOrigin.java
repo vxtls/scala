@@ -8,45 +8,87 @@
 
 package scalac.symtab;
 
-import ch.epfl.lamp.compiler.msil.Assembly;
 import scala.tools.util.AbstractFile;
 import scalac.CompilationUnit;
 
 /** Instances of this class designate the origin of a symbol. */
 public class SymbolOrigin {
 
-    //########################################################################
-    // Public Cases
+    /** Designates an unknown source. */
+    public static final SymbolOrigin Unknown = new Unknown();
 
-    /** Designates an unknown source */
-    public case Unknown;
+    public static SymbolOrigin Directory(AbstractFile file) {
+        return new Directory(file);
+    }
 
-    /** Designates a directory */
-    public case Directory(AbstractFile file);
+    public static SymbolOrigin ClassFile(AbstractFile file, String sourcefile) {
+        return new ClassFile(file, sourcefile);
+    }
 
-    /** Designates a JVM class file (the source file may be null) */
-    public case ClassFile(AbstractFile file, String sourcefile);
+    public static SymbolOrigin SymblFile(AbstractFile file) {
+        return new SymblFile(file);
+    }
 
-    /** Designates a Scala symbl file */
-    public case SymblFile(AbstractFile file);
+    public static SymbolOrigin ScalaFile(AbstractFile file) {
+        return new ScalaFile(file);
+    }
 
-    /** Designates a Scala source file */
-    public case ScalaFile(AbstractFile file);
-
-    /** Designates a Scala compilation unit */
-    public case ScalaUnit(CompilationUnit unit);
-
-    /** Designates a CLR assembly */
-    public case CLRAssembly(Assembly assembly);
-
-    //########################################################################
-    // Public Methods
+    public static SymbolOrigin ScalaUnit(CompilationUnit unit) {
+        return new ScalaUnit(unit);
+    }
 
     /** Records the source file attribute. */
     public void setSourceFileAttribute(String sourcefile) {
-        if (this instanceof SymbolOrigin.ClassFile)
-            ((SymbolOrigin.ClassFile)this).sourcefile = sourcefile;
     }
 
-    //########################################################################
+    private static final class Unknown extends SymbolOrigin {
+        private Unknown() {
+        }
+    }
+
+    public static final class Directory extends SymbolOrigin {
+        public final AbstractFile file;
+
+        private Directory(AbstractFile file) {
+            this.file = file;
+        }
+    }
+
+    public static final class ClassFile extends SymbolOrigin {
+        public final AbstractFile file;
+        public String sourcefile;
+
+        private ClassFile(AbstractFile file, String sourcefile) {
+            this.file = file;
+            this.sourcefile = sourcefile;
+        }
+
+        public void setSourceFileAttribute(String sourcefile) {
+            this.sourcefile = sourcefile;
+        }
+    }
+
+    public static final class SymblFile extends SymbolOrigin {
+        public final AbstractFile file;
+
+        private SymblFile(AbstractFile file) {
+            this.file = file;
+        }
+    }
+
+    public static final class ScalaFile extends SymbolOrigin {
+        public final AbstractFile file;
+
+        private ScalaFile(AbstractFile file) {
+            this.file = file;
+        }
+    }
+
+    public static final class ScalaUnit extends SymbolOrigin {
+        public final CompilationUnit unit;
+
+        private ScalaUnit(CompilationUnit unit) {
+            this.unit = unit;
+        }
+    }
 }

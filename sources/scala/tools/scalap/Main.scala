@@ -8,9 +8,10 @@
 
 package scala.tools.scalap;
 
-import java.io._;
+import java.io.{Console => _, _};
 
 import scala.tools.util.ClassPath;
+import scala.Console;
 
 
 /** The main object used to execute scalap on the command-line.
