@@ -29,14 +29,14 @@ object MainTokenMetric {
       }
       var j = 0 ; while(j + Math.log(i)/ Math.log(10) < 7) {
         j = j+1;
-        Console.print(' ');
+        scala.Console.print(' ');
       }
-      Console.print(i.toString());
-      Console.print(" ");
-      Console.println(source.toString());
+      scala.Console.print(i.toString());
+      scala.Console.print(" ");
+      scala.Console.println(source.toString());
       totale = totale + i;
     }
-    Console.println(totale.toString()+" total");
+    scala.Console.println(totale.toString()+" total");
   }
 
   def process(args: Array[String]): unit = {

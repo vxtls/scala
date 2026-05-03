@@ -70,19 +70,19 @@ abstract class WordAutomInScala extends Autom2Scala {
       .setInfo( _seqIterType( elementType ) ) ;
 
       this.stateSym = owner.newVariable( pos, fresh.newName("q"))
-      .setInfo( definitions.IntClass.info ) ;
+      .setInfo( definitions.IntClass.tpe ) ;
 
       this.resultSym = owner.newVariable( pos, fresh.newName("swRes"))
-      .setInfo( definitions.IntClass.info ) ;
+      .setInfo( definitions.IntClass.tpe ) ;
 
-      this.funSym.setInfo( MethodType(scala.List (definitions.IntClass.info),
-                                          definitions.IntClass.info ));
+      this.funSym.setInfo( MethodType(scala.List (definitions.IntClass.tpe),
+                                          definitions.IntClass.tpe ));
 
       this.curSym = owner.newVariable( pos, "cur" /*Names.cur*/ )
       .setInfo( elementType );
 
       this.hasnSym = owner.newVariable( pos, nme.hasNext )
-      .setInfo( definitions.BooleanClass.info );
+      .setInfo( definitions.BooleanClass.tpe );
 
     }
 
@@ -104,11 +104,15 @@ abstract class WordAutomInScala extends Autom2Scala {
       // restyp definitions.BooleanClass.info /* restype */);
     }
 
+    val savedResultType = resultType;
+    resultType = definitions.BooleanClass.tpe;
     am.construct( m, scala.List (
       CaseDef( pat, Literal( true )),
       CaseDef( Ident(definitions.PatternWildcard), Literal( false )) ),
                  false);
-    am.toTree();
+    val tree = m.tree;
+    resultType = savedResultType;
+    tree;
   }
 
   /** do the translation
@@ -143,4 +147,3 @@ abstract class WordAutomInScala extends Autom2Scala {
 
 }
 }
-

@@ -40,6 +40,7 @@ abstract class SymbolicXMLBuilder(make: TreeBuilder, p: Parsers # Parser, preser
    _mutable             ,
    _append              ,
    _plus                ,
+   _plusplus            ,
    _collection          ,
    _toList              ,
    _xml                 ,
@@ -224,7 +225,7 @@ abstract class SymbolicXMLBuilder(make: TreeBuilder, p: Parsers # Parser, preser
 
 
   /** makes an element */
-  def element(pos: int, qname: String, attrMap: mutable.Map[String,Tree], args: mutable.Buffer[Tree]): Tree = {
+  def element(pos: int, qname: String, attrMap: mutable.Buffer[Pair[String,Tree]], args: mutable.Buffer[Tree]): Tree = {
     //Console.println("SymbolicXMLBuilder::element("+pos+","+qname+","+attrMap+","+args+")");
     var setNS = new mutable.HashMap[String, Tree];
 
@@ -240,20 +241,20 @@ abstract class SymbolicXMLBuilder(make: TreeBuilder, p: Parsers # Parser, preser
     }
 
     /* DEBUG */
-    val attrIt = attrMap.keys;
+    val attrIt = attrMap.elements;
     while( attrIt.hasNext ) {
-      val z = attrIt.next;
+      val attr = attrIt.next;
+      val z = attr._1;
       if( z.startsWith("xmlns") ) {  // handle namespace
         val i = z.indexOf(':');
         if( i == -1 )
-          handleNamespaceBinding(null, attrMap( z ));
+          handleNamespaceBinding(null, attr._2);
           //setNS.update("default", attrMap( z ) );
         else {
           val zz = z.substring( i+1, z.length() );
           //setNS.update( zz, attrMap( z ) );
-          handleNamespaceBinding(zz, attrMap( z ));
+          handleNamespaceBinding(zz, attr._2);
         }
-        attrMap -= z;
       }
     }
 
@@ -299,12 +300,14 @@ abstract class SymbolicXMLBuilder(make: TreeBuilder, p: Parsers # Parser, preser
     var it = attrMap.elements;
     while (it.hasNext) {
       val ansk = it.next;
-      getPrefix(ansk._1) match {
-        case Some(pre) =>
-          val key = ansk._1.substring(pre.length()+1, ansk._1.length());
-          handlePrefixedAttribute(pre, key, ansk._2);
-        case None      =>
-          handleUnprefixedAttribute(ansk._1, ansk._2);
+      if (!ansk._1.startsWith("xmlns")) {
+        getPrefix(ansk._1) match {
+          case Some(pre) =>
+            val key = ansk._1.substring(pre.length()+1, ansk._1.length());
+            handlePrefixedAttribute(pre, key, ansk._2);
+          case None      =>
+            handleUnprefixedAttribute(ansk._1, ansk._2);
+        }
       }
     }
     //  attrs
@@ -346,4 +349,3 @@ abstract class SymbolicXMLBuilder(make: TreeBuilder, p: Parsers # Parser, preser
     atPos(pos) { Block(ts, Block( ts2, t)) }
   }
 }
-

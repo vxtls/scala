@@ -8,9 +8,9 @@
 
 // $Id$
 
-
 package scala.reflect;
 
+import scala.Predef._;
 
 abstract class Symbol {
   val owner: Symbol;

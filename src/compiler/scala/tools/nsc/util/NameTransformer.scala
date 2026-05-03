@@ -52,6 +52,19 @@ object NameTransformer {
           buf.append(name.substring(0, i));
         }
         buf.append(op2code(c));
+      } else if (c >= nops) {
+        if (buf == null) {
+          buf = new StringBuffer();
+          buf.append(name.substring(0, i));
+        }
+        buf.append("$u");
+        val hex = java.lang.Integer.toHexString(c);
+        var j = hex.length();
+        while (j < 4) {
+          buf.append('0');
+          j = j + 1
+        }
+        buf.append(hex);
       } else if (buf != null) {
         buf.append(c)
       }
@@ -86,6 +99,25 @@ object NameTransformer {
 	    }
 	  }
 	}
+        if (ops == null && ch1 == 'u' && i + 5 < len) {
+          var value = 0;
+          var j = 2;
+          while (j < 6 && value >= 0) {
+            val digit = Character.digit(name.charAt(i + j), 16);
+            if (digit < 0) value = -1
+            else value = (value << 4) + digit;
+            j = j + 1
+          }
+          if (value >= 0) {
+            if (buf == null) {
+              buf = new StringBuffer();
+              buf.append(name.substring(0, i));
+            }
+            buf.append(value.asInstanceOf[char]);
+            ops = new OpCodes(0.asInstanceOf[char], "", null);
+            i = i + 6
+          }
+        }
       }
       if (ops == null) {
 	if (buf != null) buf.append(c);

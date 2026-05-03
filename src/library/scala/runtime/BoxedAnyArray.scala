@@ -23,6 +23,16 @@ final class BoxedAnyArray(val length: Int) extends BoxedArray {
   private var unboxed: Object = null;
   private var elemTag: String = null;
 
+  private def className(elemTag: String): String =
+    elemTag.replace('/', '.');
+
+  private def elementClass(elemTag: String): Class = {
+    val loader = java.lang.Thread.currentThread().getContextClassLoader();
+    val name = className(elemTag);
+    if (loader == null) Class.forName(name)
+    else Class.forName(name, false, loader)
+  }
+
   def apply(index: Int): Object = synchronized {
     if (unboxed == null)
       boxed(index);
@@ -136,10 +146,10 @@ final class BoxedAnyArray(val length: Int) extends BoxedArray {
 	  i = i + 1
 	}
 	unboxed = newvalue;
-      } else if (elemTag == boxed.getClass().getComponentType()) {
+      } else if (className(elemTag) == boxed.getClass().getComponentType().getName()) {
 	unboxed = boxed;
       } else {
-	unboxed = java.lang.reflect.Array.newInstance(Class.forName(elemTag), length);
+	unboxed = java.lang.reflect.Array.newInstance(elementClass(elemTag), length);
 	System.arraycopy(boxed, 0, unboxed, 0, length);
       }
       boxed = null
