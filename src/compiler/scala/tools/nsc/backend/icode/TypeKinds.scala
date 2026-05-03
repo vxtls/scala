@@ -295,19 +295,21 @@ import scala.collection.mutable.{Map, HashMap};
 
 
   /** Return the TypeKind of the given type */
-  def toTypeKind(t: Type): TypeKind = t match {
-    case ThisType(sym) => REFERENCE(sym);
-
-    case SingleType(pre, sym) =>
+  def toTypeKind(t: Type): TypeKind =
+    if (t.isInstanceOf[ThisType]) {
+      REFERENCE(t.asInstanceOf[ThisType].sym)
+    } else if (t.isInstanceOf[SingleType]) {
+      val sym = t.asInstanceOf[SingleType].sym;
       primitiveTypeMap get sym match {
         case Some(k) => k;
         case None    => REFERENCE(sym);
       }
-
-    case ConstantType(value) =>
-      toTypeKind(value.tpe);
-
-    case TypeRef(_, sym, args) =>
+    } else if (t.isInstanceOf[ConstantType]) {
+      toTypeKind(t.asInstanceOf[ConstantType].value.tpe)
+    } else if (t.isInstanceOf[TypeRef]) {
+      val tref = t.asInstanceOf[TypeRef];
+      val sym = tref.sym;
+      val args = tref.args;
       primitiveTypeMap get sym match {
         case Some(k) => k;
         case None    =>
@@ -316,8 +318,8 @@ import scala.collection.mutable.{Map, HashMap};
           else
             REFERENCE(sym);
       }
-
-    case ClassInfoType(_, _, sym) =>
+    } else if (t.isInstanceOf[ClassInfoType]) {
+      val sym = t.asInstanceOf[ClassInfoType].symbol;
       primitiveTypeMap get sym match {
         case Some(k) => k;
         case None    =>
@@ -326,9 +328,7 @@ import scala.collection.mutable.{Map, HashMap};
           else
             REFERENCE(sym);
       }
-
-    case _ => abort("Unknown type: " + t);
-  }
+    } else abort("Unknown type: " + t)
 
   /** A map from scala primitive Types to ICode TypeKinds */
   private var primitiveTypeMap: Map[Symbol, TypeKind] = null;

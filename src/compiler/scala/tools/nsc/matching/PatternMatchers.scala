@@ -127,27 +127,60 @@ trait PatternMatchers: (TransMatcher with PatternNodes) extends AnyRef with Patt
   }
 
   protected def patternArgs(tree: Tree):List[Tree] = {
+    def flattenSequenceArgs(args: List[Tree]): List[Tree] =
+      args flatMap {
+        case Sequence(ts) => flattenSequenceArgs(ts);
+        case tree => List(tree);
+      }
+
+    def seqApplyArgs(args: List[Tree]): List[Tree] =
+      if (args.length == 1)
+        args(0) match {
+          case ArrayValue(_, ts) => // test array values
+            flattenSequenceArgs(ts);
+          case Sequence(ts) =>
+            flattenSequenceArgs(ts);
+          case _ =>
+            flattenSequenceArgs(args);
+        }
+      else flattenSequenceArgs(args);
+
     tree match {
       case Bind(_, pat) =>
         patternArgs(pat);
       case Apply(_, args) =>
-        if ( isSeqApply(tree.asInstanceOf[Apply])  && !delegateSequenceMatching)
-          args(0) match {
-            case ArrayValue(_, ts) => // test array values
-              ts;
-            //case Sequence(ts) =>
-            //  ts;
-            case _ =>
-              args;
-          }
+        if (isSeqApply(tree.asInstanceOf[Apply]))
+          if (delegateSequenceMatching)
+            List(Sequence(seqApplyArgs(args)).setType(tree.tpe))
+          else seqApplyArgs(args)
         else args
-      case Sequence(ts) if (!delegateSequenceMatching) =>
-        ts;
+      case Sequence(ts) =>
+        if (delegateSequenceMatching) List() else ts;
       case ArrayValue(_, ts) => // test array values
-        ts;
+        if (delegateSequenceMatching) List() else ts;
       case _ =>
         List();
     }
+  }
+
+  protected def sequenceArgs(tree: Apply): List[Tree] = {
+    def flattenSequenceArgs(args: List[Tree]): List[Tree] =
+      args flatMap {
+        case Sequence(ts) => flattenSequenceArgs(ts);
+        case tree => List(tree);
+      }
+
+    val args = tree.args;
+    if (args.length == 1)
+      args(0) match {
+        case ArrayValue(_, ts) =>
+          flattenSequenceArgs(ts);
+        case Sequence(ts) =>
+          flattenSequenceArgs(ts);
+        case _ =>
+          flattenSequenceArgs(args);
+      }
+    else flattenSequenceArgs(args);
   }
 
   /** returns true if apply is a "sequence apply". analyzer inserts Sequence nodes if something is a
@@ -162,13 +195,39 @@ trait PatternMatchers: (TransMatcher with PatternNodes) extends AnyRef with Patt
    *     (( tree.args.length == 1 ) && tree.args(0).isInstanceOf[Sequence])
    *     but fails
    */
-  protected def isSeqApply( tree: Apply  ): Boolean =  {
-   // Console.print("isSeqApply? "+tree.toString());
-   // val res =
-	tree match {
-	  case Apply(_, List(ArrayValue(_,_))) => (tree.tpe.symbol.flags & Flags.CASE) == 0
-	  case _ => false;
-	}
+	  protected def isSeqApply( tree: Apply  ): Boolean =  {
+	   // Console.print("isSeqApply? "+tree.toString());
+	   // val res =
+	        def isListSymbol(sym: Symbol): Boolean = {
+	          sym != null &&
+	          sym != NoSymbol &&
+	          (sym == definitions.ListClass ||
+	           sym == definitions.ListClass.linkedModule ||
+	           sym == definitions.ListClass.linkedModule.moduleClass ||
+	           sym.fullNameString == "scala.List")
+	        }
+	        def isListApplyFun(fn: Tree): Boolean = fn match {
+	          case TypeApply(fn1, _) =>
+	            isListApplyFun(fn1)
+	          case Select(qual, name) =>
+	            name == nme.apply &&
+	            (isListSymbol(qual.symbol) ||
+	             (qual.symbol != null && isListSymbol(qual.symbol.sourceModule)))
+	          case _ =>
+	            fn.symbol != null &&
+	            (isListSymbol(fn.symbol.owner) ||
+	             isListSymbol(fn.symbol.owner.sourceModule))
+	        }
+		tree match {
+		  case Apply(_, List(ArrayValue(_, _))) =>
+	            (tree.tpe.symbol.flags & Flags.CASE) == 0
+		  case Apply(_, List(Sequence(_))) =>
+	            (tree.tpe.symbol.flags & Flags.CASE) == 0
+		  case Apply(fn, _) =>
+	            tree.tpe <:< definitions.SeqClass.tpe ||
+	            isListApplyFun(fn)
+		  case _ => false;
+		}
 	//Console.println(res);
 	//res;
   }
@@ -215,21 +274,16 @@ trait PatternMatchers: (TransMatcher with PatternNodes) extends AnyRef with Patt
         //Console.println("delegateSequenceMatching "+delegateSequenceMatching);
         if (isSeqApply(t)) {
           if (!delegateSequenceMatching) {
-            args(0) match {
-            //  case Sequence(ts)=>
-              case ArrayValue(_, ts)=>
-                //Console.println("doing pSeqpat ");
-                val res =  pSequencePat(tree.pos, tree.tpe, ts.length);
-                //Console.println("pSeqpat.casted =  "+res.casted);
-                //Console.println("pSeqpat.casted.pos =  "+res.casted.pos);
-                res
-            }
+            val ts = patternArgs(tree);
+            val res = pSequencePat(tree.pos, tree.tpe, ts.length);
+            res
           } else {
             //Console.println("delegating ... ");
             val res = pConstrPat(tree.pos, tree.tpe);
             res.and = pHeader(tree.pos, header.getTpe(), header.selector);
             //res.and.and = pSeqContainerPat(tree.pos, tree.tpe, args(0));
-            res.and.and = pSeqContainerPat(tree.pos, tree.tpe, Sequence(args(0).asInstanceOf[ArrayValue].elems));
+	            res.and.and = pSeqContainerPat(tree.pos, tree.tpe,
+	                                           Sequence(sequenceArgs(t)).setType(tree.tpe));
             res;
           }
         } else if ((fn.symbol != null) &&
@@ -323,13 +377,26 @@ trait PatternMatchers: (TransMatcher with PatternNodes) extends AnyRef with Patt
         case Literal(Constant(value)) =>
             pConstantPat(tree.pos, tree.tpe, value);
 
-        //case Sequence(ts) =>
-        case ArrayValue(_, ts) =>
-            if ( !delegateSequenceMatching ) {
-                pSequencePat(tree.pos, tree.tpe, ts.length);
-            } else {
-                pSeqContainerPat(tree.pos, tree.tpe, tree);
-            }
+	        case Sequence(ts) =>
+	            val seqTpe =
+	              if (tree.tpe.widen.baseType(definitions.SeqClass) == NoType)
+	                definitions.seqType(definitions.AnyClass.tpe)
+	              else tree.tpe;
+		            if ( !delegateSequenceMatching ) {
+		                pSequencePat(tree.pos, seqTpe, ts.length);
+		            } else {
+		                pSeqContainerPat(tree.pos, seqTpe, Sequence(ts).setType(seqTpe));
+		            }
+	        case ArrayValue(_, ts) =>
+	            val seqTpe =
+	              if (tree.tpe.widen.baseType(definitions.SeqClass) == NoType)
+	                definitions.seqType(definitions.AnyClass.tpe)
+	              else tree.tpe;
+		            if ( !delegateSequenceMatching ) {
+		                pSequencePat(tree.pos, seqTpe, ts.length);
+		            } else {
+		                pSeqContainerPat(tree.pos, seqTpe, Sequence(ts).setType(seqTpe));
+		            }
         case Alternative(ts) =>
           if(ts.length < 2)
             scala.Predef.error("ill-formed Alternative");
@@ -384,6 +451,15 @@ trait PatternMatchers: (TransMatcher with PatternNodes) extends AnyRef with Patt
      // Console.println("newHeader :: casted.tpe="+casted.tpe);
       //Console.println("newHeader :: ");
       val caseAccs = casted.tpe.symbol.caseFieldAccessors;
+      if (caseAccs.length <= index &&
+          (casted.tpe <:< definitions.SeqClass.tpe ||
+           casted.tpe.symbol.fullNameString == "scala.List" ||
+           casted.tpe.symbol.fullNameString == "scala.Seq")) {
+        val t = typed(
+          Apply(Select( ident, ident.tpe.member(nme.apply)),
+                List( Literal( Constant(index) ) )));
+        return pHeader(pos, t.tpe, t)
+      }
       if (caseAccs.length <= index) System.out.println("selecting " + index + " in case fields of " + casted.tpe.symbol + "=" + casted.tpe.symbol.caseFieldAccessors);//debug
       val ts = caseAccs(index);
       //Console.println("newHeader :: ts="+ts);
@@ -749,13 +825,13 @@ trait PatternMatchers: (TransMatcher with PatternNodes) extends AnyRef with Patt
                                ));
     return Block(ts, res);
     */
-    return Block(
-      List(
-        ValDef(root.symbol, selector),
-        toTree(root.and),
-        ThrowMatchError(selector.pos,  resultType)),
-      LabelDef(exit, List(result), Ident(result)))
-  }
+	    return Block(
+	      List(
+	        ValDef(root.symbol, selector),
+	        toTree(root.and),
+	        ThrowMatchError(selector.pos,  resultType)),
+	      LabelDef(exit, List(result), Ident(result)))
+	  }
 
   /*protected*/ def toTree(node1: PatternNode): Tree = {
     def optimize1(selType:Type, alternatives1: PatternNode ): Boolean = {
@@ -937,51 +1013,55 @@ trait PatternMatchers: (TransMatcher with PatternNodes) extends AnyRef with Patt
             return toTree(node.and);
 
           case ConstrPat(casted) =>
-            return If(gen.mkIsInstanceOf(selector.duplicate, node.getTpe()),
-                      Block(
-                        List(ValDef(casted,
-                                    gen.mkAsInstanceOf(selector.duplicate, node.getTpe(), true))),
-                            toTree(node.and)),
-                      toTree(node.or, selector.duplicate));
-          case SequencePat(casted, len) =>
-            return (
-          Or(
-            And(
+            return Or(
               And(gen.mkIsInstanceOf(selector.duplicate, node.getTpe()),
-                     Equals(
-                       typed(
-                         Apply(
-                           Select(
-                             gen.mkAsInstanceOf(selector.duplicate,
-                                                node.getTpe(),
-                                                true),
-                             node.getTpe().member(nme.length) /*defs.Seq_length*/),
-                           List())
-                       ),
-                       typed(
-                         Literal(Constant(len))
-                       ))),
-              Block(
-                List(
-                  ValDef(casted,
-                         gen.mkAsInstanceOf(selector.duplicate, node.getTpe(), true))),
-                  toTree(node.and))),
-            toTree(node.or, selector.duplicate)));
+                  Block(
+                    List(ValDef(casted,
+                                gen.mkAsInstanceOf(selector.duplicate, node.getTpe(), true))),
+                    toTree(node.and))),
+              toTree(node.or, selector.duplicate));
+	      case SequencePat(casted, len) =>
+	            return (
+	          Or(
+	            And(
+	              And(gen.mkIsInstanceOf(selector.duplicate, node.getTpe()),
+	                     Equals(
+	                       typed(
+	                         Apply(
+	                           Select(
+	                             gen.mkAsInstanceOf(selector.duplicate,
+	                                                node.getTpe(),
+	                                                true),
+	                             node.getTpe().member(nme.length) /*defs.Seq_length*/),
+	                           List())
+	                       ),
+	                       typed(
+	                         Literal(Constant(len))
+	                       ))),
+	              Block(
+	                List(
+	                  ValDef(casted,
+	                         gen.mkAsInstanceOf(selector.duplicate, node.getTpe(), true))),
+	                  toTree(node.and))),
+	            toTree(node.or, selector.duplicate)));
           case ConstantPat(value) =>
             //Console.println("selector = "+selector);
             //Console.println("selector.tpe = "+selector.tpe);
-            return If(Equals(selector.duplicate,
-                             typed(Literal(Constant(value))).setType(node.tpe)),
-                      toTree(node.and),
-                      toTree(node.or, selector.duplicate));
+            return Or(
+              And(Equals(selector.duplicate,
+                         typed(Literal(Constant(value))).setType(node.tpe)),
+                  toTree(node.and)),
+              toTree(node.or, selector.duplicate));
           case VariablePat(tree) =>
-            return If(Equals(selector.duplicate, tree),
-                      toTree(node.and),
-                      toTree(node.or, selector.duplicate));
+            return Or(
+              And(Equals(selector.duplicate, tree),
+                  toTree(node.and)),
+              toTree(node.or, selector.duplicate));
           case AltPat(header) =>
-            return If(toTree(header),
-                      toTree(node.and),
-                      toTree(node.or, selector.duplicate));
+            return Or(
+              And(toTree(header),
+                  toTree(node.and)),
+              toTree(node.or, selector.duplicate));
           case _ =>
             scala.Predef.error("can't plant this tree");
         }

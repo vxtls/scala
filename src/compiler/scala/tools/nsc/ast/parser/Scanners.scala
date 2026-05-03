@@ -124,6 +124,7 @@ import scala.tools.nsc.util.CharArrayReader
       }
 
       val lastToken = token
+      val lastName = name
       if (next.token == EMPTY) {
         fetchToken()
       } else {
@@ -153,7 +154,7 @@ import scala.tools.nsc.util.CharArrayReader
         }
       }
 
-      if (afterLineEnd() && inLastOfStat(lastToken) && inFirstOfStat(token) &&
+      if (afterLineEnd() && inLastOfStat(lastToken, lastName) && inFirstOfStat(token) &&
           (sepRegions.isEmpty || sepRegions.head == RBRACE)) {
         next.copyFrom(this)
         pos = in.lineStartPos
@@ -404,11 +405,22 @@ import scala.tools.nsc.util.CharArrayReader
         true
     }
 
-    def inLastOfStat(token: int) = token match {
+    def isOperatorName(name: Name): boolean =
+      name != null && (name.toString().charAt(0) match {
+        case '~' | '!' | '@' | '#' | '%' | '^' | '*' | '+' | '-' |
+             '<' | '>' | '?' | ':' | '=' | '&' | '|' | '\\' =>
+          true
+        case _ =>
+          false
+      })
+
+    def inLastOfStat(token: int, name: Name) = token match {
       case CHARLIT | INTLIT | LONGLIT | FLOATLIT | DOUBLELIT | STRINGLIT | SYMBOLLIT |
-           IDENTIFIER | THIS | NULL | TRUE | FALSE | RETURN | USCORE |
+           THIS | NULL | TRUE | FALSE | RETURN | USCORE |
            RPAREN | RBRACKET | RBRACE =>
         true
+      case IDENTIFIER =>
+        !isOperatorName(name)
       case _ =>
         false
     }

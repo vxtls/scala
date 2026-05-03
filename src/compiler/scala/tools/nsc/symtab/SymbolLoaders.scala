@@ -160,7 +160,7 @@ abstract class SymbolLoaders {
     protected def kindString: String = "directory path"
   }
 
-  private object classfileParser extends ClassfileParser {
+  private def newClassfileParser = new ClassfileParser {
     val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global;
   }
 
@@ -171,7 +171,10 @@ abstract class SymbolLoaders {
 */
 
   class ClassfileLoader(file: AbstractFile) extends SymbolLoader(file) {
-    protected def doComplete(root: Symbol): unit = classfileParser.parse(file, root);
+    protected def doComplete(root: Symbol): unit = {
+      val parser = newClassfileParser;
+      parser.parse(file, root.asInstanceOf[parser.global.Symbol])
+    }
     protected def kindString: String = "class file";
   }
 /*

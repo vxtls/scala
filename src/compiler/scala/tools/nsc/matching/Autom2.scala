@@ -50,23 +50,47 @@ trait Autom2: TransMatcher {
       }
     }
 
-    def callFun(args: List[Tree]): Tree = Apply(Ident(funSym),args);
+    def callFun(args: List[Tree]): Tree = Apply(Ident(funSym).setType(funSym.info),args);
+
+    def zeroValue(tpe: Type): Tree = {
+      val sym = tpe.widen.symbol;
+      if (sym == definitions.UnitClass)
+        Literal(Constant(())).setType(definitions.UnitClass.tpe)
+      else if (sym == definitions.BooleanClass)
+        Literal(Constant(false)).setType(definitions.BooleanClass.tpe)
+      else if (sym == definitions.ByteClass)
+        Literal(Constant(0.toByte)).setType(definitions.ByteClass.tpe)
+      else if (sym == definitions.ShortClass)
+        Literal(Constant(0.toShort)).setType(definitions.ShortClass.tpe)
+      else if (sym == definitions.CharClass)
+        Literal(Constant(0.toChar)).setType(definitions.CharClass.tpe)
+      else if (sym == definitions.IntClass)
+        Literal(Constant(0)).setType(definitions.IntClass.tpe)
+      else if (sym == definitions.LongClass)
+        Literal(Constant(0L)).setType(definitions.LongClass.tpe)
+      else if (sym == definitions.FloatClass)
+        Literal(Constant(0.0f)).setType(definitions.FloatClass.tpe)
+      else if (sym == definitions.DoubleClass)
+        Literal(Constant(0.0d)).setType(definitions.DoubleClass.tpe)
+      else
+        gen.mkAsInstanceOf(Literal(Constant(null)), tpe, true).setType(tpe)
+    }
 
     // overridden in RightTracerInScala
     def loadCurrentElem(body: Tree): Tree = {
       Block(
         List(
           ValDef(this.hasnSym, _hasNext( _iter() ) ),
-          ValDef(this.curSym, If(Ident( hasnSym ),
+          ValDef(this.curSym, If(Ident( hasnSym ).setType(hasnSym.info),
                                  _next( _iter() ),
-                                 EmptyTree))
+                                 zeroValue(elementType)))
         ),
         body
       );
     }
 
     /** bug ?? */
-    def currentElem() = { Ident( curSym ) }
+    def currentElem() = { Ident( curSym ).setType(curSym.info) }
 
     def currentMatches(label: Label): Tree = {
       label match {
@@ -85,13 +109,13 @@ trait Autom2: TransMatcher {
 
 
     /** `[switchResult]' */
-    def _swres(): Tree = { Ident( resultSym );}
+    def _swres(): Tree = { Ident( resultSym ).setType(resultSym.info); }
 
     /** `<state>' param */
-    def _state(): Tree = { Ident( stateSym ); }
+    def _state(): Tree = { Ident( stateSym ).setType(stateSym.info); }
 
     /** `<iterator>' param */
-    def  _iter(): Tree = { Ident( iterSym );  }
+    def  _iter(): Tree = { Ident( iterSym ).setType(iterSym.info); }
 
     /** simple optimization: if we are in a sink state, stop traversing sequence
      */
@@ -115,6 +139,7 @@ trait Autom2: TransMatcher {
         cases = CaseDef( Literal(i), stateWrap(i)) :: cases;
         i = i + 1;
       }
+      cases = CaseDef(Ident(nme.WILDCARD), code_error()) :: cases;
       //if( optimize )
       loadCurrentElem( Match( _state(), cases ));
 
@@ -137,12 +162,16 @@ trait Autom2: TransMatcher {
                                  /* defs.boolean_TYPE() restype */
       };
 
+      val savedResultType = resultType;
+      resultType = definitions.BooleanClass.tpe;
       am.construct( m, List (
         CaseDef(                 pat, Literal(true)),
         CaseDef( Ident(nme.WILDCARD), Literal(false))
       ),
-                   false);
-      am.toTree();
+	                   false);
+      val tree = m.tree;
+      resultType = savedResultType;
+      tree;
     }
 
     // @todo should be abstract
