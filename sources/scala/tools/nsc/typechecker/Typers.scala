@@ -311,6 +311,9 @@ import collection.mutable.HashMap;
       case TypeRef(_, sym, List(arg))
       if ((mode & EXPRmode) != 0 && sym == ByNameParamClass) => // (2)
 	adapt(tree setType arg, mode, pt);
+      case MethodType(List(), restpe) if ((mode & (EXPRmode | FUNmode)) == EXPRmode &&
+                                          !isFunctionType(pt)) => // (2)
+	typed(Apply(tree, List()) setPos tree.pos, mode, pt)
       case PolyType(tparams, restpe) if ((mode & TAPPmode) == 0) => // (3)
 	val tparams1 = cloneSymbols(tparams);
         val tree1 = if (tree.isType) tree
@@ -329,8 +332,8 @@ import collection.mutable.HashMap;
 	typed(applyImplicitArgs(tree1), mode, pt)
       case mt: MethodType if ((mode & (EXPRmode | FUNmode)) == EXPRmode &&
 	                      isCompatible(tree.tpe, pt)) => // (4.2)
-	if (tree.symbol.isConstructor || pt == WildcardType ||
-            !(pt <:< functionType(mt.paramTypes map (t => WildcardType), WildcardType))) {
+	if (tree.symbol.isConstructor || (pt != WildcardType &&
+            !(pt <:< functionType(mt.paramTypes map (t => WildcardType), WildcardType)))) {
           errorTree(tree, "missing arguments for " + tree.symbol) //debug
 	} else {
           if (settings.debug.value) log("eta-expanding " + tree + ":" + tree.tpe + " to " + pt);//debug
@@ -1564,4 +1567,3 @@ import collection.mutable.HashMap;
     }
   }
 }
-

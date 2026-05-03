@@ -1406,6 +1406,15 @@ import Flags._;
 
   /** Do tp1 and tp2 denote equivalent types? */
   def isSameType(tp1: Type, tp2: Type): boolean = {
+    def sameStablePrefix(pre1: Type, pre2: Type): boolean =
+      (pre1 =:= pre2) ||
+      (pre1.isStable && pre2.isStable && (pre1.singleDeref =:= pre2.singleDeref));
+
+    def singletonClass(sym: Symbol): Symbol =
+      if (sym.isModule) sym.moduleClass
+      else if (sym.isStable) sym.tpe.resultType.symbol
+      else NoSymbol;
+
     Pair(tp1, tp2) match {
       case Pair(ErrorType, _) => true
       case Pair(WildcardType, _) => true
@@ -1420,22 +1429,27 @@ import Flags._;
       case Pair(ThisType(sym1), ThisType(sym2)) =>
         sym1 == sym2
       case Pair(SingleType(pre1, sym1), SingleType(pre2, sym2))
-      if ((sym1 == sym2) && (pre1 =:= pre2)) =>
+      if ((sym1 == sym2) &&
+          sameStablePrefix(pre1, pre2)) =>
+        true
+      case Pair(SingleType(_, _), ThisType(sym2))
+      if (sym2.thisSym != sym2 && (tp1 =:= sym2.typeOfThis)) =>
+        true
+      case Pair(ThisType(sym1), SingleType(_, _))
+      if (sym1.thisSym != sym1 && (sym1.typeOfThis =:= tp2)) =>
         true
       case Pair(SingleType(pre1, sym1), ThisType(sym2))
-      if (sym1.isModule &&
-	  sym1.moduleClass == sym2 &&
-	  pre1 =:= sym2.owner.thisType) =>
+      if (singletonClass(sym1) == sym2 &&
+	  sameStablePrefix(pre1, sym2.owner.thisType)) =>
         true
       case Pair(ThisType(sym1), SingleType(pre2, sym2))
-      if (sym2.isModule &&
-	  sym2.moduleClass == sym1 &&
-	  pre2 =:= sym1.owner.thisType) =>
+      if (singletonClass(sym2) == sym1 &&
+	  sameStablePrefix(pre2, sym1.owner.thisType)) =>
         true
       case Pair(ConstantType(value1), ConstantType(value2)) =>
 	value1 == value2
       case Pair(TypeRef(pre1, sym1, args1), TypeRef(pre2, sym2, args2)) =>
-	sym1 == sym2 && (phase.erasedTypes || pre1 =:= pre2) && isSameTypes(args1, args2)
+	sym1 == sym2 && (phase.erasedTypes || sameStablePrefix(pre1, pre2)) && isSameTypes(args1, args2)
       case Pair(RefinedType(parents1, ref1), RefinedType(parents2, ref2)) =>
 	def isSubScope(s1: Scope, s2: Scope): boolean = s2.toList.forall {
 	  sym2 =>
@@ -1559,6 +1573,10 @@ import Flags._;
       case Pair(ThisType(_), _) => tp1.singleDeref <:< tp2
       case Pair(SingleType(_, _), _) => tp1.singleDeref <:< tp2
       case Pair(ConstantType(_), _) => tp1.singleDeref <:< tp2
+
+      case Pair(TypeRef(_, sym1, List()), SingleType(_, _))
+      if (sym1.isModuleClass && (tp1 =:= tp2.singleDeref)) =>
+        true
 
       case Pair(TypeRef(pre1, sym1, args1), _) =>
         (sym1 == AllClass && tp2 <:< AnyClass.tpe

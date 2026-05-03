@@ -17,7 +17,7 @@ import scala.tools.nsc.util.Position;
   /** returns  `List[ Tuple2[ scala.Int, <elemType> ] ]' */
   def SeqTraceType( elemType: Type  ):  Type = {
     appliedType(definitions.ListClass.typeConstructor,
-                List(pairType(definitions.IntClass.info,
+	                List(pairType(definitions.IntClass.tpe,
                               elemType)))
   }
 
@@ -38,13 +38,13 @@ import scala.tools.nsc.util.Position;
    */
   def getElemType_Sequence(tpe: Type):  Type = {
     //System.err.println("getElemType_Sequence("+tpe.widen()+")");
-    val tpe1 = tpe.widen.baseType( definitions.SeqClass );
-
-    if( tpe1 == NoType )
-      Predef.error("arg "+tpe+" not subtype of Seq[ A ]");
-
-    return tpe1.typeArgs( 0 );
-  }
+	    val tpe1 = tpe.widen.baseType( definitions.SeqClass );
+	
+	    if( tpe1 == NoType )
+	      return definitions.AnyClass.tpe;
+	
+	    return tpe1.typeArgs( 0 );
+	  }
 
 
   // --------- these are new
@@ -210,26 +210,18 @@ import scala.tools.nsc.util.Position;
 
   def ThrowMatchError(pos: Int, tpe: Type ) =
     atPos(pos) {
-      Throw(
-        New(
-          TypeTree(definitions.MatchErrorClass.tpe),
-          List(List(
-            Literal(cunit.toString()),
-            Literal(Position.line(cunit.source, pos))))))
-    }
-
-/*
- Apply(
-      TypeApply(
-        gen.mkRef(definitions.MatchError_fail),
-        List(TypeTree(tpe))
-      ),
-      List(
-        Literal(cunit.toString()),
-        Literal(Position.line(cunit.source, pos))
+      Apply(
+        TypeApply(
+          Select(Ident(definitions.MatchErrorModule).setType(definitions.MatchErrorModule.tpe),
+                 definitions.MatchError_fail),
+          List(TypeTree(tpe))
+        ),
+        List(
+          Literal(cunit.toString()),
+          Literal(Position.line(cunit.source, pos))
+        )
       )
-    );
-*/
+    }
 
   /* // ?!
   def ThrowMatchError(pos:int , tree:Tree ) =
@@ -257,4 +249,3 @@ import scala.tools.nsc.util.Position;
     );
   */
 }
-

@@ -13,6 +13,11 @@ package scala.tools.nsc.matching ;
 
       //case class RLabel(Object rstate, Label lab, Symbol vars[]);
 
+      private def methSym(tree: Tree): Symbol = {
+        val meth = treeInfo.methPart(tree);
+        if ((meth == null) || (meth.symbol == null)) NoSymbol else meth.symbol;
+      }
+
       override def hashCode(): Int = this match {
         case DefaultLabel() =>
           return 0;
@@ -21,6 +26,13 @@ package scala.tools.nsc.matching ;
         case TreeLabel(pat) =>
           // if pat is an  Apply, than this case can only be correctly
           // handled there are no other similar Applys (nondeterminism)
+          pat match {
+            case Apply(_, _) =>
+              val sym = methSym(pat);
+              if (sym != NoSymbol) return sym.hashCode();
+            case _ =>
+              ;
+          }
           return pat.tpe.hashCode();
         case TypeLabel(tpe) =>
           return tpe.hashCode();
@@ -55,8 +67,13 @@ package scala.tools.nsc.matching ;
 		 case Apply( _, _ ) =>
 		   pat2 match {
 		     case Apply( _, _ ) =>
-		       return (treeInfo.methPart/*methSymbol?*/( pat )
-                          == treeInfo.methPart/*methSymbol*/( pat2 ));
+                       val sym1 = methSym(pat);
+                       val sym2 = methSym(pat2);
+                       if ((sym1 != NoSymbol) && (sym2 != NoSymbol))
+                         return sym1 == sym2;
+                       if ((pat.tpe != null) && (pat2.tpe != null))
+                         return pat.tpe =:= pat2.tpe;
+		       return (treeInfo.methPart( pat ) == treeInfo.methPart( pat2 ));
 		   }
                  case _ => false;
 	       }
@@ -123,4 +140,3 @@ package scala.tools.nsc.matching ;
   case class LPair(state: Integer, lab: Label) extends Label;
 
 }
-

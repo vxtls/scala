@@ -95,8 +95,7 @@ with RightTracers {
 
       tree match {
         case x @ Ident(name) =>
-          if(x.symbol != definitions.PatternWildcard)
-            error("shouldn't happen?!");
+          ;
 
         case Bind(name, subtree) =>
           var sym: Symbol = null;
@@ -150,15 +149,46 @@ with RightTracers {
 
         case Ident(_)                => pat;
 
-        case Bind( id, empt @ Sequence(List())) =>
-          nilVars = pat.symbol /*id.symbol()*/ :: nilVars;
-		  empt;
-        case Bind( n, pat1 )         => copy.Bind(pat, n, isRegular1( pat1 ));
+	      case Bind( id, empt @ Sequence(List())) =>
+	          nilVars = pat.symbol /*id.symbol()*/ :: nilVars;
+			  empt;
+	        case Bind( n, pat1 )         => copy.Bind(pat, n, isRegular1( pat1 ));
+	
+	      case Apply(fn, List(Sequence(List(b @ Bind(id, Star(wc @ Ident(nme.WILDCARD)))))))
+	      if ((pat.tpe <:< definitions.SeqClass.tpe) ||
+	          pat.tpe.symbol == definitions.ListClass) =>
+		//Console.println("OPTIMIZING");
+		//Console.println(pat);
+		//Console.println(pat.tpe);
+		//Console.println(b.tpe);
+	        b.symbol.setInfo(pat.tpe);
+			b.setType(pat.tpe);
+	        val res = copy.Bind(b, id, wc);
+		//Console.println("====>");
+		//Console.println(res);
+		res
 
-      case Sequence( trees )       =>
-	    //isReg = isReg || ( trees.length == 0 );
-		isReg = true; // cause there are ArrayValues now
-		copy.Sequence(pat, trees map { isRegular1 });
+	      case Apply(fn, List(ArrayValue(tt, List(b @ Bind(id, Star(wc @ Ident(nme.WILDCARD)))))))
+	      if ((pat.tpe <:< definitions.SeqClass.tpe) ||
+	          pat.tpe.symbol == definitions.ListClass) =>
+		//Console.println("OPTIMIZING");
+		//Console.println(pat);
+		//Console.println(pat.tpe);
+		//Console.println(b.tpe);
+	        b.symbol.setInfo(pat.tpe);
+			b.setType(pat.tpe);
+	        val res = copy.Bind(b, id, wc);
+		//Console.println("====>");
+		//Console.println(res);
+		res
+
+	      case Sequence( trees )       =>
+		    //isReg = isReg || ( trees.length == 0 );
+			isReg = true; // cause there are ArrayValues now
+			copy.Sequence(pat, (trees map { isRegular1 }) flatMap {
+			  case Sequence(ts) => ts;
+			  case tree => List(tree);
+			});
 
 	case ArrayValue( tt, List(b @ Bind(id, Star(wc @ Ident(nme.WILDCARD))))) =>
 	//Console.println("OPTIMIZING");
@@ -224,23 +254,18 @@ with RightTracers {
 
       // @todo: remove unused variables
 
-      if(containsReg) {
-        // 2. replace nilVariables
-        //@todo: bring over AlgebraicMatcher
-		/*
-        val matcher = new PartialMatcher {
-          val global: TransMatcher.this.global.type = TransMatcher.this.global;
-          val owner = currentOwner;
-          val selector = sel ;
-        }
-        new AlgebraicMatcher() {
-          val tm: TransMatcher.this.type = TransMatcher.this;
-        }.construct( matcher, cases );
-        matcher.tree
-		*/
-                System.out.println("" + sel + " match " + ocases);
-		scala.Predef.error("regular expressions not yet implemented");
-      } else {
+	      if(containsReg) {
+	        // 2. replace nilVariables
+	        val matcher = new PartialMatcher {
+	          val global: TransMatcher.this.global.type = TransMatcher.this.global;
+	          val owner = currentOwner;
+	          val selector = sel ;
+	        }
+	        new AlgebraicMatcher() {
+	          val tm: TransMatcher.this.type = TransMatcher.this;
+	        }.construct( matcher, cases );
+	        matcher.tree
+	      } else {
         val pm = new PatternMatcher();
         pm.initialize(sel, currentOwner, true );
         pm.construct( cases );
@@ -289,8 +314,8 @@ with RightTracers {
         //Console.println("TransMatcher currentOwner ="+currentOwner+")");
         //Console.println("TransMatcher selector.tpe ="+selector.tpe+")");
         //Console.println("TransMatcher resultType ="+resultType+")");
-        val t_untyped = handle(nselector, ncases.asInstanceOf[List[CaseDef]]);
-        //Console.println("t_untyped "+t_untyped.toString());
+	        val t_untyped = handle(nselector, ncases.asInstanceOf[List[CaseDef]]);
+	        //Console.println("t_untyped "+t_untyped.toString());
         val t         = typed { atPos(tree.pos) (t_untyped) };
         //Console.println("t typed "+t.toString());
         t

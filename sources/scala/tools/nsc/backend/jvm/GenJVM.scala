@@ -74,7 +74,7 @@ abstract class GenJVM extends SubComponent {
     var jmethod: JMethod = _;
     var jcode: JExtendedCode = _;
 
-    val fjbgContext = new FJBGContext();
+    val fjbgContext = new ScalaFJBGContext();
 
     def emitClass(jclass: JClass, sym: Symbol): Unit = {
       def addScalaAttr(sym: Symbol): Unit = currentRun.symData.get(sym) match {
@@ -91,11 +91,16 @@ abstract class GenJVM extends SubComponent {
         case _ =>
           log("Could not find pickle information for " + sym);
       }
-      if (!jclass.getName().endsWith("$"))
-        addScalaAttr(if (isTopLevelModule(sym)) sym.sourceModule else sym);
-      val outfile = getFile(jclass, ".class");
-      jclass.writeTo(outfile);
-      val file = scala.tools.util.AbstractFile.getFile(outfile);
+	      if (!jclass.getName().endsWith("$"))
+	        addScalaAttr(if (isTopLevelModule(sym)) sym.sourceModule else sym);
+	      val outfile = getFile(jclass, ".class");
+	      try {
+	        jclass.writeTo(outfile);
+	      } catch {
+	        case ex: Throwable =>
+	          throw new Error("error writing class " + jclass.getName() + " for " + sym, ex)
+	      }
+	      val file = scala.tools.util.AbstractFile.getFile(outfile);
       informProgress("wrote " + outfile + " " + (if (file != null) "" + file.getFile() + " " + file.getFile().exists() else "no file"));
     }
 

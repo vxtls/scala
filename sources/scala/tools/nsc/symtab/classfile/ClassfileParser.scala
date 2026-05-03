@@ -108,6 +108,12 @@ abstract class ClassfileParser {
             in.skip(2);
           case CONSTANT_FIELDREF | CONSTANT_METHODREF | CONSTANT_INTFMETHODREF | CONSTANT_NAMEANDTYPE | CONSTANT_INTEGER | CONSTANT_FLOAT =>
             in.skip(4);
+          case CONSTANT_METHODHANDLE =>
+            in.skip(3);
+          case CONSTANT_METHODTYPE =>
+            in.skip(2);
+          case CONSTANT_INVOKEDYNAMIC =>
+            in.skip(4);
           case CONSTANT_LONG | CONSTANT_DOUBLE =>
             in.skip(8);
             i = i + 1

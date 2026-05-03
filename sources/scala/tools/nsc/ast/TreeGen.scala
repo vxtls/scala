@@ -144,15 +144,51 @@ abstract class TreeGen {
 
 
   /** Builds a list with given head and tail. */
-  def mkNewCons(head: Tree, tail: Tree):  Tree =
-    New(Apply(mkRef(definitions.ConsClass), List(head,tail)));
+  def mkNewCons(head: Tree, tail: Tree):  Tree = {
+    val elemType =
+      if (tail.tpe != null && tail.tpe.widen.baseType(definitions.ListClass) != NoType)
+        tail.tpe.widen.baseType(definitions.ListClass).typeArgs(0)
+      else treeType(head);
+    New(TypeTree(appliedType(definitions.ConsClass.typeConstructor, List(elemType))),
+        List(List(head,tail)))
+  }
 
   /** Builds a list with given head and tail. */
   def mkNil: Tree =
     mkRef(definitions.NilModule);
 
   /** Builds a pair */
-  def mkNewPair(left: Tree, right: Tree) =
-    New(Apply(mkRef(definitions.TupleClass(2)), List(left,right)));
+  def mkNewPair(left: Tree, right: Tree) = {
+    val pairType = appliedType(definitions.TupleClass(2).typeConstructor,
+                               List(treeType(left), treeType(right)));
+    New(TypeTree(pairType), List(List(left,right)))
+  }
+
+  private def treeType(tree: Tree): Type =
+    if (tree == EmptyTree) definitions.AllClass.tpe
+    else if (tree.tpe != null) tree.tpe
+    else tree match {
+      case Literal(Constant(_: Int)) =>
+        definitions.IntClass.tpe
+      case Literal(Constant(_: Boolean)) =>
+        definitions.BooleanClass.tpe
+      case Literal(Constant(_: Byte)) =>
+        definitions.ByteClass.tpe
+      case Literal(Constant(_: Short)) =>
+        definitions.ShortClass.tpe
+      case Literal(Constant(_: Char)) =>
+        definitions.CharClass.tpe
+      case Literal(Constant(_: Long)) =>
+        definitions.LongClass.tpe
+      case Literal(Constant(_: Float)) =>
+        definitions.FloatClass.tpe
+      case Literal(Constant(_: Double)) =>
+        definitions.DoubleClass.tpe
+      case Apply(TypeApply(Select(_, sym), List(tpt @ TypeTree())), List())
+        if sym == definitions.Any_asInstanceOf || sym == definitions.Any_asInstanceOfErased =>
+        tpt.tpe
+      case _ =>
+        definitions.AnyClass.tpe
+    }
 
 }

@@ -40,6 +40,14 @@ abstract class GenICode extends SubComponent  {
     val SCALA_ALL    = REFERENCE(definitions.AllClass);
     val SCALA_ALLREF = REFERENCE(definitions.AllRefClass);
     val THROWABLE    = REFERENCE(definitions.ThrowableClass);
+    def ClassCastExceptionClass = definitions.getClass("java.lang.ClassCastException");
+
+    def genThrowClassCastException(ctx: Context): Unit = {
+      ctx.bb.emit(NEW(REFERENCE(ClassCastExceptionClass)));
+      ctx.bb.emit(DUP(REFERENCE(ClassCastExceptionClass)));
+      ctx.bb.emit(CALL_METHOD(ClassCastExceptionClass.primaryConstructor, Static(true)));
+      ctx.bb.emit(THROW());
+    }
 
     ///////////////////////////////////////////////////////////
 
@@ -367,8 +375,8 @@ abstract class GenICode extends SubComponent  {
 
         case ValDef(_, _, _, rhs) =>
           val sym = tree.symbol;
-          val local = new Local(sym, toTypeKind(sym.info));
-          ctx.method.addLocal(local);
+          ctx.method.addLocal(new Local(sym, toTypeKind(sym.info)));
+          val Some(local) = ctx.method.lookupLocal(sym);
 
           if (rhs == EmptyTree) {
             if (settings.debug.value)
@@ -383,6 +391,10 @@ abstract class GenICode extends SubComponent  {
           ctx1.bb.emit(STORE_LOCAL(local, false), tree.pos);
           generatedType = UNIT;
           ctx1
+
+        case If(Literal(Constant(cond: Boolean)), thenp, elsep) =>
+          val selected = if (cond) thenp else elsep;
+          genLoad(selected, ctx, expectedType);
 
         case If(cond, thenp, elsep) =>
           var thenCtx = ctx.newBlock;
@@ -506,9 +518,7 @@ abstract class GenICode extends SubComponent  {
           else if (l.isValueType) {
             ctx1.bb.emit(DROP(l), fun.pos);
             if (cast) {
-              ctx1.bb.emit(NEW(REFERENCE(definitions.getClass("ClassCastException"))));
-              ctx1.bb.emit(DUP(ANY_REF_CLASS));
-              ctx1.bb.emit(THROW());
+              genThrowClassCastException(ctx1);
             } else
               ctx1.bb.emit(CONSTANT(Constant(false)))
           }
@@ -951,7 +961,10 @@ abstract class GenICode extends SubComponent  {
     }
 
     def genCast(from: TypeKind, to: TypeKind, ctx: Context, cast: Boolean) = {
-      if (cast)
+      if (cast && to == SCALA_ALL) {
+        ctx.bb.emit(DROP(from));
+        genThrowClassCastException(ctx);
+      } else if (cast)
         ctx.bb.emit(CHECK_CAST(to));
       else
         ctx.bb.emit(IS_INSTANCE(to));
@@ -1163,6 +1176,10 @@ abstract class GenICode extends SubComponent  {
         log("Entering genCond with tree: " + tree);
 
       tree match {
+        case Literal(Constant(value: Boolean)) =>
+          ctx.bb.emit(JUMP(if (value) thenCtx.bb else elseCtx.bb), tree.pos);
+          ctx.bb.close;
+
         case Apply(fun, args)
           if isPrimitive(fun.symbol) =>
             assert(args.length <= 1,
@@ -1669,4 +1686,3 @@ abstract class GenICode extends SubComponent  {
     }
 
 }
-
