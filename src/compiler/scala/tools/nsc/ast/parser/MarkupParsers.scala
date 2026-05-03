@@ -81,7 +81,7 @@ class MarkupParser(unit: CompilationUnit, s: Scanner, p: Parser, presWS: boolean
    *                      | `{` scalablock `}`
   */
   /*[Duplicate]*/ def xAttributes = {
-    var aMap = new mutable.HashMap[String, Tree]();
+    var aMap = new mutable.ListBuffer[Pair[String, Tree]]();
     while (xml.Parsing.isNameStart(ch)) {
       val key = xName;
       xEQ;
@@ -101,9 +101,9 @@ class MarkupParser(unit: CompilationUnit, s: Scanner, p: Parser, presWS: boolean
           Literal(Constant("<syntax-error>"))
       };
       // well-formedness constraint: unique attribute names
-      if( aMap.contains( key ))
+      if( aMap.exists(p => p._1 == key))
         reportSyntaxError( "attribute "+key+" may only be defined once" );
-      aMap.update( key, value );
+      aMap.append(Pair(key, value));
       if(( ch != '/' )&&( ch != '>' ))
         xSpace;
     };
@@ -133,13 +133,13 @@ class MarkupParser(unit: CompilationUnit, s: Scanner, p: Parser, presWS: boolean
    *  [40] STag         ::= '<' Name { S Attribute } [S]
    *  [44] EmptyElemTag ::= '<' Name { S Attribute } [S]
    */
-  /*[Duplicate]*/ def xTag: Pair[String, mutable.Map[String, Tree]] = {
+  /*[Duplicate]*/ def xTag: Pair[String, mutable.Buffer[Pair[String, Tree]]] = {
     val elemName = xName;
     xSpaceOpt;
     val aMap = if (xml.Parsing.isNameStart(ch)) {
       xAttributes;
     } else {
-      new mutable.HashMap[String, Tree]();
+      new mutable.ListBuffer[Pair[String, Tree]]();
     }
     Tuple2( elemName, aMap );
   }

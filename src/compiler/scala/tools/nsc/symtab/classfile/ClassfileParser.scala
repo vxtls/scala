@@ -110,6 +110,12 @@ abstract class ClassfileParser {
             in.skip(2);
           case CONSTANT_FIELDREF | CONSTANT_METHODREF | CONSTANT_INTFMETHODREF | CONSTANT_NAMEANDTYPE | CONSTANT_INTEGER | CONSTANT_FLOAT =>
             in.skip(4);
+          case CONSTANT_METHODHANDLE =>
+            in.skip(3);
+          case CONSTANT_METHODTYPE =>
+            in.skip(2);
+          case CONSTANT_INVOKEDYNAMIC =>
+            in.skip(4);
           case CONSTANT_LONG | CONSTANT_DOUBLE =>
             in.skip(8);
             i = i + 1
@@ -220,7 +226,7 @@ abstract class ClassfileParser {
           definitions.getClass(name.subName(start, end)).tpe
         case '[' =>
           while ('0' <= name(index) && name(index) <= '9') index = index + 1;
-          appliedType(definitions.ArrayClass.tpe, List(sig2type))
+          appliedType(definitions.ArrayClass.typeConstructor, List(sig2type))
         case '(' =>
           JavaMethodType(paramsigs2types, sig2type)
       }

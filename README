@@ -20,13 +20,7 @@ scala/
            development/       Developer documentation.
            examples/          Scala example files.
            man/               UNIX manual files.
-      lib/                    Pre-compiled libraries for the build.
-          fjbg.jar            The Java byte-code generation library.
-          jaco.jar            The JaCo Java compiler.
-          msil.jar            The CLR byte-code generation library.
-          scala-compiler.jar  The last stable version of the Scala compiler.
-          scala-library.jar   The last stable version of the Scala library.
-          scala.dll           The Scala library for Windows.
+      lib/                    No binary bootstrap jars are required here.
       README                  The file you are currently reading.
       sandbox/ †              A folder to test code etc.
       src/                    All the source files of Scala.
@@ -46,7 +40,9 @@ LAYERS:
 
 In order to guarantee the bootstrapping of the Scala compiler, SABBUS builds Scala in layers. Each layer is a complete compiled Scala compiler and library. A superior layer is always compiled by the layer just below it. Here is a short description of the four layers that SABBUS uses, from bottom to top:
 
-'starr': the stable reference Scala release which is shared by all the developers. It is found in the repository as 'lib/scala.compiler.jar' and 'lib/scala-library.jar'. Any committable source code must be compiled directly by starr to guarantee the bootstrapping of the compiler.
+'starr': the local stage5 bootstrap compiler and library. They are read from
+the adjacent way2scala-2.0-stage5-bootstrap workspace, not from binary jars in
+this repository.
 
 'locker': the local reference which is compiled by starr and is the work compiler in a typical development cycle. When it has been built once, it is “frozen” in this state. Updating it to fit the current source code must be explicitly required (see below).
 
@@ -61,9 +57,9 @@ SABBUS compiles, for each layer, the Scala library first and the compiler next. 
 Part III. Requirements for SABBUS
 --------------------------------------------------------------------------------
 
-The Scala build system is based on Apache Ant. Most required pre-compiled libraries are part of the repository (in 'lib/'). The following however is assumed to be installed on the build machine:
-  - A Java runtime environment (JRE) or SDK 1.4 or above (with 1.5 highly
-    recommended for performance reasons).
+The Scala build system is based on Apache Ant and the local stage5 bootstrap
+compiler. The following is assumed to be installed on the build machine:
+  - A Java 8 SDK.
   - Apache Ant version 1.6 or above.
 
 Part IV. Common use-cases
