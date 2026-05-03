@@ -24,8 +24,9 @@ goto loop
 set _JAVACMD=java
 set _PROPS=-Dscala.version=@version@ -Dscala.home=%SCALA_HOME%
 set _MAIN=@tool.class@
-set _TOOLS_CPATH=@fjbg.jar@;@msil.jar@;@comp.path@;@lib.path@
+set _TOOLS_CPATH=@fjbg.jar@;@comp.path@;@lib.path@
 set _LIB_CPATH=@lib.path@
+if exist "%SCALA_HOME%\lib\ant.jar" set _TOOLS_CPATH=%_TOOLS_CPATH%;%SCALA_HOME%\lib\ant.jar
 
 rem echo %_JAVACMD% %_PROPS% -cp %_CPATH% %_MAIN% %_ARGS%
 %_JAVACMD% %_PROPS% -cp %_TOOLS_CPATH% %_MAIN% -bootclasspath %_LIB_CPATH% %_ARGS%

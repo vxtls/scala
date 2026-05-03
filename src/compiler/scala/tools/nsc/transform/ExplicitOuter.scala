@@ -30,6 +30,16 @@ abstract class ExplicitOuter extends InfoTransform {
   private def isStatic(clazz: Symbol) =
     clazz.isPackageClass || outerClass(clazz).isStaticOwner;
 
+  private def outerType(clazz: Symbol): Type = {
+    val lexicalOuter = outerClass(clazz).thisType;
+    if (clazz.thisSym == clazz) lexicalOuter
+    else {
+      val selfBase = clazz.typeOfThis.singleDeref.baseType(clazz);
+      if (selfBase == NoType || selfBase.prefix == NoPrefix) lexicalOuter
+      else selfBase.prefix
+    }
+  }
+
   /** The type transformation method:
    *  1. Add an outer paramter to the formal parameters of a constructor or mixin constructor
    *     in a non-static class;
@@ -48,15 +58,16 @@ abstract class ExplicitOuter extends InfoTransform {
       if (!(clazz hasFlag INTERFACE)) {
 	if (!isStatic(clazz)) {
 	  decls1 = new Scope(decls1.toList);
+	  val outerTp = outerType(clazz);
 	  val outerAcc = clazz.newMethod(clazz.pos, nme.OUTER);
 	  if ((clazz hasFlag TRAIT) || (decls.toList exists (.isClass)))
             outerAcc.expandName(clazz);
 	  decls1 enter (
 	    outerAcc setFlag (PARAMACCESSOR | ACCESSOR | STABLE)
-		     setInfo MethodType(List(), outerClass(clazz).thisType));
+		     setInfo MethodType(List(), outerTp));
 	  decls1 enter (clazz.newValue(clazz.pos, nme.getterToLocal(outerAcc.name))
 	    setFlag (LOCAL | PRIVATE | PARAMACCESSOR | (outerAcc getFlag EXPANDEDNAME))
-	    setInfo outerClass(clazz).thisType);
+	    setInfo outerTp);
 	}
 	if (clazz.isTrait) {
 	  decls1 = new Scope(decls1.toList);
@@ -326,5 +337,4 @@ abstract class ExplicitOuter extends InfoTransform {
       }
   }
 }
-
 

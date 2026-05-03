@@ -23,9 +23,17 @@ class BitSet(initSize: Int) extends scala.collection.BitSet {
 
   [serializable]
   class ByteArray extends AnyRef with ResizableArray[Int] {
+    private var initialized: Int = 0;
 
     final def ensureBits(nbits: Int): Unit = {
+      val newlen = memsize(nbits);
       super[ResizableArray].ensureSize(memsize( nbits ));
+      var i = initialized;
+      while (i < newlen) {
+        array(i) = 0;
+        i = i + 1
+      }
+      initialized = newlen
     }
     final def and(j: Int, mask:Int): Unit = {
       array.update( j, array(j) & mask );

@@ -48,7 +48,7 @@ import Tokens._;
     val in = new Scanner(unit);
 
     /** the markup parser */
-    val xmlp = new MarkupParser(unit, in, Parser.this, true);
+    val xmlp = new MarkupParser(unit, in, Parser.this, false);
 
     object treeBuilder extends TreeBuilder {
       val global: Parsers.this.global.type = Parsers.this.global;
@@ -818,6 +818,11 @@ import Tokens._;
 	  t = errorTermTree
       }
       while (true) {
+	if (in.token == NEWLINE && !isNew && (in.next.token == LPAREN || in.next.token == LBRACE) && (t match {
+	  case Ident(_) | Select(_, _) | TypeApply(_, _) => true
+	  case _ => false
+	}))
+	  in.nextToken();
 	in.token match {
 	  case DOT =>
 	    t = atPos(in.skipToken()) { Select(t, ident()) }

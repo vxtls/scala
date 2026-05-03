@@ -31,6 +31,11 @@ import scala.collection.mutable.ListBuffer;
         !(ObjectClass isSubClass sym.owner) && !(sym hasFlag DEFERRED)))
     }
 
+    def hasCaseNameImplementation: boolean = {
+      val sym = clazz.info.nonPrivateMember(nme.caseName);
+      hasImplementation(nme.caseName) && sym.owner.fullNameString != "scala.CaseClass"
+    }
+
     def syntheticMethod(name: Name, flags: int, tpe: Type) =
       newSyntheticMethod(name, flags | OVERRIDE, tpe);
 
@@ -40,9 +45,11 @@ import scala.collection.mutable.ListBuffer;
       method
     }
 
+    def caseFinalFlag: int = if (clazz.hasFlag(ABSTRACT)) 0 else FINAL;
+
     def caseElementMethod: Tree = {
       val method = syntheticMethod(
-	nme.caseElement, FINAL, MethodType(List(IntClass.tpe), AnyClass.tpe));
+		nme.caseElement, caseFinalFlag, MethodType(List(IntClass.tpe), AnyClass.tpe));
       val caseFields = clazz.caseFieldAccessors map gen.mkRef;
       typed(
 	DefDef(method, vparamss =>
@@ -58,7 +65,7 @@ import scala.collection.mutable.ListBuffer;
     }
 
     def caseArityMethod: Tree = {
-      val method = syntheticMethod(nme.caseArity, FINAL, PolyType(List(), IntClass.tpe));
+      val method = syntheticMethod(nme.caseArity, caseFinalFlag, PolyType(List(), IntClass.tpe));
       typed(DefDef(method, vparamss => Literal(Constant(clazz.caseFieldAccessors.length))))
     }
 
@@ -73,7 +80,7 @@ import scala.collection.mutable.ListBuffer;
     }
 
     def tagMethod: Tree = {
-      val method = syntheticMethod(nme.tag, FINAL, MethodType(List(), IntClass.tpe));
+      val method = syntheticMethod(nme.tag, caseFinalFlag, MethodType(List(), IntClass.tpe));
       typed(DefDef(method, vparamss => Literal(Constant(clazz.tag))))
     }
 
@@ -91,7 +98,8 @@ import scala.collection.mutable.ListBuffer;
       clazz.attributes.exists(p => p match {
         case Pair(SerializableAttr, _) => true;
         case _ => false
-      })
+      }) ||
+      clazz.info.parents.exists(parent => parent.symbol != clazz && isSerializable(parent.symbol))
     }
 
     def readResolveMethod: Tree = {
@@ -117,7 +125,7 @@ import scala.collection.mutable.ListBuffer;
       }
       if (!hasImplementation(nme.caseElement)) ts += caseElementMethod;
       if (!hasImplementation(nme.caseArity)) ts += caseArityMethod;
-      if (!hasImplementation(nme.caseName)) ts += caseNameMethod;
+      if (!hasCaseNameImplementation) ts += caseNameMethod;
     }
     if (!phase.erasedTypes && clazz.isModuleClass && isSerializable(clazz)) {
       // If you serialize a singleton and then deserialize it twice,

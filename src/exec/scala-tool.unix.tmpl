@@ -19,9 +19,13 @@ PREFIX=`dirname "$0"`/..;
 PREFIX=`cd "$PREFIX"; pwd`;
 
 JAVA=java
-JAVA_CLASSPATH=@fjbg.jar@:@msil.jar@:@comp.path@:@lib.path@
+JAVA_CLASSPATH=@fjbg.jar@:@comp.path@:@lib.path@
 TOOL=@tool.class@
 TOOL_CLASSPATH=@lib.path@
+ANT_JAR="$PREFIX/lib/ant.jar"
+if [ -f "$ANT_JAR" ]; then
+    JAVA_CLASSPATH="$JAVA_CLASSPATH:$ANT_JAR"
+fi
 
 # For Cygwin, switch paths to appropriate format before running java
 if $cygwin; then

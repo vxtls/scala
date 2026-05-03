@@ -335,40 +335,42 @@ abstract class RefChecks extends InfoTransform {
 	state
       }
 
-      def validateVariance(tp: Type, variance: int): unit = tp match {
-	case ErrorType => ;
-	case WildcardType => ;
-	case NoType => ;
-	case NoPrefix => ;
-	case ThisType(_) => ;
-	case ConstantType(_) => ;
-	case SingleType(pre, sym) =>
-	  validateVariance(pre, variance)
-	case TypeRef(pre, sym, args) =>
-	  if (sym.variance != NoVariance) {
-	    val v = relativeVariance(sym);
-	    if (v != AnyVariance && sym.variance != v * variance) {
+	      def validateVariance(tp: Type, variance: int): unit =
+                if (tp == ErrorType || tp == WildcardType || tp == NoType || tp == NoPrefix ||
+                    tp.isInstanceOf[ThisType] || tp.isInstanceOf[ConstantType]) {
+                  ()
+                } else if (tp.isInstanceOf[SingleType]) {
+                  validateVariance(tp.asInstanceOf[SingleType].pre, variance)
+                } else if (tp.isInstanceOf[TypeRef]) {
+                  val tref = tp.asInstanceOf[TypeRef];
+                  val pre = tref.pre;
+                  val sym = tref.sym;
+                  val args = tref.args;
+		  if (sym.variance != NoVariance) {
+		    val v = relativeVariance(sym);
+		    if (v != AnyVariance && sym.variance != v * variance) {
 	      //System.out.println("relativeVariance(" + base + "," + sym + ") = " + v);//DEBUG
 	      unit.error(base.pos,
 			 varianceString(sym.variance) + " " + sym +
 			 " occurs in " + varianceString(v * variance) +
 			 " position in type " + all + " of " + base);
 	    }
-	  }
-	  validateVariance(pre, variance);
-	  validateVarianceArgs(args, variance, sym.typeParams);
-	case ClassInfoType(parents, decls, symbol) =>
-	  validateVariances(parents, variance);
-	case RefinedType(parents, decls) =>
-	  validateVariances(parents, variance);
-	case TypeBounds(lo, hi) =>
-	  validateVariance(lo, -variance);
-	  validateVariance(hi, variance);
-	case MethodType(formals, result) =>
-	  validateVariance(result, variance);
-	case PolyType(tparams, result) =>
-	  validateVariance(result, variance);
-      }
+		  }
+		  validateVariance(pre, variance);
+		  validateVarianceArgs(args, variance, sym.typeParams);
+                } else if (tp.isInstanceOf[ClassInfoType]) {
+                  validateVariances(tp.asInstanceOf[ClassInfoType].parents, variance);
+                } else if (tp.isInstanceOf[RefinedType]) {
+                  validateVariances(tp.asInstanceOf[RefinedType].parents, variance);
+                } else if (tp.isInstanceOf[TypeBounds]) {
+                  val bnds = tp.asInstanceOf[TypeBounds];
+		  validateVariance(bnds.lo, -variance);
+		  validateVariance(bnds.hi, variance);
+                } else if (tp.isInstanceOf[MethodType]) {
+		  validateVariance(tp.asInstanceOf[MethodType].resultType, variance);
+                } else if (tp.isInstanceOf[PolyType]) {
+		  validateVariance(tp.asInstanceOf[PolyType].resultType, variance);
+                }
 
       def validateVariances(tps: List[Type], variance: int): unit =
 	tps foreach (tp => validateVariance(tp, variance));
@@ -526,13 +528,16 @@ abstract class RefChecks extends InfoTransform {
 	  validateBaseTypes(currentOwner);
 	  checkAllOverrides(currentOwner);
 
-	case TypeTree() =>
-	  new TypeTraverser {
-	    def traverse(tp: Type) = tp match {
-	      case TypeRef(pre, sym, args) => checkBounds(sym.typeParams, args); this
-	      case _ => this
-	    }
-	  } traverse tree.tpe
+		case TypeTree() =>
+		  new TypeTraverser {
+		    def traverse(tp: Type) = {
+		      if (tp.isInstanceOf[TypeRef]) {
+		        val tref = tp.asInstanceOf[TypeRef];
+		        checkBounds(tref.sym.typeParams, tref.args);
+		      }
+                      this
+		    }
+		  } traverse tree.tpe
 
 	case TypeApply(fn, args) =>
 	  checkBounds(fn.tpe.typeParams, args map (.tpe));
