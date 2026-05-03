@@ -59,7 +59,8 @@ object ScalaRunTime {
   }
 
   def _toString(x: CaseClass): String = {
-    caseFields(x).mkString(x.caseName + "(", ",", ")")
+    if (x.caseArity == 0) x.caseName
+    else caseFields(x).mkString(x.caseName + "(", ",", ")")
   }
 
   def _hashCode(x: CaseClass): Int = {

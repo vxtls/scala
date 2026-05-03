@@ -39,4 +39,7 @@ object ClassfileConstants {
   final val CONSTANT_METHODREF = 10;
   final val CONSTANT_INTFMETHODREF = 11;
   final val CONSTANT_NAMEANDTYPE = 12;
+  final val CONSTANT_METHODHANDLE = 15;
+  final val CONSTANT_METHODTYPE = 16;
+  final val CONSTANT_INVOKEDYNAMIC = 18;
 }

@@ -203,7 +203,7 @@ public class Debug {
 
     /**
      * Returns the class name of the object. Does some pretty printing
-     * for parameterless pico case classes.
+     * for parameterless case classes compiled with the legacy frontend.
      */
     public static String getClassNameOf(Object object) {
         if (object == null) return "null";

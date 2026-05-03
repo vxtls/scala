@@ -230,12 +230,16 @@ import collection.mutable.HashMap;
     def attrInfo(attr: Tree): AttrInfo = attr match {
       case Apply(Select(New(tpt), nme.CONSTRUCTOR), args) =>
         Pair(tpt.tpe, args map {
-          case Literal(value) =>
-            value
-          case arg =>
-            error(arg.pos, "attribute argument needs to be a constant; found: " + arg);
-            null
-        })
+	      case Literal(value) =>
+	        value
+	      case arg =>
+                if (arg.tpe.isInstanceOf[ConstantType]) {
+                  arg.tpe.asInstanceOf[ConstantType].value
+                } else {
+	          error(arg.pos, "attribute argument needs to be a constant; found: " + arg);
+	          null
+                }
+	    })
     }
 
     /** Post-process an identifier or selection node, performing the following:
@@ -300,7 +304,12 @@ import collection.mutable.HashMap;
      *  If all this fails, error
      */
 //    def adapt(tree: Tree, mode: int, pt: Type): Tree = {
-    protected def adapt(tree: Tree, mode: int, pt: Type): Tree = tree.tpe match {
+    protected def adapt(tree: Tree, mode: int, pt: Type): Tree =
+      if ((mode & EXPRmode) != 0 && tree.tpe.isInstanceOf[TypeRef] &&
+          tree.tpe.asInstanceOf[TypeRef].sym == ByNameParamClass &&
+          tree.tpe.asInstanceOf[TypeRef].args.length == 1) {
+        adapt(tree setType tree.tpe.asInstanceOf[TypeRef].args.head, mode, pt)
+      } else tree.tpe match {
       case ct @ ConstantType(value) if ((mode & TYPEmode) == 0 && (ct <:< pt)) => // (0)
 	copy.Literal(tree, value)
       case OverloadedType(pre, alts) if ((mode & FUNmode) == 0) => // (1)
@@ -308,9 +317,9 @@ import collection.mutable.HashMap;
 	adapt(tree, mode, pt)
       case PolyType(List(), restpe) => // (2)
 	adapt(tree setType restpe, mode, pt);
-      case TypeRef(_, sym, List(arg))
-      if ((mode & EXPRmode) != 0 && sym == ByNameParamClass) => // (2)
-	adapt(tree setType arg, mode, pt);
+      case MethodType(List(), restpe) if ((mode & (EXPRmode | FUNmode)) == EXPRmode &&
+                                          !isFunctionType(pt)) => // (2)
+	typed(Apply(tree, List()) setPos tree.pos, mode, pt)
       case PolyType(tparams, restpe) if ((mode & TAPPmode) == 0) => // (3)
 	val tparams1 = cloneSymbols(tparams);
         val tree1 = if (tree.isType) tree
@@ -329,8 +338,8 @@ import collection.mutable.HashMap;
 	typed(applyImplicitArgs(tree1), mode, pt)
       case mt: MethodType if ((mode & (EXPRmode | FUNmode)) == EXPRmode &&
 	                      isCompatible(tree.tpe, pt)) => // (4.2)
-	if (tree.symbol.isConstructor || pt == WildcardType ||
-            !(pt <:< functionType(mt.paramTypes map (t => WildcardType), WildcardType))) {
+	if (tree.symbol.isConstructor || (pt != WildcardType &&
+            !(pt <:< functionType(mt.paramTypes map (t => WildcardType), WildcardType)))) {
           errorTree(tree, "missing arguments for " + tree.symbol) //debug
 	} else {
           if (settings.debug.value) log("eta-expanding " + tree + ":" + tree.tpe + " to " + pt);//debug
@@ -1564,4 +1573,3 @@ import collection.mutable.HashMap;
     }
   }
 }
-

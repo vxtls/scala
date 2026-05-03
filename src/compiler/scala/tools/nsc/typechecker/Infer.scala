@@ -23,8 +23,12 @@ package scala.tools.nsc.typechecker;
    *  (nargs - params.length + 1) copies of its type is returned. */
   def formalTypes(formals: List[Type], nargs: int): List[Type] = {
     val formals1 = formals map {
-      case TypeRef(_, sym, List(arg)) if (sym == ByNameParamClass) => arg
-      case formal => formal
+      formal =>
+        if (formal.isInstanceOf[TypeRef]) {
+          val tref = formal.asInstanceOf[TypeRef];
+          if (tref.sym == ByNameParamClass && tref.args.length == 1) tref.args.head
+          else formal
+        } else formal
     }
     if (!formals1.isEmpty && (formals1.last.symbol == RepeatedParamClass)) {
       val ft = formals1.last.typeArgs.head;

@@ -68,7 +68,6 @@ import Flags._;
       def List_head = getMember(ListClass, "head");
       def List_tail = getMember(ListClass, "tail");
     var ArrayClass: Symbol = _;
-    var TypeClass: Symbol = _;
     var SerializableClass: Symbol = _;
     var PredefModule: Symbol = _;
     var ConsoleModule: Symbol = _;
@@ -150,8 +149,8 @@ import Flags._;
     var String_+           : Symbol = _;
 
     // members of class scala.Iterator
-    var Iterator_next      : Symbol = _;
-    var Iterator_hasNext   : Symbol = _;
+      def Iterator_next = getMember(IteratorClass, nme.next);
+      def Iterator_hasNext = getMember(IteratorClass, nme.hasNext);
 
     // pattern wildcard
     var PatternWildcard: Symbol = _;
@@ -188,13 +187,13 @@ import Flags._;
       var i = 0;
       var j = fullname.pos('.', i);
       while (j < fullname.length) {
-        sym = sym.info.nonPrivateMember(fullname.subName(i, j));
+        sym = sym.info.member(fullname.subName(i, j));
         i = j + 1;
         j = fullname.pos('.', i)
       }
       val result =
         if (module) sym.info.nonPrivateMember(fullname.subName(i, j)).suchThat(.hasFlag(MODULE));
-        else sym.info.nonPrivateMember(fullname.subName(i, j).toTypeName);
+        else sym.info.member(fullname.subName(i, j).toTypeName);
       if (result == NoSymbol)
 	throw new FatalError((if (module) "object " else "class ") + fullname + " not found.");
       result
@@ -340,7 +339,6 @@ import Flags._;
       SeqClass = getClass("scala.Seq");
       ListClass = getClass("scala.List");
       ArrayClass = getClass("scala.Array");
-      TypeClass = getClass("scala.Type");
       SerializableClass = getClass("java.io.Serializable");
       PredefModule = getModule("scala.Predef");
       ConsoleModule = getModule("scala.Console");
