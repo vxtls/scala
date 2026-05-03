@@ -13,7 +13,25 @@ package scala.runtime.compat;
 
 object Platform {
   def arraycopy(src: AnyRef, srcPos: Int, dest: AnyRef, destPos: Int, length: Int): Unit =
-    Array.copy(src, srcPos, dest, destPos, length)
+    if (src.isInstanceOf[scala.runtime.BoxedArray] &&
+        dest.isInstanceOf[scala.runtime.BoxedArray]) {
+      val srcarr = src.asInstanceOf[scala.runtime.BoxedArray];
+      val destarr = dest.asInstanceOf[scala.runtime.BoxedArray];
+      if ((src eq dest) && (srcPos < destPos)) {
+        var i = length - 1;
+        while (i >= 0) {
+          destarr(destPos + i) = srcarr(srcPos + i);
+          i = i - 1
+        }
+      } else {
+        var i = 0;
+        while (i < length) {
+          destarr(destPos + i) = srcarr(srcPos + i);
+          i = i + 1
+        }
+      }
+    } else
+      System.arraycopy(src, srcPos, dest, destPos, length);
   def getClass(obj: AnyRef) = obj.getClass();
   def getClassName(obj: AnyRef) = obj.getClass().getName();
   def printStackTrace(exc: java.lang.Throwable) = exc.printStackTrace();

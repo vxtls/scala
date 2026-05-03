@@ -71,7 +71,7 @@ package scala.tools.ant {
     abstract class PermissibleValue {
       val values: List[String]
       def isPermissible(value: String): Boolean =
-        (value == "") || values.exists(.startsWith(value))
+        (value == "") || values.exists(v: String => v startsWith value)
     }
 
     /** Defines valid values for the logging property. */

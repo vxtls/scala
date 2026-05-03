@@ -40,6 +40,14 @@ abstract class GenICode extends SubComponent  {
     val SCALA_ALL    = REFERENCE(definitions.AllClass);
     val SCALA_ALLREF = REFERENCE(definitions.AllRefClass);
     val THROWABLE    = REFERENCE(definitions.ThrowableClass);
+    def ClassCastExceptionClass = definitions.getClass("java.lang.ClassCastException");
+
+    def genThrowClassCastException(ctx: Context): Unit = {
+      ctx.bb.emit(NEW(REFERENCE(ClassCastExceptionClass)));
+      ctx.bb.emit(DUP(REFERENCE(ClassCastExceptionClass)));
+      ctx.bb.emit(CALL_METHOD(ClassCastExceptionClass.primaryConstructor, Static(true)));
+      ctx.bb.emit(THROW());
+    }
 
     ///////////////////////////////////////////////////////////
 
@@ -360,8 +368,8 @@ abstract class GenICode extends SubComponent  {
 
         case ValDef(_, _, _, rhs) =>
           val sym = tree.symbol;
-          val local = new Local(sym, toTypeKind(sym.info));
-          ctx.method.addLocal(local);
+          ctx.method.addLocal(new Local(sym, toTypeKind(sym.info)));
+          val Some(local) = ctx.method.lookupLocal(sym);
 
           if (rhs == EmptyTree) {
             if (settings.debug.value)
@@ -376,6 +384,10 @@ abstract class GenICode extends SubComponent  {
           ctx1.bb.emit(STORE_LOCAL(local, false), tree.pos);
           generatedType = UNIT;
           ctx1
+
+        case If(Literal(Constant(cond: Boolean)), thenp, elsep) =>
+          val selected = if (cond) thenp else elsep;
+          genLoad(selected, ctx, expectedType);
 
         case If(cond, thenp, elsep) =>
           var thenCtx = ctx.newBlock;
@@ -492,16 +504,16 @@ abstract class GenICode extends SubComponent  {
           val l = toTypeKind(obj.tpe);
           val r = toTypeKind(targs.head.tpe);
 
-          ctx1 = genLoadQualifier(fun, ctx);
+          ctx1 =
+            if (l.isValueType) genLoad(obj, ctx, l)
+            else genLoadQualifier(fun, ctx);
 
           if (l.isValueType && r.isValueType)
             genConversion(l, r, ctx1, cast)
           else if (l.isValueType) {
             ctx1.bb.emit(DROP(l), fun.pos);
             if (cast) {
-              ctx1.bb.emit(NEW(REFERENCE(definitions.getClass("ClassCastException"))));
-              ctx1.bb.emit(DUP(ANY_REF_CLASS));
-              ctx1.bb.emit(THROW());
+              genThrowClassCastException(ctx1);
             } else
               ctx1.bb.emit(CONSTANT(Constant(false)))
           }
@@ -526,13 +538,13 @@ abstract class GenICode extends SubComponent  {
 //            if (fun.symbol.isConstructor) Static(true) else SuperCall(mix);
 
           ctx.bb.emit(THIS(ctx.clazz.symbol), tree.pos);
-          val ctx1 = genLoadArguments(args, fun.symbol.info.paramTypes, ctx);
+          val ctx1 = genLoadArguments(args, fun.symbol.tpe.paramTypes, ctx);
 
           ctx1.bb.emit(CALL_METHOD(fun.symbol, invokeStyle), tree.pos);
           generatedType = if (fun.symbol.isConstructor)
                             UNIT
                           else
-                            toTypeKind(fun.symbol.info.resultType);
+                            toTypeKind(fun.symbol.tpe.resultType);
           ctx1
 
         // 'new' constructor call: Note: since constructors are
@@ -552,7 +564,7 @@ abstract class GenICode extends SubComponent  {
 
           generatedType match {
             case ARRAY(elem) =>
-              ctx1 = genLoadArguments(args, ctor.info.paramTypes, ctx);
+              ctx1 = genLoadArguments(args, ctor.tpe.paramTypes, ctx);
               ctx1.bb.emit(CREATE_ARRAY(elem), tree.pos);
 
             case REFERENCE(cls) =>
@@ -560,7 +572,7 @@ abstract class GenICode extends SubComponent  {
                      "Symbol " + ctor.owner.fullNameString + "is different than " + tpt);
               ctx1.bb.emit(NEW(generatedType), tree.pos);
               ctx1.bb.emit(DUP(generatedType));
-              ctx1 = genLoadArguments(args, ctor.info.paramTypes, ctx);
+              ctx1 = genLoadArguments(args, ctor.tpe.paramTypes, ctx);
 
               ctx1.bb.emit(CALL_METHOD(ctor, Static(true)), tree.pos);
 
@@ -677,10 +689,10 @@ abstract class GenICode extends SubComponent  {
                        else
                          ctx;
 
-            ctx1 = genLoadArguments(args, fun.symbol.info.paramTypes, ctx1);
+            ctx1 = genLoadArguments(args, sym.tpe.paramTypes, ctx1);
 
             ctx1.bb.emit(CALL_METHOD(sym, invokeStyle), tree.pos);
-            generatedType = if (sym.isClassConstructor) UNIT else toTypeKind(sym.info.resultType);
+            generatedType = if (sym.isClassConstructor) UNIT else toTypeKind(sym.tpe.resultType);
             ctx1
           }
 
@@ -837,11 +849,22 @@ abstract class GenICode extends SubComponent  {
             if (settings.debug.value)
               log("Dropped an " + from);
 
-          case _ =>
-            assert(from != UNIT, "Can't convert from UNIT to " + to +
-                 tree + " at: " + unit.position(tree.pos));
-            ctx.bb.emit(CALL_PRIMITIVE(Conversion(from, to)), tree.pos);
-        }
+	      case _ =>
+	        if (from.isValueType && to.isReferenceType) {
+	          if (from == UNIT) {
+	            ctx.bb.emit(LOAD_FIELD(definitions.BoxedUnit_UNIT, true), tree.pos);
+	          } else {
+                    val boxedModule = definitions.boxedClass(from.toType.symbol).linkedModule;
+	            ctx.bb.emit(CALL_METHOD(
+	              definitions.getMember(boxedModule, "box"),
+	              Static(false)), tree.pos);
+	          }
+	        } else {
+	          assert(from != UNIT, "Can't convert from UNIT to " + to +
+	               tree + " at: " + unit.position(tree.pos));
+	          ctx.bb.emit(CALL_PRIMITIVE(Conversion(from, to)), tree.pos);
+	        }
+	    }
       } else if (from == SCALA_ALL) {
         ctx.bb.emit(DROP(from));
         ctx.bb.emit(getZeroOf(ctx.method.returnType));
@@ -945,7 +968,10 @@ abstract class GenICode extends SubComponent  {
     }
 
     def genCast(from: TypeKind, to: TypeKind, ctx: Context, cast: Boolean) = {
-      if (cast)
+      if (cast && to == SCALA_ALL) {
+        ctx.bb.emit(DROP(from));
+        genThrowClassCastException(ctx);
+      } else if (cast)
         ctx.bb.emit(CHECK_CAST(to));
       else
         ctx.bb.emit(IS_INSTANCE(to));
@@ -1157,6 +1183,10 @@ abstract class GenICode extends SubComponent  {
         log("Entering genCond with tree: " + tree);
 
       tree match {
+        case Literal(Constant(value: Boolean)) =>
+          ctx.bb.emit(JUMP(if (value) thenCtx.bb else elseCtx.bb), tree.pos);
+          ctx.bb.close;
+
         case Apply(fun, args)
           if isPrimitive(fun.symbol) =>
             assert(args.length <= 1,
@@ -1667,4 +1697,3 @@ abstract class GenICode extends SubComponent  {
     }
 
 }
-

@@ -129,7 +129,7 @@ abstract class UnCurry extends InfoTransform {
       val formals = fun.tpe.typeArgs.init;
       val restpe = fun.tpe.typeArgs.last;
       anonClass setInfo ClassInfoType(
-	List(ObjectClass.tpe, fun.tpe, ScalaObjectClass.tpe), new Scope(), anonClass);
+	List(ObjectClass.tpe, fun.tpe, ScalaObjectClass.tpe, SerializableClass.tpe), new Scope(), anonClass);
       val applyMethod = anonClass.newMethod(fun.pos, nme.apply)
 	.setFlag(FINAL).setInfo(MethodType(formals, restpe));
       anonClass.info.decls enter applyMethod;

@@ -306,7 +306,11 @@ trait Namers requires Analyzer {
       override def complete(sym: Symbol): unit = {
         if (settings.debug.value) log("defining " + sym);
         val tp = typeSig(tree);
-        sym.setInfo(tp);
+        if (sym.isModuleClass && tree.symbol.isModule && (tp match {
+          case TypeRef(_, tsym, _) => tsym == sym
+          case _ => false
+        })) tree.symbol.setInfo(tp)
+        else sym.setInfo(tp);
         if (settings.Xgadt.value) System.out.println("" + sym + ":" + tp);
         if (settings.debug.value) log("defined " + sym);
         validate(sym);
@@ -613,4 +617,3 @@ trait Namers requires Analyzer {
 
   abstract class TypeCompleter(val tree: Tree) extends LazyType;
 }
-
