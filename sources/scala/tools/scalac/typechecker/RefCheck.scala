@@ -655,8 +655,8 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
   }
 
 
-  private def caseFields(clazz: ClassSymbol): Array[Tree] = {
-    var ct = clazz.primaryConstructor().getType();
+  private def caseFields(clazz: ClassSymbol, caseClazz: ClassSymbol): Array[Tree] = {
+    var ct = caseClazz.primaryConstructor().getType();
     ct match {
       case Type$PolyType(tparams, restp) =>
 	ct = infer.skipViewParams(tparams, restp);
@@ -665,11 +665,14 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
     val vparams: Array[Symbol] = ct.firstParams();
     val fields: Array[Tree] = new Array[Tree](vparams.length);
     var i = 0; while (i < fields.length) {
-      fields(i) = gen.mkRef(clazz.pos, clazz.thisType(), clazz.caseFieldAccessor(i));
+      fields(i) = gen.Select(gen.This(clazz.pos, clazz), caseClazz.caseFieldAccessor(i));
       i = i + 1
     }
     fields
   }
+
+  private def caseFields(clazz: ClassSymbol): Array[Tree] =
+    caseFields(clazz, clazz);
 
   private def toStringMethod(clazz: ClassSymbol): Tree = {
     val toStringSym = clazz.newMethod(
@@ -720,6 +723,30 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
     gen.DefDef(method, body)
   }
 
+  private def caseElementMethod(clazz: ClassSymbol, caseClazz: ClassSymbol): Tree = {
+    val method =
+      clazz.newMethod(clazz.pos, FINAL | OVERRIDE, Names.caseElement);
+    val seParam =
+      method.newVParam(clazz.pos, 0, Names.n, defs.int_TYPE());
+    method.setInfo(
+      Type.MethodType(NewArray.Symbol(seParam), defs.ANY_TYPE()));
+    clazz.info().members().enter(method);
+    val fields: Array[Tree] = caseFields(clazz, caseClazz);
+    var body: Tree = null;
+    if (fields.length > 0) {
+      val tags: Array[int] = new Array[int](fields.length);
+      var i = 0; while (i < fields.length) { tags(i) = i; i = i + 1 }
+      body = gen.Switch(
+        gen.mkLocalRef(clazz.pos, seParam),
+        tags,
+        fields,
+        gen.mkNullLit(clazz.pos),
+        defs.ANY_TYPE());
+    } else
+      body = gen.mkNullLit(clazz.pos);
+    gen.DefDef(method, body)
+  }
+
   private def caseArityMethod(clazz: ClassSymbol): Tree = {
     val method =
       clazz.newMethod(clazz.pos, FINAL | OVERRIDE, Names.caseArity);
@@ -728,6 +755,27 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
     clazz.info().members().enter(method);
     val fields: Array[Tree] = caseFields(clazz);
     gen.DefDef(method, gen.mkIntLit(clazz.pos, fields.length))
+  }
+
+  private def caseArityMethod(clazz: ClassSymbol, caseClazz: ClassSymbol): Tree = {
+    val method =
+      clazz.newMethod(clazz.pos, FINAL | OVERRIDE, Names.caseArity);
+    method.setInfo(
+      Type.PolyType(Symbol.EMPTY_ARRAY, defs.int_TYPE()));
+    clazz.info().members().enter(method);
+    val fields: Array[Tree] = caseFields(clazz, caseClazz);
+    gen.DefDef(method, gen.mkIntLit(clazz.pos, fields.length))
+  }
+
+  private def tagMethod(clazz: ClassSymbol, caseClazz: ClassSymbol): Tree = {
+    val flags =
+      if (clazz.isSubClass(defs.SCALAOBJECT_CLASS)) OVERRIDE else 0;
+    val method =
+      clazz.newMethod(clazz.pos, flags, Names.tag);
+    method.setInfo(
+      Type.MethodType(Symbol.EMPTY_ARRAY, defs.int_TYPE()));
+    clazz.info().members().enter(method);
+    gen.DefDef(method, gen.mkIntLit(clazz.pos, caseClazz.tag()))
   }
 
   private def readResolveMethod(clazz: ClassSymbol): Tree = {
@@ -873,6 +921,17 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
     false
   }
 
+  private def abstractCaseParent(clazz: Symbol): ClassSymbol = {
+    val cl = clazz.closure();
+    var i = 1; while (i < cl.length) {
+      val sym = cl(i).symbol();
+      if (sym.isCaseClass() && sym.isAbstractClass() && !sym.isJava())
+        return sym.asInstanceOf[ClassSymbol];
+      i = i + 1
+    }
+    null
+  }
+
   private def addSyntheticMethods(templ: Template, clazz: ClassSymbol): Template = {
     val ts = new TreeList();
     if (clazz.isCaseClass()) {
@@ -893,7 +952,15 @@ class RefCheck(globl: scalac.Global) extends Transformer(globl) {
       ts.append(gen.mkTagMethod(clazz));
       ts.append(getTypeMethod(clazz));
     } else if ((clazz.flags & ABSTRACT) == 0) {
-      if (!isTrueSubClassOfCaseClass(clazz)) {
+      val caseParent = abstractCaseParent(clazz);
+      if (caseParent != null) {
+        if (!hasImplementation(clazz, Names.caseElement))
+          ts.append(caseElementMethod(clazz, caseParent));
+        if (!hasImplementation(clazz, Names.caseArity))
+          ts.append(caseArityMethod(clazz, caseParent));
+        if (!hasImplementation(clazz, Names.tag))
+          ts.append(tagMethod(clazz, caseParent));
+      } else if (!isTrueSubClassOfCaseClass(clazz)) {
         ts.append(gen.mkTagMethod(clazz));
       }
       ts.append(getTypeMethod(clazz));
