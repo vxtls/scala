@@ -140,6 +140,7 @@ mixin class Scanners requires SyntaxAnalyzer {
       }
 
       val lastToken = token
+      val lastName = name
       if (next.token == EMPTY) {
         fetchToken()
       } else {
@@ -169,7 +170,7 @@ mixin class Scanners requires SyntaxAnalyzer {
         }
       }
 
-      if (afterLineEnd() && inLastOfStat(lastToken) && inFirstOfStat(token) &&
+      if (afterLineEnd() && inLastOfStat(lastToken, lastName) && inFirstOfStat(token) &&
           (sepRegions.isEmpty || sepRegions.head == RBRACE)) {
         next.copyFrom(this)
         pos = in.lineStartPos
@@ -422,11 +423,22 @@ mixin class Scanners requires SyntaxAnalyzer {
         true
     }
 
-    def inLastOfStat(token: int) = token match {
+    def isOperatorName(name: Name): boolean =
+      name != null && (name.toString().charAt(0) match {
+        case '~' | '!' | '@' | '#' | '%' | '^' | '*' | '+' | '-' |
+             '<' | '>' | '?' | ':' | '=' | '&' | '|' | '\\' =>
+          true
+        case _ =>
+          false
+      })
+
+    def inLastOfStat(token: int, name: Name) = token match {
       case CHARLIT | INTLIT | LONGLIT | FLOATLIT | DOUBLELIT | STRINGLIT | SYMBOLLIT |
-           IDENTIFIER | THIS | NULL | TRUE | FALSE | RETURN | USCORE |
+           THIS | NULL | TRUE | FALSE | RETURN | USCORE |
            RPAREN | RBRACKET | RBRACE =>
         true
+      case IDENTIFIER =>
+        !isOperatorName(name)
       case _ =>
         false
     }

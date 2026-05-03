@@ -18,12 +18,16 @@ abstract class TreeGen {
 
   /** Builds a reference to value whose type is given stable prefix.
    */
-  def mkQualifier(tpe: Type): Tree = tpe match {
-    case NoPrefix =>
+  def mkQualifier(tpe: Type): Tree =
+    if (tpe == NoPrefix) {
       EmptyTree
-    case ThisType(clazz) =>
+    } else if (tpe.isInstanceOf[ThisType]) {
+      val clazz = tpe.asInstanceOf[ThisType].sym;
       if (clazz.isRoot || clazz.isEmptyPackageClass) EmptyTree else This(clazz)
-    case SingleType(pre, sym) =>
+    } else if (tpe.isInstanceOf[SingleType]) {
+      val stpe = tpe.asInstanceOf[SingleType];
+      val pre = stpe.pre;
+      val sym = stpe.sym;
       if (sym.isThisSkolem) {
         mkQualifier(ThisType(sym.deSkolemize))
       } else {
@@ -35,7 +39,9 @@ abstract class TreeGen {
             qual
         }
       }
-    case TypeRef(pre, sym, args) =>
+    } else if (tpe.isInstanceOf[TypeRef]) {
+      val tref = tpe.asInstanceOf[TypeRef];
+      val sym = tref.sym;
       assert(phase.erasedTypes);
       if (sym.isModuleClass && !sym.isRoot) {
         val qual = Select(mkQualifier(sym.owner.tpe), sym.sourceModule);
@@ -46,7 +52,9 @@ abstract class TreeGen {
             qual
         }
       } else This(sym)
-  }
+    } else {
+      throw new Error("unexpected qualifier type: " + tpe)
+    }
 
   /** Builds a reference to given symbol with given stable prefix. */
   def mkRef(pre: Type, sym: Symbol): Tree  = {
@@ -144,15 +152,51 @@ abstract class TreeGen {
 
 
   /** Builds a list with given head and tail. */
-  def mkNewCons(head: Tree, tail: Tree):  Tree =
-    New(Apply(mkRef(definitions.ConsClass), List(head,tail)));
+  def mkNewCons(head: Tree, tail: Tree):  Tree = {
+    val elemType =
+      if (tail.tpe != null && tail.tpe.widen.baseType(definitions.ListClass) != NoType)
+        tail.tpe.widen.baseType(definitions.ListClass).typeArgs(0)
+      else treeType(head);
+    New(TypeTree(appliedType(definitions.ConsClass.typeConstructor, List(elemType))),
+        List(List(head,tail)))
+  }
 
   /** Builds a list with given head and tail. */
   def mkNil: Tree =
     mkRef(definitions.NilModule);
 
   /** Builds a pair */
-  def mkNewPair(left: Tree, right: Tree) =
-    New(Apply(mkRef(definitions.TupleClass(2)), List(left,right)));
+  def mkNewPair(left: Tree, right: Tree) = {
+    val pairType = appliedType(definitions.TupleClass(2).typeConstructor,
+                               List(treeType(left), treeType(right)));
+    New(TypeTree(pairType), List(List(left,right)))
+  }
+
+  private def treeType(tree: Tree): Type =
+    if (tree == EmptyTree) definitions.AllClass.tpe
+    else if (tree.tpe != null) tree.tpe
+    else tree match {
+      case Literal(Constant(_: Int)) =>
+        definitions.IntClass.tpe
+      case Literal(Constant(_: Boolean)) =>
+        definitions.BooleanClass.tpe
+      case Literal(Constant(_: Byte)) =>
+        definitions.ByteClass.tpe
+      case Literal(Constant(_: Short)) =>
+        definitions.ShortClass.tpe
+      case Literal(Constant(_: Char)) =>
+        definitions.CharClass.tpe
+      case Literal(Constant(_: Long)) =>
+        definitions.LongClass.tpe
+      case Literal(Constant(_: Float)) =>
+        definitions.FloatClass.tpe
+      case Literal(Constant(_: Double)) =>
+        definitions.DoubleClass.tpe
+      case Apply(TypeApply(Select(_, sym), List(tpt @ TypeTree())), List())
+        if sym == definitions.Any_asInstanceOf || sym == definitions.Any_asInstanceOfErased =>
+        tpt.tpe
+      case _ =>
+        definitions.AnyClass.tpe
+    }
 
 }

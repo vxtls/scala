@@ -1015,14 +1015,18 @@ mixin class Types requires SymbolTable {
   }
 
   /** A creator for type applications */
-  def appliedType(tycon: Type, args: List[Type]): Type = tycon match {
-    case TypeRef(pre, sym, _) => typeRef(pre, sym, args)
-    case PolyType(tparams, restpe) => restpe.subst(tparams, args)
-    case ErrorType => tycon
-    case _ =>
-      System.out.println(tycon.getClass());
-      System.out.println(tycon.$tag());
-      throw new Error();
+  def appliedType(tycon: Type, args: List[Type]): Type = {
+    if (tycon.isInstanceOf[TypeRef]) {
+      val tref = tycon.asInstanceOf[TypeRef];
+      typeRef(tref.pre, tref.sym, args)
+    } else tycon match {
+      case PolyType(tparams, restpe) => restpe.subst(tparams, args)
+      case ErrorType => tycon
+      case _ =>
+        System.out.println(tycon.getClass());
+        System.out.println(tycon.$tag());
+        throw new Error();
+    }
   }
 
 // Hash consing --------------------------------------------------------------
@@ -1072,36 +1076,49 @@ mixin class Types requires SymbolTable {
     }
 
     /** Map this function over given type */
-    def mapOver(tp: Type): Type = tp match {
-      case ErrorType => tp
-      case WildcardType => tp
-      case NoType => tp
-      case NoPrefix => tp
-      case ThisType(_) => tp
-      case ConstantType(_) => tp
-      case SingleType(pre, sym) =>
+    def mapOver(tp: Type): Type =
+      if (tp == ErrorType || tp == WildcardType || tp == NoType || tp == NoPrefix ||
+          tp.isInstanceOf[ThisType] || tp.isInstanceOf[ConstantType]) {
+        tp
+      } else if (tp.isInstanceOf[SingleType]) {
+        val st = tp.asInstanceOf[SingleType];
+        val pre = st.pre;
+        val sym = st.sym;
         if (sym.isPackageClass) tp // short path
         else {
           val pre1 = this(pre);
           if (pre1 eq pre) tp
           else singleType(pre1, sym)
         }
-      case SuperType(thistp, supertp) =>
+      } else if (tp.isInstanceOf[SuperType]) {
+        val st = tp.asInstanceOf[SuperType];
+        val thistp = st.thistpe;
+        val supertp = st.supertp;
         val thistp1 = this(thistp);
         val supertp1 = this(supertp);
         if ((thistp1 eq thistp) && (supertp1 eq supertp)) tp
         else SuperType(thistp1, supertp1)
-      case TypeRef(pre, sym, args) =>
+      } else if (tp.isInstanceOf[TypeRef]) {
+        val tr = tp.asInstanceOf[TypeRef];
+        val pre = tr.pre;
+        val sym = tr.sym;
+        val args = tr.args;
         val pre1 = this(pre);
 	val args1 = List.mapConserve(args)(this);
         if ((pre1 eq pre) && (args1 eq args)) tp
         else typeRef(pre1, sym, args1)
-      case TypeBounds(lo, hi) =>
+      } else if (tp.isInstanceOf[TypeBounds]) {
+        val tb = tp.asInstanceOf[TypeBounds];
+        val lo = tb.lo;
+        val hi = tb.hi;
         val lo1 = this(lo);
         val hi1 = this(hi);
         if ((lo1 eq lo) && (hi1 eq hi)) tp
         else TypeBounds(lo1, hi1)
-      case RefinedType(parents, decls) =>
+      } else if (tp.isInstanceOf[RefinedType]) {
+        val rt = tp.asInstanceOf[RefinedType];
+        val parents = rt.parents;
+        val decls = rt.decls;
         val parents1 = List.mapConserve(parents)(this);
         val decls1 = mapOver(decls);
         if ((parents1 eq parents) && (decls1 eq decls)) tp
@@ -1113,34 +1130,46 @@ mixin class Types requires SymbolTable {
         if ((parents1 eq parents) && (decls1 eq decls)) tp
         else cloneDecls(ClassInfoType(parents1, new Scope(), clazz), tp, decls1)
 */
-      case MethodType(paramtypes, result) =>
+      } else if (tp.isInstanceOf[MethodType]) {
+        val mt = tp.asInstanceOf[MethodType];
+        val paramtypes = mt.paramTypes;
+        val result = mt.resultType;
         val paramtypes1 = List.mapConserve(paramtypes)(this);
         val result1 = this(result);
         if ((paramtypes1 eq paramtypes) && (result1 eq result)) tp
         else if (tp.isInstanceOf[ImplicitMethodType]) ImplicitMethodType(paramtypes1, result1)
         else if (tp.isInstanceOf[JavaMethodType]) JavaMethodType(paramtypes1, result1)
         else MethodType(paramtypes1, result1)
-      case PolyType(tparams, result) =>
+      } else if (tp.isInstanceOf[PolyType]) {
+        val pt = tp.asInstanceOf[PolyType];
+        val tparams = pt.typeParams;
+        val result = pt.resultType;
         val tparams1 = mapOver(tparams);
         var result1 = this(result);
         if ((tparams1 eq tparams) && (result1 eq result)) tp
         else PolyType(tparams1, result1.substSym(tparams, tparams1))
-      case OverloadedType(pre, alts) =>
+      } else if (tp.isInstanceOf[OverloadedType]) {
+        val ot = tp.asInstanceOf[OverloadedType];
+        val pre = ot.pre;
         val pre1 = if (pre.isInstanceOf[ClassInfoType]) pre else this(pre);
         if (pre1 eq pre) tp
-        else OverloadedType(pre1, alts)
-      case AntiPolyType(pre, args) =>
+        else OverloadedType(pre1, ot.alternatives)
+      } else if (tp.isInstanceOf[AntiPolyType]) {
+        val at = tp.asInstanceOf[AntiPolyType];
+        val pre = at.pre;
+        val args = at.targs;
         val pre1 = this(pre);
 	val args1 = List.mapConserve(args)(this);
         if ((pre1 eq pre) && (args1 eq args)) tp
         else AntiPolyType(pre1, args1)
-      case TypeVar(_, constr) =>
+      } else if (tp.isInstanceOf[TypeVar]) {
+        val constr = tp.asInstanceOf[TypeVar].constr;
 	if (constr.inst != NoType) this(constr.inst)
 	else tp
-      case _ =>
+      } else {
 	tp
         // throw new Error("mapOver inapplicable for " + tp);
-    }
+      }
 
     /** Map this function over given scope */
     private def mapOver(scope: Scope): Scope = {
@@ -1172,14 +1201,15 @@ mixin class Types requires SymbolTable {
   class AsSeenFromMap(pre: Type, clazz: Symbol) extends TypeMap {
     def apply(tp: Type): Type =
       if ((pre eq NoType) || (pre eq NoPrefix) || !clazz.isClass) tp
-      else tp match {
-        case ThisType(sym) =>
+      else if (tp.isInstanceOf[ThisType]) {
+        val sym = tp.asInstanceOf[ThisType].sym;
           def toPrefix(pre: Type, clazz: Symbol): Type =
             if ((pre eq NoType) || (pre eq NoPrefix) || !clazz.isClass) tp
             else if ((sym isSubClass clazz) && (pre.widen.symbol isSubClass sym)) pre
             else toPrefix(pre.baseType(clazz).prefix, clazz.owner);
           toPrefix(pre, clazz)
-	case TypeRef(prefix, sym, args) if (sym.isTypeParameter) =>
+      } else if (tp.isInstanceOf[TypeRef] && tp.asInstanceOf[TypeRef].sym.isTypeParameter) {
+        val sym = tp.asInstanceOf[TypeRef].sym;
 	  def toInstance(pre: Type, clazz: Symbol): Type =
 	    if ((pre eq NoType) || (pre eq NoPrefix) || !clazz.isClass) tp
 	    else {
@@ -1192,19 +1222,24 @@ mixin class Types requires SymbolTable {
 		else if (sym eq ps.head) as.head
 		else instParam(ps.tail, as.tail);
 	      if (symclazz == clazz && (pre.widen.symbol isSubClass symclazz))
-		pre.baseType(symclazz) match {
-		  case TypeRef(_, basesym, baseargs) =>
+		{
+                  val base = pre.baseType(symclazz);
+                  if (base.isInstanceOf[TypeRef]) {
+                    val bref = base.asInstanceOf[TypeRef];
+                    val basesym = bref.sym;
+                    val baseargs = bref.args;
 		    if (basesym.typeParams.length != baseargs.length)
-                      assert(false, "asSeenFrom(" + pre + "," + clazz + ")" + sym + " " + basesym + " " + baseargs); //debug
+	                      assert(false, "asSeenFrom(" + pre + "," + clazz + ")" + sym + " " + basesym + " " + baseargs); //debug
 		    instParam(basesym.typeParams, baseargs);
-		  case _ =>
-                    throwError
-		}
+                  } else {
+	                    throwError
+                  }
+                }
 	      else toInstance(pre.baseType(clazz).prefix, clazz.owner)
 	    }
 	  toInstance(pre, clazz)
-        case _ =>
-          mapOver(tp)
+      } else {
+	          mapOver(tp)
       }
   }
 
@@ -1222,16 +1257,16 @@ mixin class Types requires SymbolTable {
         if (from.isEmpty) tp
         else if (matches(from.head, sym)) toType(tp, to.head)
         else subst(sym, from.tail, to.tail);
-      tp match {
-        case TypeRef(NoPrefix, sym, _) =>
-          subst(sym, from, to)
-        case SingleType(NoPrefix, sym) =>
-          subst(sym, from, to)
-	case PolyType(tparams, restp) =>
-	  assert(!(tparams exists (from contains)));
-	  mapOver(tp)
-        case _ =>
-          mapOver(tp)
+      if (tp.isInstanceOf[TypeRef] && tp.asInstanceOf[TypeRef].pre == NoPrefix) {
+        subst(tp.asInstanceOf[TypeRef].sym, from, to)
+      } else if (tp.isInstanceOf[SingleType] && tp.asInstanceOf[SingleType].pre == NoPrefix) {
+        subst(tp.asInstanceOf[SingleType].sym, from, to)
+      } else if (tp.isInstanceOf[PolyType]) {
+	val tparams = tp.asInstanceOf[PolyType].typeParams;
+	assert(!(tparams exists (from contains)));
+	mapOver(tp)
+      } else {
+        mapOver(tp)
       }
     }
   }
@@ -1239,10 +1274,15 @@ mixin class Types requires SymbolTable {
   /** A map to implement the substSym method */
   class SubstSymMap(from: List[Symbol], to: List[Symbol])
   extends SubstMap(from, to) {
-    protected def toType(fromtp: Type, sym: Symbol) = fromtp match {
-      case TypeRef(pre, _, args) => typeRef(pre, sym, args)
-      case SingleType(pre, _) => singleType(pre, sym)
-    }
+    protected def toType(fromtp: Type, sym: Symbol) =
+      if (fromtp.isInstanceOf[TypeRef]) {
+        val tr = fromtp.asInstanceOf[TypeRef];
+        typeRef(tr.pre, sym, tr.args)
+      } else if (fromtp.isInstanceOf[SingleType]) {
+        singleType(fromtp.asInstanceOf[SingleType].pre, sym)
+      } else {
+        throw new Error("unexpected substitution type: " + fromtp)
+      }
   }
 
   /** A map to implement the subst method */
@@ -1253,10 +1293,9 @@ mixin class Types requires SymbolTable {
 
   /** A map to implement the substThis method */
   class SubstThisMap(from: Symbol, to: Type) extends TypeMap {
-    def apply(tp: Type): Type = tp match {
-      case ThisType(sym) if (sym == from) => to
-      case _ => mapOver(tp)
-    }
+    def apply(tp: Type): Type =
+      if (tp.isInstanceOf[ThisType] && tp.asInstanceOf[ThisType].sym == from) to
+      else mapOver(tp)
   }
 
   class SubstSuperMap(from: Type, to: Type) extends TypeMap {
@@ -1266,10 +1305,9 @@ mixin class Types requires SymbolTable {
   /** A map to convert every occurrence of a wildcard type to a fresh
    *  type variable */
   object wildcardToTypeVarMap extends TypeMap {
-    def apply(tp: Type): Type = tp match {
-      case WildcardType => TypeVar(tp, new TypeConstraint)
-      case _ => mapOver(tp)
-    }
+    def apply(tp: Type): Type =
+      if (tp == WildcardType) TypeVar(tp, new TypeConstraint)
+      else mapOver(tp)
   }
 
   /** A map to implement the contains method */
@@ -1277,11 +1315,9 @@ mixin class Types requires SymbolTable {
     var result = false;
     def traverse(tp: Type): ContainsTraverser = {
       if (!result) {
-        tp match {
-          case TypeRef(_, sym1, _) if (sym == sym1) => result = true
-          case SingleType(_, sym1) if (sym == sym1) => result = true
-          case _ => mapOver(tp)
-        }
+        if (tp.isInstanceOf[TypeRef] && sym == tp.asInstanceOf[TypeRef].sym) result = true
+        else if (tp.isInstanceOf[SingleType] && sym == tp.asInstanceOf[SingleType].sym) result = true
+        else mapOver(tp)
       }
       this
     }
@@ -1293,15 +1329,15 @@ mixin class Types requires SymbolTable {
     var result: Symbol = _;
     def init = { result = NoSymbol }
     def apply(tp: Type): Type = {
-      tp match {
-	case ThisType(sym) =>
-          register(sym);
-	case TypeRef(NoPrefix, sym, args) =>
-          register(sym.owner); args foreach {arg => apply(arg); ()}
-	case SingleType(NoPrefix, sym) =>
-          register(sym.owner);
-	case _ =>
-          mapOver(tp)
+      if (tp.isInstanceOf[ThisType]) {
+        register(tp.asInstanceOf[ThisType].sym);
+      } else if (tp.isInstanceOf[TypeRef] && tp.asInstanceOf[TypeRef].pre == NoPrefix) {
+        val tr = tp.asInstanceOf[TypeRef];
+        register(tr.sym.owner); tr.args foreach {arg => apply(arg); ()}
+      } else if (tp.isInstanceOf[SingleType] && tp.asInstanceOf[SingleType].pre == NoPrefix) {
+        register(tp.asInstanceOf[SingleType].sym.owner);
+      } else {
+        mapOver(tp)
       }
       tp
     }
@@ -1322,11 +1358,15 @@ mixin class Types requires SymbolTable {
         rebind
       }
     }
-    def apply(tp: Type): Type = tp match {
-      case ThisType(sym) if (sym.isModuleClass) =>
+    def apply(tp: Type): Type =
+      if (tp.isInstanceOf[ThisType] && tp.asInstanceOf[ThisType].sym.isModuleClass) {
+        val sym = tp.asInstanceOf[ThisType].sym;
         val sym1 = adaptToNewRun(sym.owner.thisType, sym);
         if (sym1 == sym) tp else ThisType(sym1)
-      case SingleType(pre, sym) =>
+      } else if (tp.isInstanceOf[SingleType]) {
+        val st = tp.asInstanceOf[SingleType];
+        val pre = st.pre;
+        val sym = st.sym;
 	if (sym.isPackage) tp
 	else {
           val pre1 = this(pre);
@@ -1334,7 +1374,11 @@ mixin class Types requires SymbolTable {
           if ((pre1 eq pre) && (sym1 eq sym)) tp
           else singleType(pre1, sym1)
 	}
-      case TypeRef(pre, sym, args) =>
+      } else if (tp.isInstanceOf[TypeRef]) {
+        val tr = tp.asInstanceOf[TypeRef];
+        val pre = tr.pre;
+        val sym = tr.sym;
+        val args = tr.args;
 	if (sym.isPackageClass) tp
         else {
 	  val pre1 = this(pre);
@@ -1343,24 +1387,30 @@ mixin class Types requires SymbolTable {
           if ((pre1 eq pre) && (sym1 eq sym) && (args1 eq args) && sym.isExternal) tp
           else typeRef(pre1, sym1, args1)
 	}
-      case PolyType(tparams, restp) =>
+      } else if (tp.isInstanceOf[PolyType]) {
+        val pt = tp.asInstanceOf[PolyType];
+        val tparams = pt.typeParams;
+        val restp = pt.resultType;
         val restp1 = this(restp);
         if (restp1 eq restp) tp
         else PolyType(tparams, restp1)
-      case ClassInfoType(parents, decls, clazz) =>
+      } else if (tp.isInstanceOf[ClassInfoType]) {
+        val ci = tp.asInstanceOf[ClassInfoType];
+        val parents = ci.parents;
         val parents1 = List.mapConserve(parents)(this);
         if (parents1 eq parents) tp
-        else ClassInfoType(parents1, decls, clazz)
-      case RefinedType(parents, decls) =>
+        else ClassInfoType(parents1, ci.decls, ci.symbol)
+      } else if (tp.isInstanceOf[RefinedType]) {
+        val rt = tp.asInstanceOf[RefinedType];
+        val parents = rt.parents;
         val parents1 = List.mapConserve(parents)(this);
         if (parents1 eq parents) tp
-        else refinedType(parents1, tp.symbol.owner, decls)
-      case SuperType(_, _) => mapOver(tp)
-      case TypeBounds(_, _) => mapOver(tp)
-      case MethodType(_, _) => mapOver(tp)
-      case TypeVar(_, _) => mapOver(tp)
-      case _ => tp
-    }
+        else refinedType(parents1, tp.symbol.owner, rt.decls)
+      } else if (tp.isInstanceOf[SuperType]) mapOver(tp)
+      else if (tp.isInstanceOf[TypeBounds]) mapOver(tp)
+      else if (tp.isInstanceOf[MethodType]) mapOver(tp)
+      else if (tp.isInstanceOf[TypeVar]) mapOver(tp)
+      else tp
   }
 
   object freeTypeParams extends TypeTraverser {
@@ -1369,12 +1419,10 @@ mixin class Types requires SymbolTable {
       if (sym.isAbstractType && !result.contains(sym)) result = sym :: result;
     }
     override def traverse(tp: Type): TypeTraverser = {
-      tp match {
-        case TypeRef(NoPrefix, sym, _) =>
-	  includeIfAbstract(sym)
-	case TypeRef(ThisType(_), sym, _) =>
-	  includeIfAbstract(sym)
-	case _ =>
+      if (tp.isInstanceOf[TypeRef]) {
+        val tr = tp.asInstanceOf[TypeRef];
+        if (tr.pre == NoPrefix || tr.pre.isInstanceOf[ThisType])
+	  includeIfAbstract(tr.sym)
       }
       mapOver(tp);
       this
@@ -1407,70 +1455,90 @@ mixin class Types requires SymbolTable {
 
   /** Do tp1 and tp2 denote equivalent types? */
   def isSameType(tp1: Type, tp2: Type): boolean = {
-    Pair(tp1, tp2) match {
-      case Pair(ErrorType, _) => true
-      case Pair(WildcardType, _) => true
-      case Pair(_, ErrorType) => true
-      case Pair(_, WildcardType) => true
+    def sameStablePrefix(pre1: Type, pre2: Type): boolean =
+      (pre1 =:= pre2) ||
+      (pre1.isStable && pre2.isStable && (pre1.singleDeref =:= pre2.singleDeref));
 
-      case Pair(NoType, _) => false
-      case Pair(NoPrefix, _) => tp2.symbol.isPackageClass
-      case Pair(_, NoType) => false
-      case Pair(_, NoPrefix) => tp1.symbol.isPackageClass
+    def singletonClass(sym: Symbol): Symbol =
+      if (sym.isModule) sym.moduleClass
+      else if (sym.isStable) sym.tpe.resultType.symbol
+      else NoSymbol;
 
-      case Pair(ThisType(sym1), ThisType(sym2)) =>
-        sym1 == sym2
-      case Pair(SingleType(pre1, sym1), SingleType(pre2, sym2))
-      if ((sym1 == sym2) && (pre1 =:= pre2)) =>
-        true
-      case Pair(SingleType(pre1, sym1), ThisType(sym2))
-      if (sym1.isModule &&
-	  sym1.moduleClass == sym2 &&
-	  pre1 =:= sym2.owner.thisType) =>
-        true
-      case Pair(ThisType(sym1), SingleType(pre2, sym2))
-      if (sym2.isModule &&
-	  sym2.moduleClass == sym1 &&
-	  pre2 =:= sym1.owner.thisType) =>
-        true
-      case Pair(ConstantType(value1), ConstantType(value2)) =>
-	value1 == value2
-      case Pair(TypeRef(pre1, sym1, args1), TypeRef(pre2, sym2, args2)) =>
-	sym1 == sym2 && (phase.erasedTypes || pre1 =:= pre2) && isSameTypes(args1, args2)
-      case Pair(RefinedType(parents1, ref1), RefinedType(parents2, ref2)) =>
-	def isSubScope(s1: Scope, s2: Scope): boolean = s2.toList.forall {
-	  sym2 =>
-            val sym1 = s1.lookup(sym2.name);
-            sym1.info =:= sym2.info.substThis(sym2.owner, sym1.owner.thisType)
-	}
-	isSameTypes(parents1, parents2) && isSubScope(ref1, ref2) && isSubScope(ref2, ref1)
-      case Pair(MethodType(pts1, res1), MethodType(pts2, res2)) =>
-        (pts1.length == pts2.length &&
-         isSameTypes(pts1, pts2) &&
-         res1 =:= res2 &&
-         tp1.isInstanceOf[ImplicitMethodType] == tp2.isInstanceOf[ImplicitMethodType])
-      case Pair(PolyType(tparams1, res1), PolyType(tparams2, res2)) =>
-        (tparams1.length == tparams2.length &&
-         List.forall2(tparams1, tparams2)
-           ((p1, p2) => p1.info =:= p2.info.substSym(tparams2, tparams1)) &&
-         res1 =:= res2.substSym(tparams2, tparams1))
-      case Pair(TypeBounds(lo1, hi1), TypeBounds(lo2, hi2)) =>
-	lo1 =:= lo2 && hi1 =:= hi2
-      case Pair(TypeVar(_, constr1), _) =>
-	if (constr1.inst != NoType) constr1.inst =:= tp2
-	else constr1 instantiate (wildcardToTypeVarMap(tp2))
-      case Pair(_, TypeVar(_, constr2)) =>
-	if (constr2.inst != NoType) tp1 =:= constr2.inst
-	else constr2 instantiate (wildcardToTypeVarMap(tp1))
-      case Pair(SingleType(_, _), _)
-      if (tp2.isStable && tp1.singleDeref =:= tp2) =>
-        true
-      case Pair(_, SingleType(_, _))
-      if (tp1.isStable && tp1 =:= tp2.singleDeref) =>
-        true
-      case _ =>
-        false
-    }
+    if (tp1 == ErrorType || tp1 == WildcardType ||
+        tp2 == ErrorType || tp2 == WildcardType) true
+    else if (tp1 == NoType) false
+    else if (tp1 == NoPrefix) tp2.symbol.isPackageClass
+    else if (tp2 == NoType) false
+    else if (tp2 == NoPrefix) tp1.symbol.isPackageClass
+    else if (tp1.isInstanceOf[ThisType] && tp2.isInstanceOf[ThisType]) {
+      tp1.asInstanceOf[ThisType].sym == tp2.asInstanceOf[ThisType].sym
+    } else if (tp1.isInstanceOf[SingleType] && tp2.isInstanceOf[SingleType] && {
+      val st1 = tp1.asInstanceOf[SingleType];
+      val st2 = tp2.asInstanceOf[SingleType];
+      (st1.sym == st2.sym) && sameStablePrefix(st1.pre, st2.pre)
+    }) {
+      true
+    } else if (tp1.isInstanceOf[SingleType] && tp2.isInstanceOf[ThisType] && {
+      val sym2 = tp2.asInstanceOf[ThisType].sym;
+      (sym2.thisSym != sym2 && (tp1 =:= sym2.typeOfThis)) || {
+        val st1 = tp1.asInstanceOf[SingleType];
+        singletonClass(st1.sym) == sym2 && sameStablePrefix(st1.pre, sym2.owner.thisType)
+      }
+    }) {
+      true
+    } else if (tp1.isInstanceOf[ThisType] && tp2.isInstanceOf[SingleType] && {
+      val sym1 = tp1.asInstanceOf[ThisType].sym;
+      val st2 = tp2.asInstanceOf[SingleType];
+      (sym1.thisSym != sym1 && (sym1.typeOfThis =:= tp2)) ||
+      (singletonClass(st2.sym) == sym1 && sameStablePrefix(st2.pre, sym1.owner.thisType))
+    }) {
+      true
+    } else if (tp1.isInstanceOf[ConstantType] && tp2.isInstanceOf[ConstantType]) {
+      tp1.asInstanceOf[ConstantType].value == tp2.asInstanceOf[ConstantType].value
+    } else if (tp1.isInstanceOf[TypeRef] && tp2.isInstanceOf[TypeRef]) {
+      val tr1 = tp1.asInstanceOf[TypeRef];
+      val tr2 = tp2.asInstanceOf[TypeRef];
+      tr1.sym == tr2.sym && (phase.erasedTypes || sameStablePrefix(tr1.pre, tr2.pre)) &&
+      isSameTypes(tr1.args, tr2.args)
+    } else if (tp1.isInstanceOf[RefinedType] && tp2.isInstanceOf[RefinedType]) {
+      val rt1 = tp1.asInstanceOf[RefinedType];
+      val rt2 = tp2.asInstanceOf[RefinedType];
+      def isSubScope(s1: Scope, s2: Scope): boolean = s2.toList.forall {
+        sym2 =>
+          val sym1 = s1.lookup(sym2.name);
+          sym1.info =:= sym2.info.substThis(sym2.owner, sym1.owner.thisType)
+      }
+      isSameTypes(rt1.parents, rt2.parents) &&
+      isSubScope(rt1.decls, rt2.decls) && isSubScope(rt2.decls, rt1.decls)
+    } else if (tp1.isInstanceOf[MethodType] && tp2.isInstanceOf[MethodType]) {
+      val mt1 = tp1.asInstanceOf[MethodType];
+      val mt2 = tp2.asInstanceOf[MethodType];
+      mt1.paramTypes.length == mt2.paramTypes.length &&
+      isSameTypes(mt1.paramTypes, mt2.paramTypes) &&
+      mt1.resultType =:= mt2.resultType &&
+      tp1.isInstanceOf[ImplicitMethodType] == tp2.isInstanceOf[ImplicitMethodType]
+    } else if (tp1.isInstanceOf[PolyType] && tp2.isInstanceOf[PolyType]) {
+      val pt1 = tp1.asInstanceOf[PolyType];
+      val pt2 = tp2.asInstanceOf[PolyType];
+      (pt1.typeParams.length == pt2.typeParams.length &&
+       List.forall2(pt1.typeParams, pt2.typeParams)
+         ((p1, p2) => p1.info =:= p2.info.substSym(pt2.typeParams, pt1.typeParams)) &&
+       pt1.resultType =:= pt2.resultType.substSym(pt2.typeParams, pt1.typeParams))
+    } else if (tp1.isInstanceOf[TypeBounds] && tp2.isInstanceOf[TypeBounds]) {
+      val tb1 = tp1.asInstanceOf[TypeBounds];
+      val tb2 = tp2.asInstanceOf[TypeBounds];
+      tb1.lo =:= tb2.lo && tb1.hi =:= tb2.hi
+    } else if (tp1.isInstanceOf[TypeVar]) {
+      val constr1 = tp1.asInstanceOf[TypeVar].constr;
+      if (constr1.inst != NoType) constr1.inst =:= tp2
+      else constr1 instantiate (wildcardToTypeVarMap(tp2))
+    } else if (tp2.isInstanceOf[TypeVar]) {
+      val constr2 = tp2.asInstanceOf[TypeVar].constr;
+      if (constr2.inst != NoType) tp1 =:= constr2.inst
+      else constr2 instantiate (wildcardToTypeVarMap(tp1))
+    } else if (tp1.isInstanceOf[SingleType] && tp2.isStable && tp1.singleDeref =:= tp2) true
+    else if (tp2.isInstanceOf[SingleType] && tp1.isStable && tp1 =:= tp2.singleDeref) true
+    else false
   }
 
   /** Are tps1 and tps2 lists of pairwise equivalent types? */
@@ -1490,84 +1558,86 @@ mixin class Types requires SymbolTable {
 
   /** Does tp1 conform to tp2? */
   def isSubType0(tp1: Type, tp2: Type): boolean = {
-    Pair(tp1, tp2) match {
-      case Pair(ErrorType, _)    => true
-      case Pair(WildcardType, _) => true
-      case Pair(_, ErrorType)    => true
-      case Pair(_, WildcardType) => true
-
-      case Pair(NoType, _)   => false
-      case Pair(NoPrefix, _) => tp2.symbol.isPackageClass
-      case Pair(_, NoType)   => false
-      case Pair(_, NoPrefix) => tp1.symbol.isPackageClass
-
-      case Pair(ThisType(_), ThisType(_))           => tp1 =:= tp2
-      case Pair(ThisType(_), SingleType(_, _))      => tp1 =:= tp2
-      case Pair(SingleType(_, _), ThisType(_))      => tp1 =:= tp2
-      case Pair(SingleType(_, _), SingleType(_, _)) => tp1 =:= tp2
-      case Pair(ConstantType(_), ConstantType(_))   => tp1 =:= tp2
-
-      case Pair(TypeRef(pre1, sym1, args1), TypeRef(pre2, sym2, args2)) =>
-	//System.out.println("isSubType " + tp1 + " " + tp2);//DEBUG
-        def isSubArgs(tps1: List[Type], tps2: List[Type],
-                      tparams: List[Symbol]): boolean = (
-          tps1.isEmpty && tps2.isEmpty
-          ||
-          !tps1.isEmpty && !tps2.isEmpty &&
-          (tparams.head.hasFlag(COVARIANT) || (tps2.head <:< tps1.head)) &&
-          (tparams.head.hasFlag(CONTRAVARIANT) || tps1.head <:< tps2.head) &&
-          isSubArgs(tps1.tail, tps2.tail, tparams.tail)
-        );
-        (sym1 == sym2 && (pre1 <:< pre2) && isSubArgs(args1, args2, sym1.typeParams)
-         ||
-         sym1.isAbstractType && !(tp1 =:= tp1.bounds.hi) && (tp1.bounds.hi <:< tp2)
-         ||
-         sym2.isAbstractType && !(tp2 =:= tp2.bounds.lo) && (tp1 <:< tp2.bounds.lo)
-         ||
-         sym2.isClass &&
-           ({ val base = tp1 baseType sym2; !(base eq tp1) && (base <:< tp2) })
-         ||
-         sym1 == AllClass
-         ||
-         sym1 == AllRefClass && sym2 != AllClass && tp2 <:< AnyRefClass.tpe)
-      case Pair(MethodType(pts1, res1), MethodType(pts2, res2)) =>
-        (pts1.length == pts2.length &&
-         matchingParams(pts1, pts2, tp2.isInstanceOf[JavaMethodType]) &&
-         (res1 <:< res2) &&
-         tp1.isInstanceOf[ImplicitMethodType] == tp2.isInstanceOf[ImplicitMethodType])
-      case Pair(PolyType(tparams1, res1), PolyType(tparams2, res2)) =>
-        (tparams1.length == tparams2.length &&
-         List.forall2(tparams1, tparams2)
-           ((p1, p2) => p2.info.substSym(tparams2, tparams1) <:< p1.info) &&
-         res1 <:< res2.substSym(tparams2, tparams1))
-      case Pair(TypeBounds(lo1, hi1), TypeBounds(lo2, hi2)) =>
-        lo2 <:< lo1 && hi1 <:< hi2
-      case Pair(_, TypeVar(_, constr2)) =>
-        if (constr2.inst != NoType) tp1 <:< constr2.inst
-        else { constr2.lobounds = tp1 :: constr2.lobounds; true }
-      case Pair(TypeVar(_, constr1), _) =>
-        if (constr1.inst != NoType) constr1.inst <:< tp2
-        else { constr1.hibounds = tp2 :: constr1.hibounds; true }
-      case Pair(_, RefinedType(parents2, ref2)) =>
-        (parents2 forall tp1.<:<) && (ref2.toList forall tp1.specializes)
-      case Pair(RefinedType(parents1, ref1), _) =>
-        parents1 exists (.<:<(tp2))
-      /* todo: replace following with
-      case Pair(ThisType(_), _)
-         | Pair(SingleType(_, _), _)
-         | Pair(ConstantType(_), _) =>
-	 once patern matching bug is fixed */
-      case Pair(ThisType(_), _) => tp1.singleDeref <:< tp2
-      case Pair(SingleType(_, _), _) => tp1.singleDeref <:< tp2
-      case Pair(ConstantType(_), _) => tp1.singleDeref <:< tp2
-
-      case Pair(TypeRef(pre1, sym1, args1), _) =>
-        (sym1 == AllClass && tp2 <:< AnyClass.tpe
-         ||
-         sym1 == AllRefClass && tp2.symbol != AllClass && tp2 <:< AnyRefClass.tpe)
-      case _ =>
-        false
-    }
+    if (tp1 == ErrorType || tp1 == WildcardType ||
+        tp2 == ErrorType || tp2 == WildcardType) true
+    else if (tp1 == NoType) false
+    else if (tp1 == NoPrefix) tp2.symbol.isPackageClass
+    else if (tp2 == NoType) false
+    else if (tp2 == NoPrefix) tp1.symbol.isPackageClass
+    else if (tp1.isInstanceOf[ThisType] && tp2.isInstanceOf[ThisType]) tp1 =:= tp2
+    else if (tp1.isInstanceOf[ThisType] && tp2.isInstanceOf[SingleType]) tp1 =:= tp2
+    else if (tp1.isInstanceOf[SingleType] && tp2.isInstanceOf[ThisType]) tp1 =:= tp2
+    else if (tp1.isInstanceOf[SingleType] && tp2.isInstanceOf[SingleType]) tp1 =:= tp2
+    else if (tp1.isInstanceOf[ConstantType] && tp2.isInstanceOf[ConstantType]) tp1 =:= tp2
+    else if (tp1.isInstanceOf[TypeRef] && tp2.isInstanceOf[TypeRef]) {
+      val tr1 = tp1.asInstanceOf[TypeRef];
+      val tr2 = tp2.asInstanceOf[TypeRef];
+      def isSubArgs(tps1: List[Type], tps2: List[Type],
+                    tparams: List[Symbol]): boolean = (
+        tps1.isEmpty && tps2.isEmpty
+        ||
+        !tps1.isEmpty && !tps2.isEmpty &&
+        (tparams.head.hasFlag(COVARIANT) || (tps2.head <:< tps1.head)) &&
+        (tparams.head.hasFlag(CONTRAVARIANT) || tps1.head <:< tps2.head) &&
+        isSubArgs(tps1.tail, tps2.tail, tparams.tail)
+      );
+      (tr1.sym == tr2.sym && (tr1.pre <:< tr2.pre) && isSubArgs(tr1.args, tr2.args, tr1.sym.typeParams)
+       ||
+       tr1.sym.isAbstractType && !(tp1 =:= tp1.bounds.hi) && (tp1.bounds.hi <:< tp2)
+       ||
+       tr2.sym.isAbstractType && !(tp2 =:= tp2.bounds.lo) && (tp1 <:< tp2.bounds.lo)
+       ||
+       tr2.sym.isClass &&
+         ({ val base = tp1 baseType tr2.sym; !(base eq tp1) && (base <:< tp2) })
+       ||
+       tr1.sym == AllClass
+       ||
+       tr1.sym == AllRefClass && tr2.sym != AllClass && tp2 <:< AnyRefClass.tpe)
+    } else if (tp1.isInstanceOf[MethodType] && tp2.isInstanceOf[MethodType]) {
+      val mt1 = tp1.asInstanceOf[MethodType];
+      val mt2 = tp2.asInstanceOf[MethodType];
+      mt1.paramTypes.length == mt2.paramTypes.length &&
+      matchingParams(mt1.paramTypes, mt2.paramTypes, tp2.isInstanceOf[JavaMethodType]) &&
+      (mt1.resultType <:< mt2.resultType) &&
+      tp1.isInstanceOf[ImplicitMethodType] == tp2.isInstanceOf[ImplicitMethodType]
+    } else if (tp1.isInstanceOf[PolyType] && tp2.isInstanceOf[PolyType]) {
+      val pt1 = tp1.asInstanceOf[PolyType];
+      val pt2 = tp2.asInstanceOf[PolyType];
+      (pt1.typeParams.length == pt2.typeParams.length &&
+       List.forall2(pt1.typeParams, pt2.typeParams)
+         ((p1, p2) => p2.info.substSym(pt2.typeParams, pt1.typeParams) <:< p1.info) &&
+       pt1.resultType <:< pt2.resultType.substSym(pt2.typeParams, pt1.typeParams))
+    } else if (tp1.isInstanceOf[TypeBounds] && tp2.isInstanceOf[TypeBounds]) {
+      val tb1 = tp1.asInstanceOf[TypeBounds];
+      val tb2 = tp2.asInstanceOf[TypeBounds];
+      tb2.lo <:< tb1.lo && tb1.hi <:< tb2.hi
+    } else if (tp2.isInstanceOf[TypeVar]) {
+      val constr2 = tp2.asInstanceOf[TypeVar].constr;
+      if (constr2.inst != NoType) tp1 <:< constr2.inst
+      else { constr2.lobounds = tp1 :: constr2.lobounds; true }
+    } else if (tp1.isInstanceOf[TypeVar]) {
+      val constr1 = tp1.asInstanceOf[TypeVar].constr;
+      if (constr1.inst != NoType) constr1.inst <:< tp2
+      else { constr1.hibounds = tp2 :: constr1.hibounds; true }
+    } else if (tp2.isInstanceOf[RefinedType]) {
+      val rt2 = tp2.asInstanceOf[RefinedType];
+      (rt2.parents forall tp1.<:<) && (rt2.decls.toList forall tp1.specializes)
+    } else if (tp1.isInstanceOf[RefinedType]) {
+      tp1.asInstanceOf[RefinedType].parents exists (.<:<(tp2))
+    } else if (tp1.isInstanceOf[ThisType]) tp1.singleDeref <:< tp2
+    else if (tp1.isInstanceOf[SingleType]) tp1.singleDeref <:< tp2
+    else if (tp1.isInstanceOf[ConstantType]) tp1.singleDeref <:< tp2
+    else if (tp1.isInstanceOf[TypeRef] && tp2.isInstanceOf[SingleType] && {
+      val tr1 = tp1.asInstanceOf[TypeRef];
+      tr1.args.isEmpty && tr1.sym.isModuleClass && (tp1 =:= tp2.singleDeref)
+    }) {
+      true
+    } else if (tp1.isInstanceOf[TypeRef]) {
+      val tr1 = tp1.asInstanceOf[TypeRef];
+      (tr1.sym == AllClass && tp2 <:< AnyClass.tpe
+       ||
+       tr1.sym == AllRefClass && tp2.symbol != AllClass && tp2 <:< AnyRefClass.tpe)
+    } else false
   }
 
   /** Are tps1 and tps2 lists of equal length such that all elements
@@ -1600,24 +1670,37 @@ mixin class Types requires SymbolTable {
   }
 
   /** A function implementing tp1 matches tp2 */
-  private def matchesType(tp1: Type, tp2: Type): boolean = Pair(tp1, tp2) match {
-    case Pair(MethodType(pts1, res1), MethodType(pts2, res2)) =>
-      (matchingParams(pts1, pts2, tp2.isInstanceOf[JavaMethodType]) && (res1 matches res2) &&
+  private def matchesType(tp1: Type, tp2: Type): boolean =
+    if (tp1.isInstanceOf[MethodType] && tp2.isInstanceOf[MethodType]) {
+      val mt1 = tp1.asInstanceOf[MethodType];
+      val mt2 = tp2.asInstanceOf[MethodType];
+      (matchingParams(mt1.paramTypes, mt2.paramTypes, tp2.isInstanceOf[JavaMethodType]) &&
+       (mt1.resultType matches mt2.resultType) &&
        tp1.isInstanceOf[ImplicitMethodType] == tp2.isInstanceOf[ImplicitMethodType])
-    case Pair(PolyType(tparams1, res1), PolyType(tparams2, res2)) =>
-      (tparams1.length == tparams2.length &&
-       (res1 matches res2.substSym(tparams2, tparams1)))
-    case Pair(PolyType(List(), rtp1), MethodType(List(), rtp2)) => matchesType(rtp1, rtp2)
-    case Pair(MethodType(List(), rtp1), PolyType(List(), rtp2)) => matchesType(rtp1, rtp2)
-    case Pair(PolyType(List(), rtp1), _) => matchesType(rtp1, tp2)
-    case Pair(_, PolyType(List(), rtp2)) => matchesType(tp1, rtp2)
-    case Pair(MethodType(_, _), _) => false
-    case Pair(PolyType(_, _), _)   => false
-    case Pair(_, MethodType(_, _)) => false
-    case Pair(_, PolyType(_, _))   => false
-    case _ =>
-      !phase.erasedTypes || tp1 =:= tp2
-  }
+    } else if (tp1.isInstanceOf[PolyType] && tp2.isInstanceOf[PolyType]) {
+      val pt1 = tp1.asInstanceOf[PolyType];
+      val pt2 = tp2.asInstanceOf[PolyType];
+      (pt1.typeParams.length == pt2.typeParams.length &&
+       (pt1.resultType matches pt2.resultType.substSym(pt2.typeParams, pt1.typeParams)))
+    } else if (tp1.isInstanceOf[PolyType] && tp2.isInstanceOf[MethodType] &&
+               tp1.asInstanceOf[PolyType].typeParams.isEmpty &&
+               tp2.asInstanceOf[MethodType].paramTypes.isEmpty) {
+      matchesType(tp1.asInstanceOf[PolyType].resultType,
+                  tp2.asInstanceOf[MethodType].resultType)
+    } else if (tp1.isInstanceOf[MethodType] && tp2.isInstanceOf[PolyType] &&
+               tp1.asInstanceOf[MethodType].paramTypes.isEmpty &&
+               tp2.asInstanceOf[PolyType].typeParams.isEmpty) {
+      matchesType(tp1.asInstanceOf[MethodType].resultType,
+                  tp2.asInstanceOf[PolyType].resultType)
+    } else if (tp1.isInstanceOf[PolyType] && tp1.asInstanceOf[PolyType].typeParams.isEmpty) {
+      matchesType(tp1.asInstanceOf[PolyType].resultType, tp2)
+    } else if (tp2.isInstanceOf[PolyType] && tp2.asInstanceOf[PolyType].typeParams.isEmpty) {
+      matchesType(tp1, tp2.asInstanceOf[PolyType].resultType)
+    } else if (tp1.isInstanceOf[MethodType]) false
+    else if (tp1.isInstanceOf[PolyType]) false
+    else if (tp2.isInstanceOf[MethodType]) false
+    else if (tp2.isInstanceOf[PolyType]) false
+    else !phase.erasedTypes || tp1 =:= tp2
 
   /** Are tps1 and tps2 lists of pairwise equivalent types? */
   private def matchingParams(tps1: List[Type], tps2: List[Type], tps2isJava: boolean): boolean = (
@@ -1876,10 +1959,7 @@ mixin class Types requires SymbolTable {
               proto.cloneSymbol.setInfo(
                 if (proto.isTerm) glb(symtypes)
                 else {
-                  def isTypeBound(tp: Type) = tp match {
-                    case TypeBounds(_, _) => true
-                    case _ => false
-                  }
+                  def isTypeBound(tp: Type) = tp.isInstanceOf[TypeBounds];
                   def glbBounds(bnds: List[Type]): TypeBounds = {
                     val lo = lub(bnds map (.bounds.lo));
                     val hi = glb(bnds map (.bounds.hi));
@@ -1942,10 +2022,11 @@ mixin class Types requires SymbolTable {
    *  Return Some(x) if the computation succeeds with result `x'.
    *  Return None if the computuation fails.
    */
-  private def mergePrefixAndArgs(tps: List[Type], variance: int): Option[Type] = tps match {
-    case List(tp) =>
-      Some(tp)
-    case TypeRef(_, sym, _) :: rest =>
+  private def mergePrefixAndArgs(tps: List[Type], variance: int): Option[Type] =
+    if (tps.length == 1) {
+      Some(tps.head)
+    } else if (tps.head.isInstanceOf[TypeRef]) {
+      val sym = tps.head.asInstanceOf[TypeRef].sym;
       val pres = tps map (.prefix);
       val pre = if (variance == 1) lub(pres) else glb(pres);
       val argss = tps map (.typeArgs);
@@ -1961,7 +2042,8 @@ mixin class Types requires SymbolTable {
       } catch {
 	case ex: MalformedType => None
       }
-    case SingleType(_, sym) :: rest =>
+    } else if (tps.head.isInstanceOf[SingleType]) {
+      val sym = tps.head.asInstanceOf[SingleType].sym;
       val pres = tps map (.prefix);
       val pre = if (variance == 1) lub(pres) else glb(pres);
       try {
@@ -1969,7 +2051,9 @@ mixin class Types requires SymbolTable {
       } catch {
 	case ex: MalformedType => None
       }
-  }
+    } else {
+      throw new Error("mergePrefixAndArgs of incompatible types: " + tps.mkString("", " and ", ""))
+    }
 
   /** Make symbol `sym' a member of scope `tp.decls' where `thistp' is the narrowed
    *  owner type of the scope */
