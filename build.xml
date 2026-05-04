@@ -59,6 +59,7 @@ PROPERTIES
   </condition>
   <property name="bootstrap.java.home" value="${java.home}"/>
   <property name="java.exe" location="${bootstrap.java.home}/bin/java"/>
+  <property name="javac.exe" location="${bootstrap.java.home}/bin/javac"/>
   <property name="java.rt.jar" location="${bootstrap.java.home}/jre/lib/rt.jar"/>
   <!-- Location of build products properties -->
   <property name="build.dir" value="${basedir}/build"/>
@@ -346,6 +347,8 @@ BUILD SUPPORT MACROS
         destdir="@{dest.dir}"
         source="1.8"
         target="1.8"
+        fork="true"
+        executable="${javac.exe}"
         includeantruntime="false"
         debug="true"
       >
