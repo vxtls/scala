@@ -78,7 +78,7 @@ public abstract class Float   extends AnyVal implements java.io.Serializable {
     public double  $percent   (double  that) { return  value %  that; }
 
     /** @meta method []scala.Double ; */
-    public double  coerce     (            ) { return  value        ; }
+    public double  coerceToDouble(         ) { return  value        ; }
 
     public boolean $eq$eq     (float   that) { return  value == that; }
     public boolean $bang$eq   (float   that) { return  value != that; }

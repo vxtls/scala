@@ -63,21 +63,29 @@ trait Variances {
   }
 
   /** Compute variance of type parameter `tparam' in type `tp'. */
-  def varianceInType(tp: Type)(tparam: Symbol): int = tp match {
-    case ErrorType | WildcardType | NoType | NoPrefix | ThisType(_) | ConstantType(_) =>
+  def varianceInType(tp: Type)(tparam: Symbol): int =
+    if (tp == ErrorType || tp == WildcardType || tp == NoType || tp == NoPrefix ||
+        tp.isInstanceOf[ThisType] || tp.isInstanceOf[ConstantType]) {
       VARIANCES
-    case SingleType(pre, sym) =>
-      cut(varianceInType(pre)(tparam))
-    case TypeRef(pre, sym, args) =>
-      if (sym == tparam) COVARIANT
-      else varianceInType(pre)(tparam) & varianceInArgs(args, sym.typeParams)(tparam)
-    case TypeBounds(lo, hi) =>
-      flip(varianceInType(lo)(tparam)) & varianceInType(hi)(tparam)
-    case RefinedType(parents, defs) =>
-      varianceInTypes(parents)(tparam) & varianceInSyms(defs.toList)(tparam)
-    case MethodType(formals, restpe) =>
-      flip(varianceInTypes(formals)(tparam)) & varianceInType(restpe)(tparam)
-    case PolyType(tparams, restpe) =>
-      flip(varianceInSyms(tparams)(tparam)) & varianceInType(restpe)(tparam)
-  }
+    } else if (tp.isInstanceOf[SingleType]) {
+      cut(varianceInType(tp.asInstanceOf[SingleType].pre)(tparam))
+    } else if (tp.isInstanceOf[TypeRef]) {
+      val tref = tp.asInstanceOf[TypeRef];
+      if (tref.sym == tparam) COVARIANT
+      else varianceInType(tref.pre)(tparam) & varianceInArgs(tref.args, tref.sym.typeParams)(tparam)
+    } else if (tp.isInstanceOf[TypeBounds]) {
+      val bnds = tp.asInstanceOf[TypeBounds];
+      flip(varianceInType(bnds.lo)(tparam)) & varianceInType(bnds.hi)(tparam)
+    } else if (tp.isInstanceOf[RefinedType]) {
+      val rt = tp.asInstanceOf[RefinedType];
+      varianceInTypes(rt.parents)(tparam) & varianceInSyms(rt.decls.toList)(tparam)
+    } else if (tp.isInstanceOf[MethodType]) {
+      val mt = tp.asInstanceOf[MethodType];
+      flip(varianceInTypes(mt.paramTypes)(tparam)) & varianceInType(mt.resultType)(tparam)
+    } else if (tp.isInstanceOf[PolyType]) {
+      val pt = tp.asInstanceOf[PolyType];
+      flip(varianceInSyms(pt.typeParams)(tparam)) & varianceInType(pt.resultType)(tparam)
+    } else {
+      throw new Error("unexpected type in variance computation: " + tp)
+    }
 }

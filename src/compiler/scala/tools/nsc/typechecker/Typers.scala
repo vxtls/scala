@@ -331,7 +331,12 @@ trait Typers requires Analyzer {
      *  If all this fails, error
      */
 //    def adapt(tree: Tree, mode: int, pt: Type): Tree = {
-    protected def adapt(tree: Tree, mode: int, pt: Type): Tree = tree.tpe match {
+    protected def adapt(tree: Tree, mode: int, pt: Type): Tree =
+      if ((mode & EXPRmode) != 0 && tree.tpe.isInstanceOf[TypeRef] &&
+          tree.tpe.asInstanceOf[TypeRef].sym == ByNameParamClass &&
+          tree.tpe.asInstanceOf[TypeRef].args.length == 1) {
+        adapt(tree setType tree.tpe.asInstanceOf[TypeRef].args.head, mode, pt)
+      } else tree.tpe match {
       case ct @ ConstantType(value) if ((mode & TYPEmode) == 0 && (ct <:< pt)) => // (0)
 	copy.Literal(tree, value)
       case OverloadedType(pre, alts) if ((mode & FUNmode) == 0) => // (1)
@@ -339,9 +344,9 @@ trait Typers requires Analyzer {
 	adapt(tree, mode, pt)
       case PolyType(List(), restpe) => // (2)
 	adapt(tree setType restpe, mode, pt)
-      case TypeRef(_, sym, List(arg))
-      if ((mode & EXPRmode) != 0 && sym == ByNameParamClass) => // (2)
-	adapt(tree setType arg, mode, pt)
+      case MethodType(List(), restpe) if ((mode & (EXPRmode | FUNmode)) == EXPRmode &&
+                                          !isFunctionType(pt)) => // (2)
+	typed(Apply(tree, List()) setPos tree.pos, mode, pt)
       case PolyType(tparams, restpe) if ((mode & TAPPmode) == 0) => // (3)
 	val tparams1 = cloneSymbols(tparams)
         val tree1 = if (tree.isType) tree
@@ -361,8 +366,9 @@ trait Typers requires Analyzer {
       case mt: MethodType
       if (((mode & (EXPRmode | FUNmode)) == EXPRmode) &&
           (context.undetparams.isEmpty || (mode & POLYmode) != 0)) =>
-        if (!tree.symbol.isConstructor && pt != WildcardType && isCompatible(mt, pt) &&
-            (pt <:< functionType(mt.paramTypes map (t => WildcardType), WildcardType))) { // (4.2)
+        if (!tree.symbol.isConstructor && isCompatible(mt, pt) &&
+            (pt == WildcardType ||
+             (pt <:< functionType(mt.paramTypes map (t => WildcardType), WildcardType)))) { // (4.2)
           if (settings.debug.value) log("eta-expanding "+tree+":"+tree.tpe+" to "+pt)
           checkParamsConvertible(tree.pos, tree.tpe);
 	  typed(etaExpand(tree), mode, pt)
@@ -401,17 +407,20 @@ trait Typers requires Analyzer {
                     throw t;
                 }
                 tree1
-	      } else if (clazz.isSubClass(SeqClass)) { // (5.2)
-	        pt.baseType(clazz).baseType(SeqClass) match {
-		  case TypeRef(pre, seqClass, args) =>
-		    tree.setType(MethodType(List(typeRef(pre, RepeatedParamClass, args)), pt))
-		  case NoType =>
-		    errorTree(tree, "expected pattern type "+pt +
-			      " does not conform to sequence "+clazz)
-                  case ErrorType =>
-                    setError(tree)
-		}
-	      } else {
+		      } else if (clazz.isSubClass(SeqClass)) { // (5.2)
+                        val seqBase = pt.baseType(clazz).baseType(SeqClass);
+                        if (seqBase.isInstanceOf[TypeRef]) {
+                          val seqType = seqBase.asInstanceOf[TypeRef];
+                          tree.setType(MethodType(List(typeRef(seqType.pre, RepeatedParamClass, seqType.args)), pt))
+                        } else if (seqBase == NoType) {
+			  errorTree(tree, "expected pattern type "+pt +
+				    " does not conform to sequence "+clazz)
+                        } else if (seqBase == ErrorType) {
+	                  setError(tree)
+                        } else {
+                          throw new MatchError(seqBase)
+                        }
+		      } else {
 		if (!tree.tpe.isError)
 		  error(tree.pos, ""+clazz+" is neither a case class nor a sequence class")
 		setError(tree)
@@ -1226,8 +1235,12 @@ trait Typers requires Analyzer {
                 case Literal(value) =>
                   value
                 case arg =>
-                  error(arg.pos, "attribute argument needs to be a constant; found: "+arg)
-                  null
+                  if (arg.tpe.isInstanceOf[ConstantType]) {
+                    arg.tpe.asInstanceOf[ConstantType].value
+                  } else {
+                    error(arg.pos, "attribute argument needs to be a constant; found: "+arg)
+                    null
+                  }
               })
           }
           if (attrInfo != null) {
@@ -1315,10 +1328,15 @@ trait Typers requires Analyzer {
             copy.If(tree, cond1, thenp1, elsep1) setType ptOrLub(List(thenp1.tpe, elsep1.tpe))
           }
 
-        case Match(selector, cases) =>
-          val selector1 = typed(selector)
-          val cases1 = typedCases(tree, cases, selector1.tpe.widen, pt)
-          copy.Match(tree, selector1, cases1) setType ptOrLub(cases1 map (.tpe))
+	        case Match(selector, cases) =>
+	          val selector1 = typed(selector)
+	          val selectorIsError = selector1.tpe.isError;
+	          val cases1 =
+                    if (selectorIsError) cases map (cdef => { cdef setType ErrorType; cdef })
+                    else typedCases(tree, cases, selector1.tpe.widen, pt)
+	          copy.Match(tree, selector1, cases1) setType (
+                    if (selectorIsError) ErrorType
+                    else ptOrLub(cases1 map (.tpe)))
 
         case Return(expr) =>
           val enclFun = if (tree.symbol != NoSymbol) tree.symbol else context.owner.enclMethod
@@ -1698,4 +1716,3 @@ trait Typers requires Analyzer {
     }
   }
 }
-

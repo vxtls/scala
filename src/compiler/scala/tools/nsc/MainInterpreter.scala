@@ -18,12 +18,12 @@ object MainInterpreter {
 
   /** print a friendly help message */
   def printHelp = {
-    Console.println("This is an interpreter for Scala.")
-    Console.println("Type in expressions to have them evaluated.")
-    Console.println("Type :quit to exit the interpreter.")
-    Console.println("Type :compile followed by a filename to compile a complete Scala file.")
-    Console.println("Type :load followed by a filename to load a sequence of interpreter commands.")
-    Console.println("Type :help to repeat this message later.")
+    scala.Console.println("This is an interpreter for Scala.")
+    scala.Console.println("Type in expressions to have them evaluated.")
+    scala.Console.println("Type :quit to exit the interpreter.")
+    scala.Console.println("Type :compile followed by a filename to compile a complete Scala file.")
+    scala.Console.println("Type :load followed by a filename to load a sequence of interpreter commands.")
+    scala.Console.println("Type :help to repeat this message later.")
   }
 
   /** The main read-eval-print loop for the interpereter.  It calls
@@ -33,7 +33,7 @@ object MainInterpreter {
     val in = new BufferedReader(new InputStreamReader(System.in))
 
     while(true) {
-      Console.print("\nscala> ")
+      scala.Console.print("\nscala> ")
       var line = in.readLine()
       if(line == null)
         return ()  // assumes null means EOF
@@ -61,7 +61,7 @@ object MainInterpreter {
       new FileReader(filename)
     } catch {
       case _:IOException =>
-        Console.println("Error opening file: " + filename)
+        scala.Console.println("Error opening file: " + filename)
         null
     }
     if (fileIn == null) return ()
@@ -82,7 +82,7 @@ object MainInterpreter {
     def withFile(command: String)(action: String => Unit): Unit = {
       val spaceIdx = command.indexOf(' ')
       if (spaceIdx <= 0) {
-        Console.println("That command requires a filename to be specified.")
+        scala.Console.println("That command requires a filename to be specified.")
         return ()
       }
       val filename = command.substring(spaceIdx).trim
@@ -95,7 +95,7 @@ object MainInterpreter {
         case ":quit" => return false
         case _ if line.startsWith(":compile") => withFile(line)(f => interpreter.compile(f))
         case _ if line.startsWith(":load") => withFile(line)(f => interpretAllFrom(f))
-        case _ => Console.println("Unknown command.  Type :help for help.")
+        case _ => scala.Console.println("Unknown command.  Type :help for help.")
       }
     else if(line.startsWith("#!/")) // skip the first line of Unix scripts
     	()
@@ -118,14 +118,14 @@ object MainInterpreter {
     }
 
     val compiler = new Global(command.settings, reporter)
-    interpreter = new Interpreter(compiler, str=>Console.print(str))
+    interpreter = new Interpreter(compiler, str=>scala.Console.print(str))
 
     try {
       if(!command.files.isEmpty) {
         interpreter.beQuiet
         command.files match {
           case List(filename) => interpretAllFrom(filename)
-          case _ => Console.println(
+          case _ => scala.Console.println(
               "Sorry, arguments to interpreter scripts are not currently supported.")
         }
       } else {

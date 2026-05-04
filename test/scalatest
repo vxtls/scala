@@ -148,8 +148,6 @@ test_print_help() {
     echo "--jvm           next files test the JVM backend";
     echo "--pos           next files test a compilation success";
     echo "--neg           next files test a compilation failure";
-    echo "--msil          next files test the .NET backend";
-    echo "--quick         use the 'quick' build instead of distribution";
     echo "--no-run        run no test, use results of last run";
     echo "--show-log      show output of failed tests";
     echo "--show-diff     show differences between actual and expected output";
@@ -237,28 +235,6 @@ test_run_dis() {
     $SOCOS -d "$os_dstbase".obj "$@" "$os_srcbase".scala &&
     $SCALAP -classpath "$os_dstbase".obj `cat "$argsfile"` &&
     rm -rf "$dstbase".obj;
-}
-
-# Tests the .NET backend.
-test_run_msil() {
-    assemblies=`get_os_pathlist "/home/linuxsoft/apps/msil"`;
-    rm -f "$dstbase".il &&
-    rm -f "$dstbase".EXE &&
-    $SOCOS -nowarn -target:msil -o "$os_dstbase" -r $assemblies "$@" \
-        "$os_srcbase".scala &&
-    case "$UNAME" in
-        CYGWIN* )
-            ilasm /qui /nol /out="$os_dstbase".EXE "$os_dstbase".il \
-                > /dev/null &&
-#             peverify /il "$os_dstbase".EXE > /dev/null &&
-            "$dstbase".EXE "msil";;
-        * )
-            ilasm /output:"$os_dstbase".EXE "$os_dstbase".il \
-                > /dev/null &&
-            mono "$dstbase".EXE "msil";;
-    esac &&
-    rm -f "$dstbase".EXE &&
-    rm -f "$dstbase".il;
 }
 
 # Checks the specified test.
@@ -374,8 +350,6 @@ test_check_all() {
         "pos" $FILES_POS;
     test_check_kind "Testing compiler (on files whose compilation should fail)" \
         "neg" $FILES_NEG;
-    test_check_kind "Testing .NET backend" \
-	"msil" $FILES_MSIL;
 }
 
 
@@ -399,7 +373,6 @@ test_add_file() {
         jvm  ) FILES_JVM="$FILES_JVM $1"; return;;
         pos  ) FILES_POS="$FILES_POS $1"; return;;
         neg  ) FILES_NEG="$FILES_NEG $1"; return;;
-	msil ) FILES_MSIL="$FILES_MSIL $1"; return;;
         *    ) abort "unknown test type \`$TEST_TYPE'";;
     esac;
     case "$1" in
@@ -407,7 +380,6 @@ test_add_file() {
         jvm  | */jvm  | */jvm/*  | jvm/*  ) FILES_JVM="$FILES_JVM $1";;
         pos  | */pos  | */pos/*  | pos/*  ) FILES_POS="$FILES_POS $1";;
         neg  | */neg  | */neg/*  | neg/*  ) FILES_NEG="$FILES_NEG $1";;
-        msil | */msil | */msil/* | msil/* ) FILES_MSIL="$FILES_MSIL $1";;
         * ) abort "don't known what to do with \`$1'";;
     esac;
 }
@@ -453,20 +425,15 @@ FILES_RUN="";
 FILES_JVM="";
 FILES_POS="";
 FILES_NEG="";
-FILES_MSIL="";
 
-QUICK="$PREFIX/build/quick/exec"
-if [ -d "$PREFIX/dists" ]; then
-    LATEST="$PREFIX/dists/latest/bin";
-else
-    if [ -d "$PREFIX/build" ]; then
-        LATEST="$QUICK";
-    else
-        LATEST="$PREFIX/bin";
-    fi;
-fi;
-BIN_DIR="$LATEST"
+case `uname` in
+    CYGWIN* ) LATEST="$PREFIX/distribs/windows/latest";;
+    *       ) LATEST="$PREFIX/distribs/unix/latest";;
+esac;
 
+SCALA="$LATEST/bin/scala";
+SOCOS="$LATEST/bin/scalac";
+SCALAP="$LATEST/bin/scalatok";
 DIFF="diff";
 
 case `uname` in
@@ -482,8 +449,6 @@ while [ $# -gt 0 ]; do
         --jvm        ) TEST_TYPE="jvm"; shift 1;;
         --pos        ) TEST_TYPE="pos"; shift 1;;
         --neg        ) TEST_TYPE="neg"; shift 1;;
-        --msil       ) TEST_TYPE="msil"; shift 1;;
-        --quick      ) BIN_DIR="$QUICK"; shift 1;;
         --no-run     ) NORUN="true"; shift 1;;
         --show-log   ) SHOWLOG="true"; shift 1;;
         --show-diff  ) SHOWDIFF="true"; shift 1;;
@@ -524,14 +489,7 @@ if [ "$TEST_ALL" = "true" ]; then
     case "$TEST_TYPE" in
         auto | neg ) FILES_NEG="$FILES_NEG $SRCDIR/neg";;
     esac;
-    case "$TEST_TYPE" in
-               msil ) FILES_MSIL="$FILES_MSIL $SRCDIR/run";;
-    esac;
 fi;
-
-SCALA="$BIN_DIR/scala";
-SOCOS="$BIN_DIR/scalac";
-SCALAP="$LATEST/scalap";
 
 SCALA_SCALA_ARGS="-Xmx512M $SCALA_SCALA_ARGS";
 export SCALA_SCALA_ARGS;
@@ -544,16 +502,16 @@ if [ -n "$OBJDIR" ]; then
     fi
 fi
 
-printf_outline "Source directory is : $SRCDIR\\n";
-printf_outline "Scala binaries in   : $BIN_DIR\\n";
-jvm_version=`${JAVACMD:=java} -version 2>&1 | head -3 | tail -1`
-printf_outline "Java runtime is     : $jvm_version\\n\\n";
+printf_outline "Source directory is  : $SRCDIR\\n";
+printf_outline "Scala distribution is: $LATEST\\n";
+JVM_VERSION=`${JAVA_CMD:=java} -version 2>&1 | head -2 | tail -1`
+printf_outline "Java runtime is      : $JVM_VERSION\\n\\n";
 
 test_check_all;
 
 TOTAL_COUNT=`echo "$FAILURE_COUNT+$SUCCESS_COUNT" | bc`;
 if [ $FAILURE_COUNT -eq 0 ]; then
-    printf_success "All of $TOTAL_COUNT tests were successful\\n";
+    printf_success "All $TOTAL_COUNT tests were successful\\n";
 else
     printf_failure "$FAILURE_COUNT of $TOTAL_COUNT tests failed\\n";
 fi;

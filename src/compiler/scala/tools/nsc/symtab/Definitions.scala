@@ -71,7 +71,6 @@ trait Definitions requires SymbolTable {
       def List_head = getMember(ListClass, nme.head);
       def List_tail = getMember(ListClass, nme.tail);
     var ArrayClass: Symbol = _;
-    var TypeClass: Symbol = _;
     var SerializableClass: Symbol = _;
     //var NonNullClass: Symbol = _;
     var PredefModule: Symbol = _;
@@ -155,8 +154,8 @@ trait Definitions requires SymbolTable {
     var String_+           : Symbol = _;
 
     // members of class scala.Iterator
-    var Iterator_next      : Symbol = _;
-    var Iterator_hasNext   : Symbol = _;
+      def Iterator_next = getMember(IteratorClass, nme.next);
+      def Iterator_hasNext = getMember(IteratorClass, nme.hasNext);
 
     // pattern wildcard
     var PatternWildcard: Symbol = _;
@@ -349,7 +348,6 @@ trait Definitions requires SymbolTable {
       SeqClass = getClass("scala.Seq");
       ListClass = getClass("scala.List");
       ArrayClass = getClass("scala.Array");
-      //TypeClass = getClass("scala.Type");
       SerializableClass = getClass("java.io.Serializable");
       //NonNullClass = getClass("scala.NonNull");
       PredefModule = getModule("scala.Predef");

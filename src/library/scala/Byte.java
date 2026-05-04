@@ -78,7 +78,7 @@ public abstract class Byte    extends AnyVal implements java.io.Serializable {
     public double  $percent   (double  that) { return  value %  that; }
 
     /** @meta method []scala.Double ; */
-    public double  coerce     (            ) { return  value        ; }
+    public double  coerceToDouble(         ) { return  value        ; }
 
     public boolean $eq$eq     (float   that) { return  value == that; }
     public boolean $bang$eq   (float   that) { return  value != that; }
@@ -93,7 +93,7 @@ public abstract class Byte    extends AnyVal implements java.io.Serializable {
     public float   $percent   (float   that) { return  value %  that; }
 
     /** @meta method []scala.Float  ; */
-    public float   coerce     (            ) { return  value        ; }
+    public float   coerceToFloat(          ) { return  value        ; }
     /** @meta method []scala.Int    ; */
     public int     $tilde     (            ) { return ~value        ; }
 
@@ -120,7 +120,7 @@ public abstract class Byte    extends AnyVal implements java.io.Serializable {
     public long    $up        (long    that) { return  value ^  that; }
 
     /** @meta method []scala.Long   ; */
-    public long    coerce     (            ) { return  value        ; }
+    public long    coerceToLong(           ) { return  value        ; }
 
     public boolean $eq$eq     (int     that) { return  value == that; }
     public boolean $bang$eq   (int     that) { return  value != that; }
@@ -138,10 +138,10 @@ public abstract class Byte    extends AnyVal implements java.io.Serializable {
     public int     $up        (int     that) { return  value ^  that; }
 
     /** @meta method []scala.Int    ; */
-    public int     coerce     (            ) { return  value        ; }
+    public int     coerceToInt(            ) { return  value        ; }
 
     /** @meta method []scala.Short  ; */
-    public short   coerce     (            ) { return  value        ; }
+    public short   coerceToShort(          ) { return  value        ; }
 
 
     public boolean $eq$eq     (char     that) { return  value == that; }

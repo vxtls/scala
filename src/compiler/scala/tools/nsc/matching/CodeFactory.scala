@@ -17,7 +17,7 @@ trait CodeFactory requires TransMatcher  {
   /** returns  `List[ Tuple2[ scala.Int, <elemType> ] ]' */
   def SeqTraceType( elemType: Type  ):  Type = {
     appliedType(definitions.ListClass.typeConstructor,
-                List(pairType(definitions.IntClass.info,
+	                List(pairType(definitions.IntClass.tpe,
                               elemType)))
   }
 
@@ -38,13 +38,13 @@ trait CodeFactory requires TransMatcher  {
    */
   def getElemType_Sequence(tpe: Type):  Type = {
     //System.err.println("getElemType_Sequence("+tpe.widen()+")");
-    val tpe1 = tpe.widen.baseType( definitions.SeqClass );
+	    val tpe1 = tpe.widen.baseType( definitions.SeqClass );
 
-    if( tpe1 == NoType )
-      Predef.error("arg "+tpe+" not subtype of Seq[ A ]");
+	    if( tpe1 == NoType )
+	      return definitions.AnyClass.tpe;
 
-    return tpe1.typeArgs( 0 );
-  }
+	    return tpe1.typeArgs( 0 );
+	  }
 
 
   // --------- these are new
@@ -191,13 +191,19 @@ trait CodeFactory requires TransMatcher  {
   //deprecated
   def ThrowMatchError(pos: Int, tpe: Type ) =
     atPos(pos) {
-      Throw(
-        New(
-          TypeTree(definitions.MatchErrorClass.tpe),
-          List(List(
-            Literal(cunit.toString()),
-            Literal(Position.line(cunit.source, pos))))))
+      Apply(
+        TypeApply(
+          Select(Ident(definitions.MatchErrorModule).setType(definitions.MatchErrorModule.tpe),
+                 definitions.MatchError_fail),
+          List(TypeTree(tpe))
+        ),
+        List(
+          Literal(cunit.toString()),
+          Literal(Position.line(cunit.source, pos))
+        )
+      )
     }
+
 //new
   def ThrowMatchError(pos: Int, obj: Tree ) =
     atPos(pos) {
@@ -208,19 +214,6 @@ trait CodeFactory requires TransMatcher  {
             obj
           ))))
     }
-
-/*
- Apply(
-      TypeApply(
-        gen.mkRef(definitions.MatchError_fail),
-        List(TypeTree(tpe))
-      ),
-      List(
-        Literal(cunit.toString()),
-        Literal(Position.line(cunit.source, pos))
-      )
-    );
-*/
 
   /* // ?!
   def ThrowMatchError(pos:int , tree:Tree ) =
@@ -248,4 +241,3 @@ trait CodeFactory requires TransMatcher  {
     );
   */
 }
-

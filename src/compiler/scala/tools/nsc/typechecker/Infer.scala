@@ -25,8 +25,12 @@ trait Infer requires Analyzer {
    *  (nargs - params.length + 1) copies of its type is returned. */
   def formalTypes(formals: List[Type], nargs: int): List[Type] = {
     val formals1 = formals map {
-      case TypeRef(_, sym, List(arg)) if (sym == ByNameParamClass) => arg
-      case formal => formal
+      formal =>
+        if (formal.isInstanceOf[TypeRef]) {
+          val tref = formal.asInstanceOf[TypeRef];
+          if (tref.sym == ByNameParamClass && tref.args.length == 1) tref.args.head
+          else formal
+        } else formal
     }
     if (!formals1.isEmpty && (formals1.last.symbol == RepeatedParamClass)) {
       val ft = formals1.last.typeArgs.head;
@@ -54,17 +58,19 @@ trait Infer requires Analyzer {
    *  throw a NoInstance exception if a NoType or WildcardType is encountered.
    *  @throws   NoInstance
    */
-  def instantiate(tp: Type): Type = tp match {
-    case WildcardType | NoType =>
+  def instantiate(tp: Type): Type =
+    if (tp == WildcardType || tp == NoType)
       throw new NoInstance("undetermined type");
-    case TypeVar(origin, constr) =>
+    else if (tp.isInstanceOf[TypeVar]) {
+      val tvar = tp.asInstanceOf[TypeVar];
+      val origin = tvar.origin;
+      val constr = tvar.constr;
       assert(constr.inst != null);//debug
       if (constr.inst != NoType) instantiate(constr.inst)
       else throw new DeferredNoInstance(() =>
 	"no unique instantiation of type variable " + origin + " could be found");
-    case _ =>
+    } else
       instantiateMap.mapOver(tp)
-  }
 
   /** Is type fully defined, i.e. no embedded anytypes or wildcards in it? */
   def isFullyDefined(tp: Type): boolean = try {
@@ -97,9 +103,13 @@ trait Infer requires Analyzer {
 	tvar.constr.inst = null;
 	val bound: Type = if (up) tparam.info.bounds.hi else tparam.info.bounds.lo;
 	var cyclic = false;
-	for (val Pair(tvar2, Pair(tparam2, variance2)) <- config) {
+	for (val entry <- config) {
+	  val tvar2 = entry._1;
+	  val entry2 = entry._2;
+	  val tparam2 = entry2._1;
+	  val variance2 = entry2._2;
 	  if (tparam2 != tparam &&
-              ((bound contains tparam2) ||
+	      ((bound contains tparam2) ||
 	       up && (tparam2.info.bounds.lo =:= tparam.tpe) ||
 	       !up && (tparam2.info.bounds.hi =:= tparam.tpe))) {
 	    if (tvar2.constr.inst == null) cyclic = true;
@@ -535,11 +545,13 @@ trait Infer requires Analyzer {
 	  if (restpe <:< pt.subst(ptparams, ptvars)) {
 	    for (val tvar <- ptvars) {
 	      val tparam = tvar.origin.symbol;
-	      val Pair(loBounds, hiBounds) =
- 		if (tvar.constr.inst != NoType && isFullyDefined(tvar.constr.inst))
+	      val boundsPair =
+	 	if (tvar.constr.inst != NoType && isFullyDefined(tvar.constr.inst))
 		  Pair(List(tvar.constr.inst), List(tvar.constr.inst))
 		else
 		  Pair(tvar.constr.lobounds, tvar.constr.hibounds);
+	      val loBounds = boundsPair._1;
+	      val hiBounds = boundsPair._2;
 	      if (!loBounds.isEmpty || !hiBounds.isEmpty) {
                 context.nextEnclosing(.tree.isInstanceOf[CaseDef]).pushTypeBounds(tparam);
 		tparam setInfo TypeBounds(
@@ -562,12 +574,10 @@ trait Infer requires Analyzer {
           result = sym :: result;
       }
       override def traverse(tp: Type): TypeTraverser = {
-        tp match {
-          case TypeRef(NoPrefix, sym, _) =>
-	    includeIfTypeParam(sym)
-	  case TypeRef(ThisType(_), sym, _) =>
-	    includeIfTypeParam(sym)
-	  case _ =>
+        if (tp.isInstanceOf[TypeRef]) {
+          val tref = tp.asInstanceOf[TypeRef];
+          if (tref.pre == NoPrefix) includeIfTypeParam(tref.sym)
+	  else if (tref.pre.isInstanceOf[ThisType]) includeIfTypeParam(tref.sym)
         }
         mapOver(tp);
         this

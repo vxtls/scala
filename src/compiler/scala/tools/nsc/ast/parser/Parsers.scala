@@ -481,7 +481,7 @@ trait Parsers requires SyntaxAnalyzer {
     */
     def requiresTypeOpt(): Tree =
       if (in.token == COLON | in.token == REQUIRES) {
-        if (in.token == COLON)
+        if (in.token == COLON && settings.migrate.value)
           warning("`:' has been deprecated; use `requires' instead");
         in.nextToken(); simpleType()
       }
@@ -858,6 +858,11 @@ trait Parsers requires SyntaxAnalyzer {
 	  t = errorTermTree
       }
       while (true) {
+	if (in.token == NEWLINE && !isNew && (in.next.token == LPAREN || in.next.token == LBRACE) && (t match {
+	  case Ident(_) | Select(_, _) | TypeApply(_, _) => true
+	  case _ => false
+	}))
+	  in.nextToken();
 	in.token match {
 	  case DOT =>
 	    t = atPos(in.skipToken()) { selector(t) }

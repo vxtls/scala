@@ -77,7 +77,7 @@ abstract class GenJVM extends SubComponent {
     var jmethod: JMethod = _;
     var jcode: JExtendedCode = _;
 
-    val fjbgContext = new FJBGContext();
+    val fjbgContext = new ScalaFJBGContext();
 
     def emitClass(jclass: JClass, sym: Symbol): Unit = {
       def addScalaAttr(sym: Symbol): Unit = currentRun.symData.get(sym) match {
@@ -94,11 +94,16 @@ abstract class GenJVM extends SubComponent {
         case _ =>
           log("Could not find pickle information for " + sym);
       }
-      if (!jclass.getName().endsWith("$"))
-        addScalaAttr(if (isTopLevelModule(sym)) sym.sourceModule else sym);
-      val outfile = getFile(jclass, ".class");
-      jclass.writeTo(outfile);
-      val file = scala.tools.util.AbstractFile.getFile(outfile);
+	      if (!jclass.getName().endsWith("$"))
+	        addScalaAttr(if (isTopLevelModule(sym)) sym.sourceModule else sym);
+	      val outfile = getFile(jclass, ".class");
+	      try {
+	        jclass.writeTo(outfile);
+	      } catch {
+	        case ex: Throwable =>
+	          throw new Error("error writing class " + jclass.getName() + " for " + sym, ex)
+	      }
+	      val file = scala.tools.util.AbstractFile.getFile(outfile);
       informProgress("wrote " + outfile + " " + (if (file != null) "" + file.getFile() + " " + file.getFile().exists() else "no file"));
     }
 
@@ -825,6 +830,10 @@ abstract class GenJVM extends SubComponent {
           if (dst == BOOL) {
             Console.println("Illegal conversion at: " + clasz +
                             " at: " + method.sourceFile + ":" + Position.line(clasz.cunit.source, pos));
+          } else if (!src.isValueType || !dst.isValueType) {
+            abort("Illegal primitive conversion from " + src + " to " + dst +
+                  " at: " + clasz + " at: " + method.sourceFile + ":" +
+                  Position.line(clasz.cunit.source, pos));
           } else
             jcode.emitT2T(javaType(src), javaType(dst));
 

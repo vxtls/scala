@@ -71,7 +71,7 @@ package scala.tools.ant {
     abstract class PermissibleValue {
       val values: List[String]
       def isPermissible(value: String): Boolean =
-        (value == "") || values.exists(.startsWith(value))
+        (value == "") || values.exists(v: String => v startsWith value)
     }
 
     /** Defines valid values for the logging property. */
@@ -364,7 +364,7 @@ package scala.tools.ant {
       * ant file.
       * @param message A message describing the error.
       * @throws BuildException A build error exception thrown in every case. */
-    private def error(message: String): Nothing =
+    private def error(message: String): All =
       throw new BuildException(message, getLocation())
 
 /******************************************************************************\
