@@ -20,22 +20,27 @@ trait Namers requires Analyzer {
    *  2. The skolem is a method parameter which appears in parameter `tparams'
    */
   class DeSkolemizeMap(tparams: List[Symbol]) extends TypeMap {
-    def apply(tp: Type): Type = tp match {
-      case TypeRef(pre, sym, args) =>
-      val tparam = sym.deSkolemize;
-      mapOver(
-          if (tparam == sym || !(tparams contains tparam)) tp
-          else rawTypeRef(NoPrefix, tparam, args))
-      case SingleType(pre, sym) if (sym.isThisSkolem) =>
-        ThisType(sym.deSkolemize)
-      case PolyType(tparams1, restpe) =>
-        new DeSkolemizeMap(tparams1 ::: tparams).mapOver(tp)
-      case ClassInfoType(parents, decls, clazz) =>
+    def apply(tp: Type): Type =
+      if (tp.isInstanceOf[TypeRef]) {
+        val tref = tp.asInstanceOf[TypeRef];
+        val tparam = tref.sym.deSkolemize;
+        mapOver(
+          if (tparam == tref.sym || !(tparams contains tparam)) tp
+          else rawTypeRef(NoPrefix, tparam, tref.args))
+      } else if (tp.isInstanceOf[SingleType] &&
+                 tp.asInstanceOf[SingleType].sym.isThisSkolem) {
+        val st = tp.asInstanceOf[SingleType];
+        ThisType(st.sym.deSkolemize)
+      } else if (tp.isInstanceOf[PolyType]) {
+        val pt = tp.asInstanceOf[PolyType];
+        new DeSkolemizeMap(pt.typeParams ::: tparams).mapOver(tp)
+      } else if (tp.isInstanceOf[ClassInfoType]) {
+        val ci = tp.asInstanceOf[ClassInfoType];
+        val parents = ci.parents;
         val parents1 = List.mapConserve(parents)(this);
-        if (parents1 eq parents) tp else ClassInfoType(parents1, decls, clazz);
-      case _ =>
+        if (parents1 eq parents) tp else ClassInfoType(parents1, ci.decls, ci.symbol)
+      } else
         mapOver(tp)
-    }
   }
 
   class Namer(val context: Context) {
@@ -191,7 +196,11 @@ trait Namers requires Analyzer {
 
     def skolemize(tparams: List[AbsTypeDef]): unit = {
       val tskolems = newTypeSkolems(tparams map (.symbol));
-      for (val Pair(tparam, tskolem) <- tparams zip tskolems) tparam.symbol = tskolem
+      for (val entry <- tparams zip tskolems) {
+        val tparam = entry._1;
+        val tskolem = entry._2;
+        tparam.symbol = tskolem
+      }
     }
 
     def applicableTypeParams(owner: Symbol): List[Symbol] =
@@ -306,7 +315,10 @@ trait Namers requires Analyzer {
       override def complete(sym: Symbol): unit = {
         if (settings.debug.value) log("defining " + sym);
         val tp = typeSig(tree);
-        sym.setInfo(tp);
+        if (sym.isModuleClass && tree.symbol.isModule &&
+            tp.isInstanceOf[TypeRef] && tp.asInstanceOf[TypeRef].sym == sym)
+          tree.symbol.setInfo(tp)
+        else sym.setInfo(tp);
         if (settings.Xgadt.value) System.out.println("" + sym + ":" + tp);
         if (settings.debug.value) log("defined " + sym);
         validate(sym);
@@ -608,4 +620,3 @@ trait Namers requires Analyzer {
 
   abstract class TypeCompleter(val tree: Tree) extends LazyType;
 }
-

@@ -342,6 +342,7 @@ trait StdNames requires SymbolTable {
     val _mutable             = newTermName("mutable");
     val _append              = newTermName("append");
     val _plus                = newTermName("$amp$plus");
+    val _plusplus            = newTermName("$amp$plus$plus");
     val _collection          = newTermName("collection");
     val _toList              = newTermName("toList");
     val _xml                 = newTermName("xml");

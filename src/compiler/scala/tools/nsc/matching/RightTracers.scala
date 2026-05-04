@@ -11,7 +11,7 @@ import java.util._ ;
 import scala.tools.nsc.util.Position;
 import scala.tools.nsc.symtab.Flags;
 
-mixin class RightTracers requires TransMatcher {
+trait RightTracers requires TransMatcher {
 
   import global._ ;
   import java.util._ ;
@@ -65,8 +65,7 @@ abstract class RightTracerInScala  extends Autom2Scala {
     def traverse(tree: Tree): Unit = {
       tree match {
         case x @ Ident(name)=>
-          if(x.symbol != definitions.PatternWildcard)
-            scala.Predef.error("shouldn't happen?!");
+          ;
 
         case Star(t) =>
           traverse(t);
@@ -93,6 +92,15 @@ abstract class RightTracerInScala  extends Autom2Scala {
   //final def defs = cf.defs;
 
   val allVars: Set = collectVars( pat );
+
+  val allVarIt = allVars.iterator();
+  while (allVarIt.hasNext()) {
+    val varSym = allVarIt.next().asInstanceOf[Symbol];
+    if (varSym.tpe != null &&
+        varSym.tpe != NoType &&
+        varSym.tpe.widen.baseType(definitions.SeqClass) != NoType)
+      seqVars.add(varSym);
+  }
 
   var varsToExport: Set = new HashSet(); // @todo HANDLE seqVars THESE GLOBALLY INSTEAD OF LOCALLY
 
@@ -144,8 +152,9 @@ abstract class RightTracerInScala  extends Autom2Scala {
       helpVar.setInfo( realVar.tpe );
       rhs = EmptyTree;
     } else {
-      helpVar.setInfo( definitions.ListClass.info /* LIST_TYPE(elementType)*/ );
-      rhs = gen.mkNil;
+      helpVar.setInfo(appliedType(definitions.ListClass.typeConstructor,
+                                  scala.List(elementType)) /* LIST_TYPE(elementType)*/ );
+      rhs = gen.mkAsInstanceOf(gen.mkNil, helpVar.info, true);
     }
 
     helpMap.put( realVar, helpVar );
@@ -176,21 +185,21 @@ abstract class RightTracerInScala  extends Autom2Scala {
     .setInfo( SeqTraceType( elementType ));
 
     this.stateSym = owner.newVariable ( pos, fresh.newName("q"))
-    .setInfo( definitions.IntClass.info ) ;
+    .setInfo( definitions.IntClass.tpe ) ;
 
     this.curSym = owner.newVariable( pos, fresh.newName("cur"))
     .setInfo( elementType ) ;
 
     this.targetSym = owner.newVariable( pos, fresh.newName("p"))
-    .setInfo( definitions.IntClass.info ) ;
+    .setInfo( definitions.IntClass.tpe ) ;
 
     funSym.setInfo(
       MethodType( scala.List (  // dummy symbol MethodType
         SeqTraceType(elementType),
         //funSym.newValueParameter( pos, fresh.newName("iter") /*, SeqTraceType elementType */),
-        definitions.IntClass.info),
+        definitions.IntClass.tpe),
       //funSym.newValueParameter( pos, fresh.newName( "q" ) /*, definitions.IntClass.info */),
-                     definitions.UnitClass.info)) // result
+                     definitions.UnitClass.tpe)) // result
 
   }
 
@@ -362,13 +371,19 @@ abstract class RightTracerInScala  extends Autom2Scala {
      */
     //System.out.println("RightTracerInScala::freshenMap :"+freshenMap);
 
-    // "freshening"
+    val symbolFreshener = new Transformer {
+      override val copy = new StrictTreeCopier;
 
-    //@nsc @todo @todo @todo @todo
-
-    //val tc = new TreeCloner( global, freshenMap, Type.IdMap );
-    //pat = tc.transform( pat );
-    //@nsc   this commented out, is broken anyway.
+      override def transform(tree1: Tree): Tree = {
+        val tree = super.transform(tree1);
+        if (tree.hasSymbol) {
+          val symbol = freshenMap.get(tree.symbol);
+          if (symbol != null) tree.setSymbol(symbol.asInstanceOf[Symbol]);
+        }
+        tree;
+      }
+    };
+    pat = symbolFreshener.transform(pat);
 
     // val match  case <pat> =>  <do binding>; true
     //             case _     => false
@@ -389,6 +404,8 @@ abstract class RightTracerInScala  extends Autom2Scala {
 
     val theBody =  Block(ts, Literal( true )); // just `true'
 
+    val savedResultType = resultType;
+    resultType = definitions.BooleanClass.tpe;
     am.construct( m, scala.List(
       CaseDef( pat, theBody), // freshening
       // if tree val matches pat -> update vars, return true
@@ -397,7 +414,9 @@ abstract class RightTracerInScala  extends Autom2Scala {
                  true // do binding please
                );
 
-    am.toTree();
+    val tree = m.tree;
+    resultType = savedResultType;
+    tree;
   }
 
   /** returns translation of transition with label from i.
@@ -507,7 +526,7 @@ abstract class RightTracerInScala  extends Autom2Scala {
   def refHelpVar(realVar: Symbol) = {
     val hv = helpMap.get( realVar ).asInstanceOf[Symbol];
     //assert hv != null : realVar;
-    Ident(hv);
+    Ident(hv).setType(hv.info);
   }
 
   def assignToHelpVar(realVar: Symbol, rhs: Tree): Tree = {
@@ -527,10 +546,10 @@ abstract class RightTracerInScala  extends Autom2Scala {
      else
      return gen.ValDef( realVar, hv );
      */
-    if( isSameType(realVar.tpe, hv.tpe))
-      ValDef( realVar, hv ); // e.g. x @ _*
-    else {
+    if( isSameType(realVar.tpe, elementType))
       ValDef( realVar, SeqList_head( hv ));
+    else {
+      ValDef( realVar, gen.mkAsInstanceOf(hv, realVar.tpe, true) ); // e.g. x @ _*
     }
   }
 }

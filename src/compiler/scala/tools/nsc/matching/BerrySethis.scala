@@ -4,7 +4,7 @@ import java.util.{ HashSet, HashMap, TreeSet, TreeMap, Vector };
 
 //import scala.compiler.printer.XMLAutomPrinter;
 
-mixin class BerrySethis requires TransMatcher {
+trait BerrySethis requires TransMatcher {
 
 import global._;
 /** a Berry-Sethi style construction for nfas.
@@ -48,6 +48,7 @@ class BerrySethi {
     //DEBUG.print( pat );
     //System.out.println("</nullable>");
     pat match {
+      case Typed(tree, _)       => nullable(tree);
       case Apply(_, _)          => false;
       case Sequence( trees )    => trees.isEmpty || (trees forall {nullable});
       case Star(t)              => true; // ? new
@@ -91,6 +92,14 @@ class BerrySethi {
     pat match {
       case Sequence( trees ) =>
         return compFirst( trees );
+      case Typed(tree @ Sequence(_), _) =>
+        return compFirst(tree);
+      case Typed(tree @ Star(_), _) =>
+        return compFirst(tree);
+      case Typed(tree @ Alternative(_), _) =>
+        return compFirst(tree);
+      case Typed(tree @ Bind(_, _), _) =>
+        return compFirst(tree);
       case Typed(_,_) |  Select(_,_) | Apply(_, _) =>
         val tmp = new TreeSet();
         tmp.add( posMap.get( pat ).asInstanceOf[Integer]); // singleton set
@@ -114,6 +123,9 @@ class BerrySethi {
       case Bind(_, tree) =>
         return compFirst(tree);
 
+      case Star(tree) =>
+        return compFirst(tree);
+
       case Ident(  name ) =>
         //if (name != Name.fromString("_"))
         //    error("unexpected pattern");
@@ -135,7 +147,18 @@ class BerrySethi {
     //DEBUG.print( pat );
     //System.out.println("</compLast>");
     pat match {
-      case Sequence( _ ) | Apply(_, _) =>
+      case Sequence(trees) =>
+        return compLast(trees);
+      case Typed(tree @ Sequence(_), _) =>
+        return compLast(tree);
+      case Typed(tree @ Star(_), _) =>
+        return compLast(tree);
+      case Typed(tree @ Alternative(_), _) =>
+        return compLast(tree);
+      case Typed(tree @ Bind(_, _), _) =>
+        return compLast(tree);
+
+      case Apply(_, _) =>
         val tmp = new TreeSet();
         tmp.add(posMap.get( pat ).asInstanceOf[Integer]); // singleton set
         return tmp;
@@ -156,6 +179,9 @@ class BerrySethi {
 
       case Bind( _, tree ) =>
         return compLast( tree );
+
+      case Star(tree) =>
+        return compLast(tree);
 
       case _ =>
         scala.Predef.error("unexpected pattern");
@@ -200,7 +226,7 @@ class BerrySethi {
       while( nullable(tmp) && (i >= 0 )) {
         tmp = pats( i );
         result.addAll( compLast( tmp ));
-        i = i + 1;
+        i = i - 1;
       }
     return result;
   }
@@ -256,6 +282,15 @@ class BerrySethi {
         }
       if( null == first ) first = new TreeSet();
       return first;
+
+      case Typed(tree @ Sequence(_), _) =>
+        return compFollow1(fol, tree);
+      case Typed(tree @ Star(_), _) =>
+        return compFollow1(fol, tree);
+      case Typed(tree @ Alternative(_), _) =>
+        return compFollow1(fol, tree);
+      case Typed(tree @ Bind(_, _), _) =>
+        return compFollow1(fol, tree);
 
       case Alternative( choices ) =>
         val first = new TreeSet();
@@ -373,6 +408,19 @@ class BerrySethi {
     pat match {
 
       // (is tree automaton stuff, more than Berry-Sethi)
+      case Typed(tree @ Sequence(_), _) =>
+        traverse(tree);
+        return ;
+      case Typed(tree @ Star(_), _) =>
+        traverse(tree);
+        return ;
+      case Typed(tree @ Alternative(_), _) =>
+        traverse(tree);
+        return ;
+      case Typed(tree @ Bind(_, _), _) =>
+        traverse(tree);
+        return ;
+
       case Apply( _, _ ) | Typed( _, _ )| Select( _, _ ) =>
         val label = new TreeLabel( pat );
         seenLabel( pat, label ) ;
@@ -421,11 +469,10 @@ class BerrySethi {
               return ;
             }
 
-      scala.Predef.error("should not get here"); //  removed idents?
+      // _ and variable x ( == x @ _ )
       //if( null != recVars.get( pat.symbol ) ) {
       //  return ;
       //}
-      // _ and variable x ( == x @ _ )
       val label = DefaultLabel();
       seenLabel( pat, label );
 

@@ -11,5 +11,4 @@
 
 package scala.reflect;
 
-
 class TypedCode[T](val code: Code) {}

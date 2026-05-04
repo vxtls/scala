@@ -124,7 +124,7 @@ object Stream {
  * @author Martin Odersky, Matthias Zenger
  * @version 1.1 08/08/03
  */
-mixin class Stream[+a] extends Seq[a] {
+trait Stream[+a] extends Seq[a] {
 
   def isEmpty: Boolean;
   def head: a;

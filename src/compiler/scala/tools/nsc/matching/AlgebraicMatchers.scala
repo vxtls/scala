@@ -9,7 +9,7 @@ package scala.tools.nsc.matching;
 /** the pattern matcher, tweaked to work with regular patterns
  *  @author Burak Emir
  */
-mixin class AlgebraicMatchers  requires TransMatcher {
+trait AlgebraicMatchers  requires TransMatcher {
 
   import global._;
 
@@ -74,9 +74,34 @@ mixin class AlgebraicMatchers  requires TransMatcher {
 
     val result = exit.newValueParameter(root.pos, "resultA").setInfo( resultType );
 
+    def zeroValue(tpe: Type): Tree = {
+      val sym = tpe.widen.symbol;
+      if (sym == definitions.UnitClass)
+        Literal(Constant(())).setType(definitions.UnitClass.tpe)
+      else if (sym == definitions.BooleanClass)
+        Literal(Constant(false)).setType(definitions.BooleanClass.tpe)
+      else if (sym == definitions.ByteClass)
+        Literal(Constant(0.toByte)).setType(definitions.ByteClass.tpe)
+      else if (sym == definitions.ShortClass)
+        Literal(Constant(0.toShort)).setType(definitions.ShortClass.tpe)
+      else if (sym == definitions.CharClass)
+        Literal(Constant(0.toChar)).setType(definitions.CharClass.tpe)
+      else if (sym == definitions.IntClass)
+        Literal(Constant(0)).setType(definitions.IntClass.tpe)
+      else if (sym == definitions.LongClass)
+        Literal(Constant(0L)).setType(definitions.LongClass.tpe)
+      else if (sym == definitions.FloatClass)
+        Literal(Constant(0.0f)).setType(definitions.FloatClass.tpe)
+      else if (sym == definitions.DoubleClass)
+        Literal(Constant(0.0d)).setType(definitions.DoubleClass.tpe)
+      else
+        gen.mkAsInstanceOf(Literal(Constant(null)), tpe, true).setType(tpe)
+    }
+
     Block(
       List (
-        ValDef(root.symbol, _m.selector)
+        ValDef(root.symbol, _m.selector),
+        ValDef(result, zeroValue(resultType))
       ),
       If( super.toTree(root.and),
          LabelDef(exit, List(result), Ident(result)),
@@ -137,12 +162,13 @@ mixin class AlgebraicMatchers  requires TransMatcher {
     var defaultNode = collectSeqPats(node, seqPatNodes, bodies);
 
     val defaultCase = toTree(defaultNode, selector1);
+    val seqSelector = gen.mkAsInstanceOf(selector1.duplicate, node.getTpe(), true);
 
     val wordRec = new SequenceMatcher();
 
     val m = new PartialMatcher {
       val owner = _m.owner;
-      val selector = selector1;
+      val selector = seqSelector;
     }
 
     var pats: scala.List[Tree] = Nil;
@@ -164,7 +190,8 @@ mixin class AlgebraicMatchers  requires TransMatcher {
 
     //_m.defs.addAll(m.defs);
 
-    m.tree;
+    Or(And(gen.mkIsInstanceOf(selector1.duplicate, node.getTpe()), m.tree),
+       defaultCase);
   }
 
 } // class AlgebraicMatcher

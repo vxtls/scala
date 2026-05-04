@@ -10,7 +10,7 @@ import java.util._ ;
 
 import scala.tools.nsc.util.Position;
 
-mixin class LeftTracers requires TransMatcher {
+trait LeftTracers requires TransMatcher {
 
 import global._;
 
@@ -36,7 +36,7 @@ abstract class LeftTracerInScala extends Autom2Scala {
       .setInfo( _seqIterType( elementType ) ) ;
 
       this.stateSym = owner.newVariable( pos, fresh.newName( "q" ))
-      .setInfo( definitions.IntClass.info ) ;
+      .setInfo( definitions.IntClass.tpe ) ;
 
       this.accumType = _accumType( elementType );
       this.accumTypeArg = accumType.typeArgs( 0 );
@@ -52,7 +52,7 @@ abstract class LeftTracerInScala extends Autom2Scala {
       this.funSym.setInfo(
         MethodType(
           scala.List (  // dummy symbol MethodType
-            definitions.IntClass.info,
+            definitions.IntClass.tpe,
             accumType
           ),
           accumType)
@@ -71,7 +71,7 @@ abstract class LeftTracerInScala extends Autom2Scala {
       .setInfo( elementType );
 
       this.hasnSym = owner.newVariable( pos, nme.hasNext )
-      .setInfo( definitions.BooleanClass.info );
+      .setInfo( definitions.BooleanClass.tpe );
 
     }
 
@@ -105,7 +105,7 @@ abstract class LeftTracerInScala extends Autom2Scala {
         */
         val hd = gen.mkNewPair( Literal(i), currentElem() );
 
-        val newAcc = gen.mkNewCons(hd, Ident(accumSym ));
+        val newAcc = gen.mkNewCons(hd, Ident(accumSym ).setType(accumSym.info));
 
         //return callFun( new Tree[] { newAcc , _iter(), mkIntLit( pos, target )} );
         callFun( scala.List( Literal(target.intValue() ), newAcc ) );
@@ -176,7 +176,7 @@ abstract class LeftTracerInScala extends Autom2Scala {
    Block(scala.List(
       ValDef( iterSym, newIterator( selector )),
       ValDef( stateSym, Literal( 0 ) ),
-      ValDef( accumSym, gen.mkNil /*mkNil( pos )*/),
+      ValDef( accumSym, gen.mkAsInstanceOf(gen.mkNil, accumType, true) /*mkNil( pos )*/),
       ValDef( resultSym,
                  LabelDef( this.funSym,
                               scala.List (
@@ -205,11 +205,15 @@ abstract class LeftTracerInScala extends Autom2Scala {
           //scala.Predef.error("should not happen?!");
           null; // Literal(true); ?!
       case _ =>
+        val savedResultType = resultType;
+        resultType = definitions.BooleanClass.tpe;
         am.construct(m, scala.List (
           CaseDef( pat, Literal( true )),
           CaseDef( Ident( nme.WILDCARD ), Literal(false)) ),
                      false);
-      am.toTree();
+        val tree = m.tree;
+        resultType = savedResultType;
+        tree;
     }
   }
 
@@ -217,9 +221,9 @@ abstract class LeftTracerInScala extends Autom2Scala {
   /** return the accumulator + last state
    */
   override def run_finished(state: Int): Tree = {
-    val hd = gen.mkNewPair( Literal(state), EmptyTree);
+    val hd = gen.mkNewPair( Literal(state), zeroValue(elementType));
     //System.err.println(hd.type);
-    gen.mkNewCons(hd, Ident( accumSym ));
+    gen.mkNewCons(hd, Ident( accumSym ).setType(accumSym.info));
 /*
     mkNewCons(pos,
                   accumTypeArg,
