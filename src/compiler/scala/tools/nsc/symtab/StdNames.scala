@@ -227,6 +227,11 @@ trait StdNames requires SymbolTable {
     val caseName = newTermName("caseName");
     val checkCastability = newTermName("checkCastability");
     val coerce = newTermName("coerce");
+    val coerceToDouble = newTermName("coerceToDouble");
+    val coerceToFloat = newTermName("coerceToFloat");
+    val coerceToInt = newTermName("coerceToInt");
+    val coerceToLong = newTermName("coerceToLong");
+    val coerceToShort = newTermName("coerceToShort");
     val defaultValue = newTermName("defaultValue");
     val dummy = newTermName("$dummy");
     val elem = newTermName("elem");

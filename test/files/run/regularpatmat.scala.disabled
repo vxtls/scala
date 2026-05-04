@@ -1,6 +1,6 @@
 // Burak's test suite for regular pattern matching
 
-//import java.lang.System; // to avoid name clash with .NET's library
+//import java.lang.System; // to avoid name clash with platform libraries
 
 object Test {
   def main(args: Array[String]): Unit = {

@@ -39,7 +39,7 @@ abstract class ClassfileParser {
   private var staticDefs: Scope = _;       // the scope of all static definitions
   private var pool: ConstantPool = _;      // the classfile's constant pool
   private var isScala: boolean = _;        // does class file describe a scala class?
-  private var hasMeta: boolean = _;        // does class file contain jaco meta attribute?s
+  private var hasMeta: boolean = _;        // does class file contain meta attributes?
   private var busy: boolean = false;       // lock to detect recursive reads
   private var classTParams: Map[Name,Symbol] =
     collection.immutable.ListMap.Empty[Name,Symbol];
@@ -117,6 +117,12 @@ abstract class ClassfileParser {
           case CONSTANT_CLASS | CONSTANT_STRING =>
             in.skip(2);
           case CONSTANT_FIELDREF | CONSTANT_METHODREF | CONSTANT_INTFMETHODREF | CONSTANT_NAMEANDTYPE | CONSTANT_INTEGER | CONSTANT_FLOAT =>
+            in.skip(4);
+          case CONSTANT_METHODHANDLE =>
+            in.skip(3);
+          case CONSTANT_METHODTYPE =>
+            in.skip(2);
+          case CONSTANT_INVOKEDYNAMIC =>
             in.skip(4);
           case CONSTANT_LONG | CONSTANT_DOUBLE =>
             in.skip(8);
@@ -231,7 +237,7 @@ abstract class ClassfileParser {
           definitions.getClass(name.subName(start, end)).tpe
         case ARRAY_TAG =>
           while ('0' <= name(index) && name(index) <= '9') index = index + 1;
-          appliedType(definitions.ArrayClass.tpe, List(sig2type))
+          appliedType(definitions.ArrayClass.typeConstructor, List(sig2type))
         case '(' =>
           JavaMethodType(paramsigs2types, sig2type)
       }

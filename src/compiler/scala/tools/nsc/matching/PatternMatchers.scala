@@ -423,7 +423,7 @@ trait PatternMatchers requires (TransMatcher with PatternNodes) extends AnyRef w
         case MethodType(_, _) =>
           //Console.println("Hello?!");
           pHeader(pos, accType.resultType, Apply(accTree, List()));
-        // jaco case accessor
+        // case accessor
         case _ =>
           //Console.println("Hola?!");
           pHeader(pos, accType, accTree);

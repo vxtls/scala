@@ -22,9 +22,7 @@ scala/
            examples/          Scala example files.
            man/               UNIX manual files.
       lib/                    Pre-compiled libraries for the build.
-          ant-contrib.jar     Support libraries for the build tool.
           fjbg.jar            The Java byte-code generation library.
-          jaco.jar            The JaCo Java compiler.
           scala-compiler.jar  The last stable version of the Scala compiler.
           scala-library.jar   The last stable version of the Scala library.
       logs/ †                 Build tool log files.

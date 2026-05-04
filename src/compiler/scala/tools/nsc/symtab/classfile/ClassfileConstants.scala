@@ -59,4 +59,7 @@ object ClassfileConstants {
   final val VOID_TAG   = 'V';
   final val ANNOTATION_TAG = '@';
 
+  final val CONSTANT_METHODHANDLE = 15;
+  final val CONSTANT_METHODTYPE = 16;
+  final val CONSTANT_INVOKEDYNAMIC = 18;
 }

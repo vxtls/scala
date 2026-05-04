@@ -44,7 +44,7 @@ import scala.tools.nsc.util.Position;
 
 /**
  * The ICode intermediate representation. It is a stack-based
- * representation, very close to the JVM and .NET. It uses the
+ * representation, very close to the JVM. It uses the
  * erased types of Scala and references Symbols to refer named entities
  * in the source files.
  */

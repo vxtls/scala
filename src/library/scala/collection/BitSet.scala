@@ -102,7 +102,7 @@ abstract class BitSet extends AnyRef with Function1[Int,Boolean] with Set[Int] {
       res && (this.capacity <= other.capacity || {
         // if this set is bigger check that the rest is empty
         while (i < memsize(this.capacity) && res) {
-          res == arr(i) == 0;
+          res = arr(i) == 0;
           i = i + 1
         }
         res

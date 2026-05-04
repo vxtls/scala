@@ -4,7 +4,7 @@
 // $Id$
 
 //############################################################################
-// serves as an entry point with the MSIL backend
+// serves as an entry point for backend runtime checks
 
 object TestMain {
   def main(args: Array[String]): Unit = {
