@@ -245,6 +245,9 @@ trait Definitions requires SymbolTable {
       msym.setInfo(PolyType(List(tparam), tcon(tparam)))
     }
 
+    private def newParameterlessMethod(owner: Symbol, name: Name, restpe: Type) =
+      newMethod(owner, name).setInfo(PolyType(List(),restpe))
+
     private def newTypeParam(owner: Symbol, index: int): Symbol =
       owner.newTypeParameter(Position.NOPOS, "T" + index)
         .setInfo(TypeBounds(AllClass.typeConstructor, AnyClass.typeConstructor));
@@ -253,6 +256,16 @@ trait Definitions requires SymbolTable {
     val boxedArrayClass = new HashMap[Symbol, Symbol];
     val refClass = new HashMap[Symbol, Symbol];
     private val abbrvTag = new HashMap[Symbol, char];
+
+    private def newValueClass(name: Name, tag: char): Symbol = {
+      val clazz =
+        newClass(ScalaPackageClass, name, List(AnyValClass.typeConstructor));
+      boxedClass(clazz) = getClass("scala.runtime.Boxed" + name);
+      boxedArrayClass(clazz) = getClass("scala.runtime.Boxed" + name + "Array");
+      refClass(clazz) = getClass("scala.runtime." + name + "Ref");
+      abbrvTag(clazz) = tag;
+      clazz
+    }
 
     private def getValueClass(name: String, tag: char): Symbol = {
       val result = getClass("scala." + name);
@@ -265,12 +278,153 @@ trait Definitions requires SymbolTable {
       result
     }
 
+    private def initValueClasses: Unit = {
+      val booltype = BooleanClass.typeConstructor;
+      val boolparam = List(booltype);
+      val bytetype = ByteClass.typeConstructor
+      val byteparam = List(bytetype)
+      val chartype = CharClass.typeConstructor
+      val charparam = List(chartype)
+      val shorttype = ShortClass.typeConstructor
+      val shortparam = List(shorttype)
+      val inttype = IntClass.typeConstructor
+      val intparam = List(inttype)
+      val longtype = LongClass.typeConstructor
+      val longparam = List(longtype)
+      val floattype = FloatClass.typeConstructor
+      val floatparam = List(floattype)
+      val doubletype = DoubleClass.typeConstructor
+      val doubleparam = List(doubletype)
+      val stringtype = StringClass.typeConstructor
+      val anyparam = List(AnyClass.typeConstructor)
+
+      def addCommonValueMethods(clazz: Symbol): Unit = {
+        newMethod(clazz, nme.EQ, anyparam, booltype)
+        newMethod(clazz, nme.NE, anyparam, booltype)
+        newMethod(clazz, nme.equals_, anyparam, booltype)
+        newMethod(clazz, nme.hashCode_, List(), inttype)
+        newMethod(clazz, nme.toString_, List(), stringtype)
+      }
+
+      addCommonValueMethods(UnitClass)
+
+      newParameterlessMethod(BooleanClass, nme.ZNOT, booltype);
+      addCommonValueMethods(BooleanClass)
+      newMethod(BooleanClass, nme.EQ,   boolparam, booltype);
+      newMethod(BooleanClass, nme.NE,   boolparam, booltype);
+      newMethod(BooleanClass, nme.ZOR,  boolparam, booltype);
+      newMethod(BooleanClass, nme.ZAND, boolparam, booltype);
+      newMethod(BooleanClass, nme.OR,   boolparam, booltype);
+      newMethod(BooleanClass, nme.AND,  boolparam, booltype);
+      newMethod(BooleanClass, nme.XOR,  boolparam, booltype);
+
+      def initValueClass(clazz: Symbol, isCardinal: Boolean): Unit = {
+        addCommonValueMethods(clazz)
+
+        def addBinops(params: List[Type], restype: Type, isCardinal: Boolean) = {
+          newMethod(clazz, nme.EQ,  params, booltype)
+          newMethod(clazz, nme.NE,  params, booltype)
+          newMethod(clazz, nme.LT,  params, booltype)
+          newMethod(clazz, nme.LE,  params, booltype)
+          newMethod(clazz, nme.GT,  params, booltype)
+          newMethod(clazz, nme.GE,  params, booltype)
+          newMethod(clazz, nme.ADD, params, restype)
+          newMethod(clazz, nme.SUB, params, restype)
+          newMethod(clazz, nme.MUL, params, restype)
+          newMethod(clazz, nme.DIV, params, restype)
+          newMethod(clazz, nme.MOD, params, restype)
+          if (isCardinal) {
+            newMethod(clazz, nme.OR, params, restype)
+            newMethod(clazz, nme.AND, params, restype)
+            newMethod(clazz, nme.XOR, params, restype)
+          }
+        }
+
+        newParameterlessMethod(clazz, nme.toByte,   bytetype)
+        newParameterlessMethod(clazz, nme.toShort,  shorttype)
+        newParameterlessMethod(clazz, nme.toChar,   chartype)
+        newParameterlessMethod(clazz, nme.toInt,    inttype)
+        newParameterlessMethod(clazz, nme.toLong,   longtype)
+        newParameterlessMethod(clazz, nme.toFloat,  floattype)
+        newParameterlessMethod(clazz, nme.toDouble, doubletype)
+
+        newMethod(clazz, nme.ADD, List(stringtype), stringtype)
+
+        val restype =
+          if ((clazz eq LongClass) ||
+              (clazz eq FloatClass) ||
+              (clazz eq DoubleClass))
+            clazz.typeConstructor
+          else inttype
+
+        if (isCardinal) {
+          newMethod(clazz, nme.LSL, intparam,  restype)
+          newMethod(clazz, nme.LSL, longparam, restype)
+          newMethod(clazz, nme.LSR, intparam,  restype)
+          newMethod(clazz, nme.LSR, longparam, restype)
+          newMethod(clazz, nme.ASR, intparam,  restype)
+          newMethod(clazz, nme.ASR, longparam, restype)
+        }
+
+        newParameterlessMethod(clazz, nme.ADD, restype)
+        newParameterlessMethod(clazz, nme.SUB, restype)
+        if (isCardinal)
+          newParameterlessMethod(clazz, nme.NOT, restype)
+
+        val restype2 = if (isCardinal) longtype else restype
+        val restype3 = if (clazz eq DoubleClass) doubletype else floattype
+        addBinops(byteparam,   restype,    isCardinal)
+        addBinops(shortparam,  restype,    isCardinal)
+        addBinops(charparam,   restype,    isCardinal)
+        addBinops(intparam,    restype,    isCardinal)
+        addBinops(longparam,   restype2,   isCardinal)
+        addBinops(floatparam,  restype3,   false)
+        addBinops(doubleparam, doubletype, false)
+
+        if (clazz eq ByteClass) {
+          newParameterlessMethod(clazz, nme.coerceToShort,  shorttype)
+          newParameterlessMethod(clazz, nme.coerceToInt,    inttype)
+          newParameterlessMethod(clazz, nme.coerceToLong,   longtype)
+          newParameterlessMethod(clazz, nme.coerceToFloat,  floattype)
+          newParameterlessMethod(clazz, nme.coerceToDouble, doubletype)
+        } else if (clazz eq ShortClass) {
+          newParameterlessMethod(clazz, nme.coerceToInt,    inttype)
+          newParameterlessMethod(clazz, nme.coerceToLong,   longtype)
+          newParameterlessMethod(clazz, nme.coerceToFloat,  floattype)
+          newParameterlessMethod(clazz, nme.coerceToDouble, doubletype)
+        } else if (clazz eq CharClass) {
+          newParameterlessMethod(clazz, nme.coerceToInt,    inttype)
+          newParameterlessMethod(clazz, nme.coerceToLong,   longtype)
+          newParameterlessMethod(clazz, nme.coerceToFloat,  floattype)
+          newParameterlessMethod(clazz, nme.coerceToDouble, doubletype)
+        } else if (clazz eq IntClass) {
+          newParameterlessMethod(clazz, nme.coerceToLong,   longtype)
+          newParameterlessMethod(clazz, nme.coerceToFloat,  floattype)
+          newParameterlessMethod(clazz, nme.coerceToDouble, doubletype)
+        } else if (clazz eq LongClass) {
+          newParameterlessMethod(clazz, nme.coerceToFloat,  floattype)
+          newParameterlessMethod(clazz, nme.coerceToDouble, doubletype)
+        } else if (clazz eq FloatClass) {
+          newParameterlessMethod(clazz, nme.coerce, doubletype)
+        }
+      }
+
+      initValueClass(ByteClass,   true)
+      initValueClass(ShortClass,  true)
+      initValueClass(CharClass,   true)
+      initValueClass(IntClass,    true)
+      initValueClass(LongClass,   true)
+      initValueClass(FloatClass,  false)
+      initValueClass(DoubleClass, false)
+    }
+
     /** Is symbol a value class? */
-    def isValueClass(sym: Symbol): boolean = boxedClass contains sym;
+    def isValueClass(sym: Symbol): boolean =
+      (sym eq UnitClass) || (boxedClass contains sym);
 
     /** Is symbol a value class? */
     def isNumericValueClass(sym: Symbol): boolean =
-      isValueClass(sym) && sym != BooleanClass && sym != UnitClass;
+      (sym ne BooleanClass) && (boxedClass contains sym);
 
     /** Is symbol a value or array class? */
     def isUnboxedClass(sym: Symbol): boolean = isValueClass(sym) || sym == ArrayClass;
@@ -311,32 +465,58 @@ trait Definitions requires SymbolTable {
       assert(ScalaPackage != null, "Scala package is null");
       ScalaPackageClass = ScalaPackage.tpe.symbol;
 
-      AnyClass = newClass(ScalaPackageClass, "Any", List());
-      AnyValClass = getClass("scala.AnyVal") setFlag SEALED;
+      AnyClass = newClass(ScalaPackageClass, nme.Any, List());
+
+      val anyparam = List(AnyClass.typeConstructor);
+
+      var syntheticValueClasses = false;
+      try {
+        AnyValClass = getClass("scala.AnyVal") setFlag SEALED;
+      } catch {
+        case ex: FatalError =>
+          syntheticValueClasses = true;
+          AnyValClass = newClass(ScalaPackageClass, nme.AnyVal, anyparam)
+            .setFlag(SEALED);
+      }
       ObjectClass = getClass("java.lang.Object");
 
-      AnyRefClass = newAlias(ScalaPackageClass, "AnyRef", ObjectClass.typeConstructor);
+      AnyRefClass =
+        newAlias(ScalaPackageClass, nme.AnyRef, ObjectClass.typeConstructor);
 
-      AllRefClass = newClass(ScalaPackageClass, "AllRef", List(AnyRefClass.typeConstructor))
+      AllRefClass = newClass(ScalaPackageClass, nme.AllRef, List(AnyRefClass.typeConstructor))
 	.setFlag(ABSTRACT | TRAIT | FINAL);
 
-      AllClass = newClass(ScalaPackageClass, "All", List(AnyClass.typeConstructor))
+      AllClass = newClass(ScalaPackageClass, nme.All, anyparam)
 	.setFlag(ABSTRACT | TRAIT | FINAL);
 
       StringClass = getClass("java.lang.String");
       ThrowableClass = getClass("java.lang.Throwable");
       NullPointerExceptionClass = getClass("java.lang.NullPointerException");
 
-      // the scala value classes
-      UnitClass = getValueClass("Unit", 'V');
-      BooleanClass = getValueClass("Boolean", 'Z');
-      ByteClass = getValueClass("Byte", 'B');
-      ShortClass = getValueClass("Short", 'S');
-      CharClass = getValueClass("Char", 'C');
-      IntClass = getValueClass("Int", 'I');
-      LongClass = getValueClass("Long", 'L');
-      FloatClass = getValueClass("Float", 'F');
-      DoubleClass = getValueClass("Double", 'D');
+      if (syntheticValueClasses) {
+        UnitClass =
+          newClass(ScalaPackageClass, nme.Unit, List(AnyValClass.typeConstructor));
+        abbrvTag(UnitClass) = 'V'
+
+        BooleanClass = newValueClass(nme.Boolean, 'Z');
+        ByteClass =    newValueClass(nme.Byte, 'B');
+        ShortClass =   newValueClass(nme.Short, 'S');
+        CharClass =    newValueClass(nme.Char, 'C');
+        IntClass =     newValueClass(nme.Int, 'I');
+        LongClass =    newValueClass(nme.Long, 'L');
+        FloatClass =   newValueClass(nme.Float, 'F');
+        DoubleClass =  newValueClass(nme.Double, 'D');
+      } else {
+        UnitClass = getValueClass("Unit", 'V');
+        BooleanClass = getValueClass("Boolean", 'Z');
+        ByteClass = getValueClass("Byte", 'B');
+        ShortClass = getValueClass("Short", 'S');
+        CharClass = getValueClass("Char", 'C');
+        IntClass = getValueClass("Int", 'I');
+        LongClass = getValueClass("Long", 'L');
+        FloatClass = getValueClass("Float", 'F');
+        DoubleClass = getValueClass("Double", 'D');
+      }
 
       // the scala reference classes
       ScalaObjectClass = getClass("scala.ScalaObject");
@@ -370,47 +550,49 @@ trait Definitions requires SymbolTable {
       for (val i <- List.range(0, MaxFunctionArity + 1))
 	FunctionClass(i) = getClass("scala.Function" + i);
 
+      if (syntheticValueClasses)
+        initValueClasses;
+
+      val booltype = BooleanClass.typeConstructor;
+
       // members of class scala.Any
-      Any_== = newMethod(
-        AnyClass, "==", List(AnyClass.typeConstructor), BooleanClass.typeConstructor) setFlag FINAL;
-      Any_!= = newMethod(
-        AnyClass, "!=", List(AnyClass.typeConstructor), BooleanClass.typeConstructor) setFlag FINAL;
-      Any_equals = newMethod(
-        AnyClass, nme.equals_, List(AnyClass.typeConstructor), BooleanClass.typeConstructor);
+      Any_== = newMethod(AnyClass, "==", anyparam, booltype) setFlag FINAL;
+      Any_!= = newMethod(AnyClass, "!=", anyparam, booltype) setFlag FINAL;
+      Any_equals = newMethod(AnyClass, nme.equals_, anyparam, booltype);
       Any_hashCode = newMethod(
         AnyClass, nme.hashCode_, List(), IntClass.typeConstructor);
       Any_toString = newMethod(
         AnyClass, nme.toString_, List(), StringClass.typeConstructor);
 
       Any_isInstanceOf = newPolyMethod(
-        AnyClass, nme.isInstanceOf, tparam => BooleanClass.typeConstructor) setFlag FINAL;
+        AnyClass, nme.isInstanceOf, tparam => booltype) setFlag FINAL;
       Any_asInstanceOf = newPolyMethod(
         AnyClass, nme.asInstanceOf, tparam => tparam.typeConstructor) setFlag FINAL;
       Any_isInstanceOfErased = newPolyMethod(
-        AnyClass, nme.isInstanceOfErased, tparam => BooleanClass.typeConstructor) setFlag FINAL;
+        AnyClass, nme.isInstanceOfErased, tparam => booltype) setFlag FINAL;
       //todo: do we need this?
       Any_asInstanceOfErased = newPolyMethod(
         AnyClass, nme.asInstanceOfErased, tparam => tparam.typeConstructor) setFlag FINAL;
 
       // members of class java.lang.{Object, String}
       Object_== = newMethod(
-        ObjectClass, "==", List(AnyRefClass.typeConstructor), BooleanClass.typeConstructor) setFlag FINAL;
+        ObjectClass, "==", List(AnyRefClass.typeConstructor), booltype) setFlag FINAL;
       Object_!= = newMethod(
-        ObjectClass, "!=", List(AnyRefClass.typeConstructor), BooleanClass.typeConstructor) setFlag FINAL;
+        ObjectClass, "!=", List(AnyRefClass.typeConstructor), booltype) setFlag FINAL;
       Object_eq = newMethod(
-        ObjectClass, "eq", List(AnyRefClass.typeConstructor), BooleanClass.typeConstructor) setFlag FINAL;
+        ObjectClass, "eq", List(AnyRefClass.typeConstructor), booltype) setFlag FINAL;
       Object_ne = newMethod(
-        ObjectClass, "ne", List(AnyRefClass.typeConstructor), BooleanClass.typeConstructor) setFlag FINAL;
+        ObjectClass, "ne", List(AnyRefClass.typeConstructor), booltype) setFlag FINAL;
       Object_synchronized = newPolyMethod(
         ObjectClass, nme.synchronized_, tparam => MethodType(List(tparam.typeConstructor), tparam.typeConstructor)) setFlag FINAL;
       Object_isInstanceOf = newPolyMethod(
 	ObjectClass, "$isInstanceOf",
-        tparam => MethodType(List(), BooleanClass.typeConstructor)) setFlag FINAL;
+        tparam => MethodType(List(), booltype)) setFlag FINAL;
       Object_asInstanceOf = newPolyMethod(
 	ObjectClass, "$asInstanceOf",
         tparam => MethodType(List(), tparam.typeConstructor)) setFlag FINAL;
       String_+ = newMethod(
-        StringClass, "+", List(AnyClass.typeConstructor), StringClass.typeConstructor) setFlag FINAL;
+        StringClass, "+", anyparam, StringClass.typeConstructor) setFlag FINAL;
 
       PatternWildcard = NoSymbol.newValue(Position.NOPOS, "_").setInfo(AllClass.typeConstructor);
 

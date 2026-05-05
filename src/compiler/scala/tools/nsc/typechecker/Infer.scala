@@ -637,11 +637,12 @@ trait Infer requires Analyzer {
       case OverloadedType(pre, alts) => tryTwice {
 	if (settings.debug.value) log("infer method alt " + tree.symbol + " with alternatives " + (alts map pre.memberType) + ", argtpes = " + argtpes + ", pt = " + pt);
 	val alts1 = alts filter (alt => isApplicable(undetparams, pre.memberType(alt), argtpes, pt));
-	def improves(sym1: Symbol, sym2: Symbol) = (
-	  sym2 == NoSymbol || sym2.isError ||
-	  ((sym1.owner isSubClass sym2.owner) &&
-	   specializes(pre.memberType(sym1), pre.memberType(sym2)))
-	);
+		def improves(sym1: Symbol, sym2: Symbol) = (
+		  sym2 == NoSymbol || sym2.isError ||
+		  (sym2.owner == ObjectClass && (sym1.owner isSubClass sym2.owner)) ||
+		  ((sym1.owner isSubClass sym2.owner) &&
+		   specializes(pre.memberType(sym1), pre.memberType(sym2)))
+		);
 	val best = ((NoSymbol: Symbol) /: alts1) ((best, alt) =>
 	  if (improves(alt, best)) alt else best);
 	val competing = alts1 dropWhile (alt => best == alt || improves(best, alt));

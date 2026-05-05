@@ -1182,8 +1182,10 @@ trait Typers requires Analyzer {
 	    if (impSym.tpe != NoType) {
 	      var impSym1 = NoSymbol
 	      var imports1 = imports.tail
-	      def ambiguousImportError = ambiguousError(
-		"it is imported twice in the same scope by\n"+imports.head +  "\nand "+imports1.head)
+	      def ambiguousImportError =
+                if (!(imports.head.qual.tpe =:= imports1.head.qual.tpe))
+		  ambiguousError(
+		    "it is imported twice in the same scope by\n"+imports.head +  "\nand "+imports1.head)
 	      while (!imports1.isEmpty &&
                      (!imports.head.isExplicitImport(name) ||
                       imports1.head.depth == imports.head.depth)) {
@@ -1739,4 +1741,3 @@ trait Typers requires Analyzer {
     }
   }
 }
-
