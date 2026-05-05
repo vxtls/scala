@@ -44,7 +44,11 @@ PROPERTIES
   </condition>
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
+  <property name="comp.starr.extra.jar" location="${comp.starr.jar}/../../../locker/lib/compiler"/>
   <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
+  <condition property="ant.jar" value="${ant.core.lib}">
+    <isset property="ant.core.lib"/>
+  </condition>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
   <condition property="bootstrap.java.home" value="${env.JAVA_HOME}">
     <isset property="env.JAVA_HOME"/>
@@ -60,6 +64,7 @@ PROPERTIES
     value="All$.class,AllRef$.class,Ref.class"/>
   <!-- Sets location of build folders -->
   <property name="build.dir" value="${basedir}/build"/>
+  <property name="bridge.dir" value="${build.dir}/bridge"/>
   <property name="locker.dir" value="${build.dir}/locker"/>
   <property name="quick.dir" value="${build.dir}/quick"/>
   <property name="strap.dir" value="${build.dir}/strap"/>
@@ -113,6 +118,7 @@ Example:
   <!-- Creating class-pathes -->
     <path id="starr.classpath">
       <pathelement location="${lib.starr.jar}"/>
+      <pathelement location="${comp.starr.extra.jar}"/>
       <pathelement location="${comp.starr.jar}"/>
       <pathelement location="${fjbg.jar}"/>
       <pathelement location="${ant.jar}"/>
@@ -195,6 +201,7 @@ SETUP
     <mkdir dir="${java8.stubs.dir}/src/java/io"/>
     <mkdir dir="${java8.stubs.dir}/src/java/nio"/>
     <mkdir dir="${java8.stubs.dir}/src/java/util"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/logging"/>
     <mkdir dir="${java8.stubs.dir}/src/java/util/regex"/>
     <mkdir dir="${java8.stubs.dir}/src/javax/swing"/>
     <mkdir dir="${java8.stubs.dir}/src/javax/swing/border"/>
@@ -227,6 +234,33 @@ public final class Arrays {
 package java.util;
 public interface Comparator {
   public int compare(Object a, Object b);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/logging/Handler.java"><![CDATA[
+package java.util.logging;
+public abstract class Handler {
+  protected Handler() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/logging/FileHandler.java"><![CDATA[
+package java.util.logging;
+public class FileHandler extends Handler {
+  public FileHandler(String pattern) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/logging/Level.java"><![CDATA[
+package java.util.logging;
+public class Level {
+  public static final Level FINE = new Level();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/logging/Logger.java"><![CDATA[
+package java.util.logging;
+public class Logger {
+  public static Logger getLogger(String name) { return null; }
+  public void addHandler(Handler handler) {}
+  public void setLevel(Level level) {}
+  public void log(Level level, String msg) {}
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/util/regex/Pattern.java"><![CDATA[
@@ -449,11 +483,25 @@ public class TreePath {
     <jar destfile="${java8.stubs.jar}" basedir="${java8.stubs.dir}/classes"/>
   </target>
 
-  <target name="setup.locker" depends="setup, build.locker">
+  <target name="setup.bridge" depends="setup, build.bridge">
+    <path id="bridge.classpath">
+      <pathelement location="${bridge.dir}/lib/library"/>
+      <pathelement location="${bridge.dir}/lib/compiler"/>
+      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${ant.jar}"/>
+    </path>
+    <taskdef
+      name="bridge"
+      classname="scala.tools.ant.Scalac"
+      classpathref="bridge.classpath"/>
+  </target>
+
+  <target name="setup.locker" depends="setup.bridge, build.locker">
     <path id="locker.classpath">
       <pathelement location="${locker.dir}/lib/library"/>
       <pathelement location="${locker.dir}/lib/compiler"/>
       <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${ant.jar}"/>
     </path>
     <taskdef
       name="locker"
@@ -520,7 +568,78 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
     depends="clean.unfreeze, build.locker"
     description="Rebuilds LOCKER from the current sources"/>
 
-  <target name="build.locker" depends="setup, build.java8.stubs" unless="locker.avail">
+  <target name="build.bridge" depends="setup, build.java8.stubs">
+  <!-- Build a temporary compiler that can understand the v2.3 case-class and
+       typed-pattern source before LOCKER is rebuilt from clean v2.3 outputs. -->
+    <mkdir dir="${bridge.dir}/lib/library"/>
+    <copy todir="${bridge.dir}/lib/library">
+      <fileset dir="${lib.starr.jar}"/>
+    </copy>
+    <mkdir dir="${bridge.dir}/current-library"/>
+    <starr
+      srcdir="${src.dir}/library"
+      destdir="${bridge.dir}/current-library"
+      usepredefs="no" force="yes" addparams="-Xexperimental"
+      bootclasspath="${java.boot.classpath}:${bridge.dir}/current-library:${bridge.dir}/lib/library"
+      classpath="${bridge.dir}/current-library:${bridge.dir}/lib/library">
+      <include name="scala/compat/StringBuilder.scala"/>
+      <include name="scala/Ordered.scala"/>
+      <include name="scala/Product.scala"/>
+      <include name="scala/Product0.scala"/>
+      <include name="scala/Product1.scala"/>
+      <include name="scala/Product2.scala"/>
+      <include name="scala/Product3.scala"/>
+      <include name="scala/Product4.scala"/>
+      <include name="scala/Product5.scala"/>
+      <include name="scala/Product6.scala"/>
+      <include name="scala/Product7.scala"/>
+      <include name="scala/Product8.scala"/>
+      <include name="scala/Product9.scala"/>
+    </starr>
+    <starr
+      srcdir="${src.dir}/library"
+      destdir="${bridge.dir}/current-library"
+      force="yes" addparams="-Xexperimental"
+      bootclasspath="${java.boot.classpath}:${bridge.dir}/current-library:${bridge.dir}/lib/library"
+      classpath="${bridge.dir}/current-library:${bridge.dir}/lib/library">
+      <include name="scala/Predef.scala"/>
+      <include name="scala/compat/Platform.scala"/>
+      <include name="scala/runtime/RichBoolean.scala"/>
+      <include name="scala/runtime/RichByte.scala"/>
+      <include name="scala/runtime/RichChar.scala"/>
+      <include name="scala/runtime/RichDouble.scala"/>
+      <include name="scala/runtime/RichException.scala"/>
+      <include name="scala/runtime/RichFloat.scala"/>
+      <include name="scala/runtime/RichInt.scala"/>
+      <include name="scala/runtime/RichLong.scala"/>
+      <include name="scala/runtime/RichShort.scala"/>
+      <include name="scala/runtime/RichString.scala"/>
+      <include name="scala/runtime/StringAdd.scala"/>
+      <include name="scala/Console.scala"/>
+    </starr>
+    <copy todir="${bridge.dir}/lib/library" overwrite="true">
+      <fileset dir="${bridge.dir}/current-library"/>
+    </copy>
+    <mkdir dir="${bridge.dir}/lib/compiler"/>
+    <starr
+      srcdir="${src.dir}/compiler"
+      destdir="${bridge.dir}/lib/compiler"
+      addparams="-Xexperimental"
+      bootclasspath="${java.boot.classpath}:${bridge.dir}/lib/library">
+      <classpath>
+        <pathelement location="${bridge.dir}/lib/library"/>
+        <pathelement location="${bridge.dir}/lib/compiler"/>
+        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${ant.jar}"/>
+      </classpath>
+      <include name="**/*.scala"/>
+      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
+    </starr>
+    <build.support build.dir="${bridge.dir}"/>
+    <build.links build.dir="${bridge.dir}"/>
+  </target>
+
+  <target name="build.locker" depends="setup.bridge" unless="locker.avail">
     <property name="built.locker" value="yes"/>
   <!-- Build library -->
     <mkdir dir="${locker.dir}/lib/library"/>
@@ -535,23 +654,33 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
       fork="true" executable="${javac.exe}" includeantruntime="false"
       classpath="${locker.dir}/lib/library"
       includes="**/*.java"/>
-    <starr
+    <bridge
       srcdir="${src.dir}/library"
       destdir="${locker.dir}/lib/library"
-      usepredefs="no" addparams="-Xexperimental"
+      usepredefs="no" deprecation="yes"
       bootclasspath="${java.boot.classpath}:${lib.starr.jar}"
       classpath="${locker.dir}/lib/library">
       <include name="scala/compat/StringBuilder.scala"/>
       <include name="scala/compat/Platform.scala"/>
       <include name="scala/runtime/RichException.scala"/>
       <include name="scala/Product.scala"/>
+      <include name="scala/Product0.scala"/>
+      <include name="scala/Product1.scala"/>
+      <include name="scala/Product2.scala"/>
+      <include name="scala/Product3.scala"/>
+      <include name="scala/Product4.scala"/>
+      <include name="scala/Product5.scala"/>
+      <include name="scala/Product6.scala"/>
+      <include name="scala/Product7.scala"/>
+      <include name="scala/Product8.scala"/>
+      <include name="scala/Product9.scala"/>
       <include name="scala/Ordered.scala"/>
       <include name="scala/Predef.scala"/>
-    </starr>
-    <starr
+    </bridge>
+    <bridge
       srcdir="${src.dir}/library"
       destdir="${locker.dir}/lib/library"
-      addparams="-Xexperimental"
+      deprecation="yes"
       bootclasspath="${java.boot.classpath}:${locker.dir}/lib/library:${lib.starr.jar}"
       classpath="${locker.dir}/lib/library">
       <include name="**/*.scala"/>
@@ -561,18 +690,28 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
       <exclude name="scala/compat/Platform.scala"/>
       <exclude name="scala/runtime/RichException.scala"/>
       <exclude name="scala/Product.scala"/>
+      <exclude name="scala/Product0.scala"/>
+      <exclude name="scala/Product1.scala"/>
+      <exclude name="scala/Product2.scala"/>
+      <exclude name="scala/Product3.scala"/>
+      <exclude name="scala/Product4.scala"/>
+      <exclude name="scala/Product5.scala"/>
+      <exclude name="scala/Product6.scala"/>
+      <exclude name="scala/Product7.scala"/>
+      <exclude name="scala/Product8.scala"/>
+      <exclude name="scala/Product9.scala"/>
       <exclude name="scala/Ordered.scala"/>
       <exclude name="scala/Predef.scala"/>
       <exclude name="scala/dbc/**"/>
       <exclude name="scala/actors/**"/>
       <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </starr>
+    </bridge>
   <!-- Build actors library -->
     <mkdir dir="${locker.dir}/lib/actors"/>
-    <starr
+    <bridge
       srcdir="${src.dir}/actors"
       destdir="${locker.dir}/lib/actors"
-      addparams="-Xexperimental"
+      deprecation="yes"
       bootclasspath="${java.boot.classpath}:${locker.dir}/lib/library">
       <classpath>
         <pathelement location="${locker.dir}/lib/library"/>
@@ -580,13 +719,18 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
       </classpath>
       <include name="scala/actors/**/*.scala"/>
       <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </starr>
+    </bridge>
   <!-- Build compiler -->
     <mkdir dir="${locker.dir}/lib/compiler"/>
-    <starr
+    <copy todir="${locker.dir}/lib/compiler">
+      <fileset dir="${bridge.dir}/lib/compiler">
+        <include name="scala/tools/nsc/doc/**"/>
+      </fileset>
+    </copy>
+    <bridge
       srcdir="${src.dir}/compiler"
       destdir="${locker.dir}/lib/compiler"
-      addparams="-Xexperimental"
+      deprecation="yes" addparams="-Xexperimental"
       bootclasspath="${java.boot.classpath}:${locker.dir}/lib/library">
       <classpath>
         <pathelement location="${locker.dir}/lib/library"/>
@@ -595,8 +739,9 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
         <pathelement location="${ant.jar}"/>
       </classpath>
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/doc/**"/>
       <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </starr>
+    </bridge>
   <!-- Timing the build -->
   <!-- Copy support files to build folder and links external libraries-->
     <build.support build.dir="${locker.dir}"/>
@@ -921,6 +1066,26 @@ DOCUMENTATION
 
   <target name="docs" depends="setup.quick"
     description="Generated the API for library sources">
+    <java
+      fork="true"
+      jvm="${bootstrap.java.home}/bin/java"
+      classname="org.apache.tools.ant.Main"
+      maxmemory="1024m"
+      failonerror="true">
+      <classpath>
+        <pathelement location="${ant.jar}"/>
+        <pathelement location="${ant.home}/lib/ant-launcher.jar"/>
+      </classpath>
+      <arg value="-f"/>
+      <arg file="${ant.file}"/>
+      <arg value="-Dlib.starr.jar=${lib.starr.jar}"/>
+      <arg value="-Dcomp.starr.jar=${comp.starr.jar}"/>
+      <arg value="-Dfjbg.jar=${fjbg.jar}"/>
+      <arg value="docs.impl"/>
+    </java>
+  </target>
+
+  <target name="docs.impl" depends="setup.quick">
     <mkdir dir="${api-lib.dir}"/>
     <quickdoc
       srcdir="${src.dir}"
@@ -965,13 +1130,32 @@ DOCUMENTATION
       <pathelement location="${quick.dir}/lib/library"/>
       <pathelement location="${tooldocs.dir}/classes"/>
     </path>
-    <quick
-      srcdir="${src.dir}/manual"
-      destdir="${tooldocs.dir}/classes"
-      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library"
-      classpathref="manual.classpath">
-      <include name="**/*.scala"/>
-    </quick>
+    <path id="manual.compiler.classpath">
+      <pathelement location="${quick.dir}/lib/library"/>
+      <pathelement location="${quick.dir}/lib/compiler"/>
+      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${ant.jar}"/>
+    </path>
+    <path id="manual.sources">
+      <fileset dir="${src.dir}/manual" includes="**/*.scala"/>
+    </path>
+    <pathconvert property="manual.classpath.value" refid="manual.classpath"/>
+    <pathconvert property="manual.sources.value" refid="manual.sources" pathsep=" "/>
+    <java
+      fork="true"
+      jvm="${bootstrap.java.home}/bin/java"
+      classname="scala.tools.nsc.Main"
+      classpathref="manual.compiler.classpath"
+      maxmemory="512m"
+      failonerror="true">
+      <arg value="-d"/>
+      <arg file="${tooldocs.dir}/classes"/>
+      <arg value="-bootclasspath"/>
+      <arg value="${java.boot.classpath}:${quick.dir}/lib/library"/>
+      <arg value="-classpath"/>
+      <arg value="${manual.classpath.value}"/>
+      <arg line="${manual.sources.value}"/>
+    </java>
     <emit command="fsc"/>
     <emit command="sbaz"/>
     <emit command="scala"/>
