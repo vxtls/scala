@@ -652,22 +652,85 @@ BUILD QUICK-TEST LAYER
 
   <target name="build" depends="setup.locker"
     description="Builds a quick-test (QUICK) version of the compiler">
-  <!-- Reuse the locker library; v2.2.0's quick compiler cannot yet
-       recompile the bridge Predef/XML sources that locker compiled. -->
-    <mkdir dir="${quick.dir}/lib"/>
-    <copy todir="${quick.dir}/lib/library">
-      <fileset dir="${locker.dir}/lib/library"/>
+  <!-- Build library -->
+    <mkdir dir="${quick.dir}/lib/library"/>
+    <mkdir dir="${quick.dir}/lib/library/scala"/>
+    <copy todir="${quick.dir}/lib/library/scala">
+      <fileset dir="${locker.dir}/lib/library/scala" includes="${bootstrap.inherited.scala.classes}"/>
     </copy>
+    <copy todir="${quick.dir}/lib/library">
+      <fileset dir="${locker.dir}/lib/library" includes="scala/xml/path/**/*.class"/>
+    </copy>
+    <javac
+      srcdir="${src.dir}/library"
+      destdir="${quick.dir}/lib/library"
+      source="1.8" target="1.8" deprecation="yes"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
+      classpath="${quick.dir}/lib/library"
+      includes="**/*.java"/>
+    <locker
+      srcdir="${src.dir}/library"
+      destdir="${quick.dir}/lib/library"
+      usepredefs="no" addparams="${nsc.params}"
+      bootclasspath="${java.boot.classpath}:${locker.dir}/lib/library"
+      classpath="${quick.dir}/lib/library">
+      <include name="scala/Function*.scala"/>
+      <include name="scala/Tuple*.scala"/>
+      <include name="scala/PartialFunction.scala"/>
+      <include name="scala/Iterable.scala"/>
+      <include name="scala/BufferedIterator.scala"/>
+      <include name="scala/Iterator.scala"/>
+      <include name="scala/Seq.scala"/>
+      <include name="scala/Ordered.scala"/>
+      <include name="scala/Predef.scala"/>
+    </locker>
+    <locker
+      srcdir="${src.dir}/library"
+      destdir="${quick.dir}/lib/library"
+      addparams="${nsc.params}"
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library:${locker.dir}/lib/library"
+      classpath="${quick.dir}/lib/library">
+      <include name="**/*.scala"/>
+      <exclude name="scala/All$.scala"/>
+      <exclude name="scala/AllRef$.scala"/>
+      <exclude name="scala/Predef.scala"/>
+      <exclude name="scala/xml/path/**"/>
+      <exclude name="scala/dbc/**"/>
+      <exclude name="scala/actors/**"/>
+      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
+    </locker>
   <!-- Build DBC -->
     <mkdir dir="${quick.dir}/lib/dbc"/>
   <!-- Build actors library -->
-    <copy todir="${quick.dir}/lib/actors">
-      <fileset dir="${locker.dir}/lib/actors"/>
-    </copy>
+    <mkdir dir="${quick.dir}/lib/actors"/>
+    <locker
+      srcdir="${src.dir}/actors"
+      destdir="${quick.dir}/lib/actors"
+      addparams="${nsc.params}"
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library">
+      <classpath>
+        <pathelement location="${quick.dir}/lib/library"/>
+        <pathelement location="${quick.dir}/lib/actors"/>
+      </classpath>
+      <include name="scala/actors/**/*.scala"/>
+      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
+    </locker>
   <!-- Build compiler -->
-    <copy todir="${quick.dir}/lib/compiler">
-      <fileset dir="${locker.dir}/lib/compiler"/>
-    </copy>
+    <mkdir dir="${quick.dir}/lib/compiler"/>
+    <locker
+      srcdir="${src.dir}/compiler"
+      destdir="${quick.dir}/lib/compiler"
+      addparams="${nsc.params}"
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library">
+      <classpath>
+        <pathelement location="${quick.dir}/lib/library"/>
+        <pathelement location="${quick.dir}/lib/compiler"/>
+        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${ant.jar}"/>
+      </classpath>
+      <include name="**/*.scala"/>
+      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
+    </locker>
   <!-- Timing the build -->
   <!-- Copy support files to build folder and links external libraries-->
     <build.support build.dir="${quick.dir}"/>
@@ -890,13 +953,13 @@ DOCUMENTATION
       <pathelement location="${quick.dir}/lib/library"/>
       <pathelement location="${tooldocs.dir}/classes"/>
     </path>
-    <starr
+    <quick
       srcdir="${src.dir}/manual"
       destdir="${tooldocs.dir}/classes"
       bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library"
       classpathref="manual.classpath">
       <include name="**/*.scala"/>
-    </starr>
+    </quick>
     <emit command="fsc"/>
     <emit command="sbaz"/>
     <emit command="scala"/>
