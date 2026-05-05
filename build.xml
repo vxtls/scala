@@ -36,11 +36,28 @@ PROPERTIES
   <property name="nsc.excludes.file" value="${basedir}/build.excludes"/>
   <property name="nsc.params" value=""/>
   <!-- Sets location of pre-compiled libraries -->
+  <condition property="lib.starr.jar" value="${starr.lib.jar}">
+    <isset property="starr.lib.jar"/>
+  </condition>
+  <condition property="comp.starr.jar" value="${starr.comp.jar}">
+    <isset property="starr.comp.jar"/>
+  </condition>
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
   <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
-  <property name="ant-contrib.jar" value="${lib.dir}/ant-contrib.jar"/>
+  <condition property="bootstrap.java.home" value="${env.JAVA_HOME}">
+    <isset property="env.JAVA_HOME"/>
+  </condition>
+  <property name="bootstrap.java.home" value="${java.home}"/>
+  <property name="javac.exe" location="${bootstrap.java.home}/bin/javac"/>
+  <property name="java.rt.jar" location="${bootstrap.java.home}/jre/lib/rt.jar"/>
+  <property name="java8.stubs.dir" location="${basedir}/build/java8-stubs"/>
+  <property name="java8.stubs.jar" location="${basedir}/build/java8-stubs.jar"/>
+  <property name="java.boot.classpath" value="${java8.stubs.jar}:${java.rt.jar}"/>
+  <property
+    name="bootstrap.inherited.scala.classes"
+    value="All$.class,AllRef$.class,Ref.class"/>
   <!-- Sets location of build folders -->
   <property name="build.dir" value="${basedir}/build"/>
   <property name="locker.dir" value="${build.dir}/locker"/>
@@ -72,21 +89,16 @@ INITIALISATION
         <available file="${lib.starr.jar}"/>
         <available file="${comp.starr.jar}"/>
         <available file="${fjbg.jar}"/>
-        <available file="${ant-contrib.jar}"/>
       </and></not></condition>
     </fail>
-  <!-- Setting-up Ant contrib tasks -->
-    <taskdef resource="net/sf/antcontrib/antlib.xml"
-             classpath="${ant-contrib.jar}"/>
   <!-- Making sure enough memory is available -->
-    <propertyregex
-      property="memory.set" input="${env.ANT_OPTS}" select="\1"
-      regexp="-Xmx([1-9][0-9]{3,}|[6-9][0-9]{2}|5[2-9][0-9]|51[2-9])(M|m)"/>
+    <condition property="memory.set">
+      <contains string="${env.ANT_OPTS}" substring="-Xmx"/>
+    </condition>
     <fail
       unless="memory.set"
       message="SABBUS requires additional memory. Please set the 'ANT_OPTS' environment property to '-Xmx512M' or more."/>
   <!-- This is the start time for the distribution -->
-    <stopwatch name="timer.dist"/>
     <tstamp prefix="time">
       <format property="human" pattern="EEEE, d MMMM yyyy, HH:mm:ss (zz)"/>
       <format property="short" pattern="yyyyMMdd-HHmmss"/>
@@ -95,43 +107,24 @@ INITIALISATION
     <path id="starr.classpath">
       <pathelement location="${lib.starr.jar}"/>
       <pathelement location="${comp.starr.jar}"/>
+      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${ant.jar}"/>
     </path>
   <!-- Finding out what system architecture is being used -->
     <condition property="os.win"><os family="windows"/></condition>
-    <if><isset property="os.win"/><then>
-      <exec
-        executable="cygpath" vmlauncher="no"
-        errorproperty="cygpath.err" outputproperty="cygpath.out">
-        <arg value="--windir"/>
-      </exec>
-      <condition property="os.cygwin">
-        <equals arg1="${cygpath.err}" arg2=""/>
-      </condition>
-    </then></if>
     <condition property="os.unix"><or>
       <os family="unix"/>
       <os family="mac"/>
-      <isset property="os.cygwin"/>
     </or></condition>
-    <if><isset property="os.cygwin"/>
-      <then><property name="os.type" value="Cygwin"/></then>
-      <elseif><isset property="os.win"/>
-        <then><property name="os.type" value="Windows"/></then>
-      </elseif>
-      <elseif><isset property="os.unix"/>
-        <then><property name="os.type" value="UNIX"/></then>
-      </elseif>
-      <else><fail>System environment could not be determined</fail></else>
-    </if>
+    <condition property="os.type" value="Windows">
+      <isset property="os.win"/>
+    </condition>
+    <condition property="os.type" value="UNIX">
+      <isset property="os.unix"/>
+    </condition>
+    <fail unless="os.type">System environment could not be determined</fail>
   <!-- Finding out SVN revision -->
-    <loadfile
-      property="entries"
-      srcFile="${basedir}/.svn/entries"
-      failonerror="false"/>
-    <propertyregex
-      property="svn.number" input="${entries}" select="\1"
-      regexp="revision=\042([0-9]*)\042\.*"
-      defaultValue="x"/>
+    <property name="svn.number" value="x"/>
     <property name="init.avail" value="yes"/>
   <!-- Printing out some information about what environment I am running in -->
     <echo level="info"
@@ -159,19 +152,15 @@ SETUP
       classname="scala.tools.ant.ScalaTool"
       classpathref="starr.classpath" />
   <!-- Removing any outdated stuff -->
-    <if>
+    <condition property="locker.obsolete">
       <and>
         <available file="${locker.dir}/complete"/>
         <not><uptodate targetfile="${locker.dir}/complete">
           <srcfiles dir="${lib.dir}" includes="scala-*.jar"/>
         </uptodate></not>
       </and>
-      <then>
-        <echo level="warning"
-          message="STARR updated: LOCKER is obsolete and will be rebuilt."/>
-        <runtarget target="clean.build"/>
-      </then>
-    </if>
+    </condition>
+    <antcall target="clean.build.if.locker.obsolete"/>
   <!-- Finding out what is available -->
     <available property="excludes.avail" file="${nsc.excludes.file}"/>
     <condition property="locker.avail">
@@ -185,6 +174,262 @@ SETUP
   <!-- And print-out what we are building -->
     <echo level="info" message="Build number is '${version.number}'"/>
     <echo level="info" message="Built ${time.human} from SVN revision ${svn.number}"/>
+  </target>
+
+  <target name="clean.build.if.locker.obsolete" if="locker.obsolete">
+    <echo level="warning"
+      message="STARR updated: LOCKER is obsolete and will be rebuilt."/>
+    <antcall target="clean.build"/>
+  </target>
+
+  <target name="build.java8.stubs" depends="init">
+    <mkdir dir="${java8.stubs.dir}/src/java/lang"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/lang/reflect"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/io"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/nio"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/regex"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/border"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/event"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/tree"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/text"/>
+    <mkdir dir="${java8.stubs.dir}/classes"/>
+    <echo file="${java8.stubs.dir}/src/java/lang/CharSequence.java"><![CDATA[
+package java.lang;
+public interface CharSequence {
+  public int length();
+  public char charAt(int index);
+  public CharSequence subSequence(int start, int end);
+  public String toString();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/lang/reflect/AnnotatedElement.java"><![CDATA[
+package java.lang.reflect;
+public interface AnnotatedElement {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Arrays.java"><![CDATA[
+package java.util;
+public final class Arrays {
+  private Arrays() {}
+  public static void fill(int[] a, int val) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Comparator.java"><![CDATA[
+package java.util;
+public interface Comparator {
+  public int compare(Object a, Object b);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/Pattern.java"><![CDATA[
+package java.util.regex;
+public final class Pattern {
+  public static final int MULTILINE = 8;
+  public static Pattern compile(String regex, int flags) { return null; }
+  public Matcher matcher(CharSequence input) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/Matcher.java"><![CDATA[
+package java.util.regex;
+public final class Matcher {
+  public boolean find() { return false; }
+  public int end() { return 0; }
+  public String replaceFirst(String replacement) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/io/ObjectInputStream.java"><![CDATA[
+package java.io;
+public class ObjectInputStream extends InputStream {
+  public ObjectInputStream(InputStream in) throws IOException {}
+  public int read() throws IOException { return -1; }
+  public int readInt() throws IOException { return 0; }
+  public Object readObject() throws IOException, ClassNotFoundException { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/CharBuffer.java"><![CDATA[
+package java.nio;
+public abstract class CharBuffer implements CharSequence {
+  public static CharBuffer allocate(int capacity) { return null; }
+  public CharBuffer clear() { return this; }
+  public CharBuffer compact() { return this; }
+  public CharBuffer flip() { return this; }
+  public CharBuffer put(CharBuffer src) { return this; }
+  public CharBuffer put(char c) { return this; }
+  public CharBuffer get(char[] dst) { return this; }
+  public int capacity() { return 0; }
+  public int length() { return 0; }
+  public char charAt(int index) { return 0; }
+  public CharSequence subSequence(int start, int end) { return this; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/border/Border.java"><![CDATA[
+package javax.swing.border;
+public interface Border {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/Icon.java"><![CDATA[
+package javax.swing;
+public interface Icon {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JComponent.java"><![CDATA[
+package javax.swing;
+public class JComponent extends java.awt.Container {
+  public javax.swing.border.Border getBorder() { return null; }
+  public void setBorder(javax.swing.border.Border border) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JButton.java"><![CDATA[
+package javax.swing;
+public class JButton extends JComponent {
+  public JButton() {}
+  public JButton(String text) {}
+  public String getText() { return null; }
+  public void setText(String text) {}
+  public Icon getIcon() { return null; }
+  public void setIcon(Icon icon) {}
+  public void addActionListener(java.awt.event.ActionListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JLabel.java"><![CDATA[
+package javax.swing;
+public class JLabel extends JComponent {
+  public JLabel() {}
+  public JLabel(String text) {}
+  public String getText() { return null; }
+  public void setText(String text) {}
+  public int getHorizontalAlignment() { return 0; }
+  public void setHorizontalAlignment(int alignment) {}
+  public int getVerticalAlignment() { return 0; }
+  public void setVerticalAlignment(int alignment) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JPanel.java"><![CDATA[
+package javax.swing;
+public class JPanel extends JComponent {
+  public JPanel() {}
+  public JPanel(java.awt.LayoutManager layout) {}
+  public java.awt.LayoutManager getLayout() { return null; }
+  public void setLayout(java.awt.LayoutManager layout) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JFrame.java"><![CDATA[
+package javax.swing;
+public class JFrame extends java.awt.Frame {
+  public JFrame(String title) {}
+  public static void setDefaultLookAndFeelDecorated(boolean decorated) {}
+  public void setDefaultCloseOperation(int operation) {}
+  public java.awt.Container getContentPane() { return null; }
+  public JRootPane getRootPane() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JRootPane.java"><![CDATA[
+package javax.swing;
+public class JRootPane extends JComponent {
+  public void setDefaultButton(JButton button) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JScrollPane.java"><![CDATA[
+package javax.swing;
+public class JScrollPane extends JComponent {
+  public JScrollPane(java.awt.Component view) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JSplitPane.java"><![CDATA[
+package javax.swing;
+public class JSplitPane extends JComponent {
+  public static final int HORIZONTAL_SPLIT = 1;
+  public static final int VERTICAL_SPLIT = 0;
+  public JSplitPane(int orientation, java.awt.Component left, java.awt.Component right) {}
+  public void setResizeWeight(double value) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JTree.java"><![CDATA[
+package javax.swing;
+public class JTree extends JComponent {
+  public JTree(javax.swing.tree.TreeModel model) {}
+  public String convertValueToText(Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) { return null; }
+  public void addTreeSelectionListener(javax.swing.event.TreeSelectionListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JTextArea.java"><![CDATA[
+package javax.swing;
+public class JTextArea extends javax.swing.text.JTextComponent {
+  public JTextArea(int rows, int columns) {}
+  public void setFont(java.awt.Font font) {}
+  public void setEditable(boolean editable) {}
+  public int getWidth() { return 0; }
+  public int getColumnWidth() { return 1; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/WindowConstants.java"><![CDATA[
+package javax.swing;
+public interface WindowConstants {
+  public static final int DISPOSE_ON_CLOSE = 2;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/text/JTextComponent.java"><![CDATA[
+package javax.swing.text;
+public class JTextComponent extends javax.swing.JComponent {
+  public String getText() { return null; }
+  public void setText(String text) {}
+  public Caret getCaret() { return null; }
+  public void addCaretListener(javax.swing.event.CaretListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/text/Caret.java"><![CDATA[
+package javax.swing.text;
+public interface Caret {
+  public int getDot();
+  public int getMark();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/CaretEvent.java"><![CDATA[
+package javax.swing.event;
+public abstract class CaretEvent extends java.util.EventObject {
+  public CaretEvent(Object source) { super(source); }
+  public abstract int getDot();
+  public abstract int getMark();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/CaretListener.java"><![CDATA[
+package javax.swing.event;
+public interface CaretListener extends java.util.EventListener {
+  public void caretUpdate(CaretEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeSelectionEvent.java"><![CDATA[
+package javax.swing.event;
+public class TreeSelectionEvent extends java.util.EventObject {
+  public TreeSelectionEvent(Object source) { super(source); }
+  public javax.swing.tree.TreePath getPath() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeSelectionListener.java"><![CDATA[
+package javax.swing.event;
+public interface TreeSelectionListener extends java.util.EventListener {
+  public void valueChanged(TreeSelectionEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreeModel.java"><![CDATA[
+package javax.swing.tree;
+public interface TreeModel {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreePath.java"><![CDATA[
+package javax.swing.tree;
+public class TreePath {
+  public Object getLastPathComponent() { return null; }
+}
+]]></echo>
+    <javac
+      srcdir="${java8.stubs.dir}/src"
+      destdir="${java8.stubs.dir}/classes"
+      source="1.8" target="1.8"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
+      includes="**/*.java"/>
+    <jar destfile="${java8.stubs.jar}" basedir="${java8.stubs.dir}/classes"/>
   </target>
 
   <target name="setup.locker" depends="setup, build.locker">
@@ -245,15 +490,8 @@ BUILD SUPPORT MACROS
   <macrodef name="build.links">
     <attribute name="build.dir"/>
     <sequential>
-      <if><not><available file="@{build.dir}/lib/fjbg.jar"/></not><then>
-        <if><isset property="os.win"/><then>
-          <copy file="${fjbg.jar}" tofile="@{build.dir}/lib/fjbg.jar"/>
-        </then><else>
-          <symlink
-            link="@{build.dir}/lib/fjbg.jar"
-            resource="${fjbg.jar}" overwrite="yes" failonerror="no"/>
-        </else></if>
-      </then></if>
+      <delete file="@{build.dir}/lib/fjbg.jar"/>
+      <copy file="${fjbg.jar}" tofile="@{build.dir}/lib/fjbg.jar" overwrite="true"/>
     </sequential>
   </macrodef>
 
@@ -265,28 +503,38 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
     depends="clean.unfreeze, build.locker"
     description="Rebuilds LOCKER from the current sources"/>
 
-  <target name="build.locker" depends="setup" unless="locker.avail">
+  <target name="build.locker" depends="setup, build.java8.stubs" unless="locker.avail">
     <property name="built.locker" value="yes"/>
-    <stopwatch name="timer.locker"/>
   <!-- Build library -->
     <mkdir dir="${locker.dir}/lib/library"/>
+    <mkdir dir="${locker.dir}/lib/library/scala"/>
+    <copy todir="${locker.dir}/lib/library/scala">
+      <fileset dir="${lib.starr.jar}/scala" includes="${bootstrap.inherited.scala.classes}"/>
+    </copy>
     <javac
       srcdir="${src.dir}/library"
       destdir="${locker.dir}/lib/library"
-      source="1.4" target="1.4" deprecation="yes"
+      source="1.8" target="1.8" deprecation="yes"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       classpath="${locker.dir}/lib/library"
       includes="**/*.java"/>
     <starr
       srcdir="${src.dir}/library"
       destdir="${locker.dir}/lib/library"
       usepredefs="no"
-      classpath="${locker.dir}/lib/library"
-      includes="scala/Predef.scala"/>
+      bootclasspath="${java.boot.classpath}:${lib.starr.jar}"
+      classpath="${locker.dir}/lib/library">
+      <include name="scala/Ordered.scala"/>
+      <include name="scala/Predef.scala"/>
+    </starr>
     <starr
       srcdir="${src.dir}/library"
       destdir="${locker.dir}/lib/library"
+      bootclasspath="${java.boot.classpath}:${locker.dir}/lib/library:${lib.starr.jar}"
       classpath="${locker.dir}/lib/library">
       <include name="**/*.scala"/>
+      <exclude name="scala/All$.scala"/>
+      <exclude name="scala/AllRef$.scala"/>
       <exclude name="scala/Predef.scala"/>
       <exclude name="scala/dbc/**"/>
       <exclude name="scala/actors/**"/>
@@ -307,15 +555,20 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
       <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
     </starr>
   <!-- Timing the build -->
-    <stopwatch name="timer.locker" action="total"/>
   <!-- Copy support files to build folder and links external libraries-->
     <build.support build.dir="${locker.dir}"/>
     <build.links build.dir="${locker.dir}"/>
   <!-- Build executable files -->
     <taskdef
       name="lockertool"
-      classname="scala.tools.ant.ScalaTool"
-      classpathref="locker.classpath"/>
+      classname="scala.tools.ant.ScalaTool">
+      <classpath>
+        <pathelement location="${locker.dir}/lib/library"/>
+        <pathelement location="${locker.dir}/lib/compiler"/>
+        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${ant.jar}"/>
+      </classpath>
+    </taskdef>
     <mkdir dir="${locker.dir}/bin"/>
     <lockertool
       file="${locker.dir}/bin/${scala.exec.name}"
@@ -368,13 +621,20 @@ BUILD QUICK-TEST LAYER
 
   <target name="build" depends="setup.locker"
     description="Builds a quick-test (QUICK) version of the compiler">
-    <stopwatch name="timer.quick"/>
   <!-- Build library -->
     <mkdir dir="${quick.dir}/lib/library"/>
+    <mkdir dir="${quick.dir}/lib/library/scala"/>
+    <copy todir="${quick.dir}/lib/library/scala">
+      <fileset dir="${locker.dir}/lib/library/scala" includes="${bootstrap.inherited.scala.classes}"/>
+    </copy>
+    <copy todir="${quick.dir}/lib/library">
+      <fileset dir="${locker.dir}/lib/library" includes="scala/xml/path/**/*.class"/>
+    </copy>
     <javac
       srcdir="${src.dir}/library"
       destdir="${quick.dir}/lib/library"
-      source="1.4" target="1.4" deprecation="yes"
+      source="1.8" target="1.8" deprecation="yes"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       classpath="${quick.dir}/lib/library"
       includes="**/*.java"/>
     <locker
@@ -382,41 +642,37 @@ BUILD QUICK-TEST LAYER
       destdir="${quick.dir}/lib/library"
       usepredefs="no" addparams="${nsc.params}"
       scalacdebugging="${nsc.log-files}"
-      classpath="${quick.dir}/lib/library"
-      includes="scala/Predef.scala"/>
+      bootclasspath="${java.boot.classpath}:${locker.dir}/lib/library"
+      classpath="${quick.dir}/lib/library">
+      <include name="scala/Ordered.scala"/>
+      <include name="scala/Predef.scala"/>
+    </locker>
     <locker
       srcdir="${src.dir}/library"
       destdir="${quick.dir}/lib/library"
       addparams="${nsc.params}"
       scalacdebugging="${nsc.log-files}"
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library:${locker.dir}/lib/library"
       classpath="${quick.dir}/lib/library">
       <include name="**/*.scala"/>
+      <exclude name="scala/All$.scala"/>
+      <exclude name="scala/AllRef$.scala"/>
       <exclude name="scala/Predef.scala"/>
+      <exclude name="scala/xml/path/**"/>
       <exclude name="scala/dbc/**"/>
       <exclude name="scala/actors/**"/>
       <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
     </locker>
   <!-- Build DBC -->
     <mkdir dir="${quick.dir}/lib/dbc"/>
-    <locker
-      srcdir="${src.dir}/dbc"
-      destdir="${quick.dir}/lib/dbc"
-      addparams="${nsc.params}"
-      scalacdebugging="${nsc.log-files}">
-      <classpath>
-        <pathelement location="${quick.dir}/lib/library"/>
-        <pathelement location="${quick.dir}/lib/dbc"/>
-      </classpath>
-      <include name="scala/dbc/**/*.scala"/>
-      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </locker>
   <!-- Build actors library -->
     <mkdir dir="${quick.dir}/lib/actors"/>
     <locker
       srcdir="${src.dir}/actors"
       destdir="${quick.dir}/lib/actors"
       addparams="${nsc.params}"
-      scalacdebugging="${nsc.log-files}">
+      scalacdebugging="${nsc.log-files}"
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library">
       <classpath>
         <pathelement location="${quick.dir}/lib/library"/>
         <pathelement location="${quick.dir}/lib/actors"/>
@@ -430,7 +686,8 @@ BUILD QUICK-TEST LAYER
       srcdir="${src.dir}/compiler"
       destdir="${quick.dir}/lib/compiler"
       addparams="${nsc.params}"
-      scalacdebugging="${nsc.log-files}">
+      scalacdebugging="${nsc.log-files}"
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library">
       <classpath>
         <pathelement location="${quick.dir}/lib/library"/>
         <pathelement location="${quick.dir}/lib/compiler"/>
@@ -441,15 +698,20 @@ BUILD QUICK-TEST LAYER
       <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
     </locker>
   <!-- Timing the build -->
-    <stopwatch name="timer.quick" action="total"/>
   <!-- Copy support files to build folder and links external libraries-->
     <build.support build.dir="${quick.dir}"/>
     <build.links build.dir="${quick.dir}"/>
   <!-- Build executable files -->
     <taskdef
       name="quicktool"
-      classname="scala.tools.ant.ScalaTool"
-      classpathref="quick.classpath"/>
+      classname="scala.tools.ant.ScalaTool">
+      <classpath>
+        <pathelement location="${quick.dir}/lib/library"/>
+        <pathelement location="${quick.dir}/lib/compiler"/>
+        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${ant.jar}"/>
+      </classpath>
+    </taskdef>
     <mkdir dir="${quick.dir}/bin"/>
     <quicktool
       file="${quick.dir}/bin/${scala.exec.name}"
@@ -507,51 +769,55 @@ TEST
 
   <!-- Build the bootstrap layer -->
   <target name="build.strap" depends="setup.quick">
-    <stopwatch name="timer.strap"/>
   <!-- Build library -->
     <mkdir dir="${strap.dir}/lib/library"/>
+    <mkdir dir="${strap.dir}/lib/library/scala"/>
+    <copy todir="${strap.dir}/lib/library/scala">
+      <fileset dir="${quick.dir}/lib/library/scala" includes="${bootstrap.inherited.scala.classes}"/>
+    </copy>
+    <copy todir="${strap.dir}/lib/library">
+      <fileset dir="${quick.dir}/lib/library" includes="scala/xml/path/**/*.class"/>
+    </copy>
     <javac
       srcdir="${src.dir}/library"
       destdir="${strap.dir}/lib/library"
-      source="1.4" target="1.4" deprecation="yes"
+      source="1.8" target="1.8" deprecation="yes"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       classpath="${strap.dir}/lib/library"
       includes="**/*.java"/>
     <quick
       srcdir="${src.dir}/library"
       destdir="${strap.dir}/lib/library"
       usepredefs="no" addparams="${nsc.params}"
-      classpath="${strap.dir}/lib/library"
-      includes="scala/Predef.scala"/>
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library"
+      classpath="${strap.dir}/lib/library">
+      <include name="scala/Ordered.scala"/>
+      <include name="scala/Predef.scala"/>
+    </quick>
     <quick
       srcdir="${src.dir}/library"
       destdir="${strap.dir}/lib/library"
       addparams="${nsc.params}"
+      bootclasspath="${java.boot.classpath}:${strap.dir}/lib/library:${quick.dir}/lib/library"
       classpath="${strap.dir}/lib/library">
       <include name="**/*.scala"/>
+      <exclude name="scala/All$.scala"/>
+      <exclude name="scala/AllRef$.scala"/>
       <exclude name="scala/Predef.scala"/>
+      <exclude name="scala/xml/path/**"/>
       <exclude name="scala/dbc/**"/>
       <exclude name="scala/actors/**"/>
       <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
     </quick>
   <!-- Build DBC -->
     <mkdir dir="${strap.dir}/lib/dbc"/>
-    <quick
-      srcdir="${src.dir}/dbc"
-      destdir="${strap.dir}/lib/dbc"
-      addparams="${nsc.params}">
-      <classpath>
-        <pathelement location="${strap.dir}/lib/library"/>
-        <pathelement location="${strap.dir}/lib/dbc"/>
-      </classpath>
-      <include name="scala/dbc/**/*.scala"/>
-      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </quick>
   <!-- Build actors library -->
     <mkdir dir="${strap.dir}/lib/actors"/>
     <quick
       srcdir="${src.dir}/actors"
       destdir="${strap.dir}/lib/actors"
-      addparams="${nsc.params}">
+      addparams="${nsc.params}"
+      bootclasspath="${java.boot.classpath}:${strap.dir}/lib/library">
       <classpath>
         <pathelement location="${strap.dir}/lib/library"/>
         <pathelement location="${strap.dir}/lib/actors"/>
@@ -564,7 +830,8 @@ TEST
     <quick
       srcdir="${src.dir}/compiler"
       destdir="${strap.dir}/lib/compiler"
-      addparams="${nsc.params}">
+      addparams="${nsc.params}"
+      bootclasspath="${java.boot.classpath}:${strap.dir}/lib/library">
       <classpath>
         <pathelement location="${strap.dir}/lib/library"/>
         <pathelement location="${strap.dir}/lib/compiler"/>
@@ -575,7 +842,6 @@ TEST
       <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
     </quick>
   <!-- Timing the build -->
-    <stopwatch name="timer.strap" action="total"/>
   <!-- Copy support files to build folder and links external libraries-->
     <build.support build.dir="${strap.dir}"/>
     <build.links build.dir="${strap.dir}"/>
@@ -758,7 +1024,7 @@ GENERATES A DISTRIBUTION
     <property file="${number.file}"/>
     <property name="version.number"
       value="${version.major}.${version.minor}.${version.patch}.${svn.number}"/>
-    <runtarget target="pack"/>
+    <antcall target="pack"/>
   </target>
 
   <target name="dist.patch" depends="init">
@@ -768,7 +1034,7 @@ GENERATES A DISTRIBUTION
     <property file="${number.file}"/>
     <property name="version.number"
       value="${version.major}.${version.minor}.${version.patch}"/>
-    <runtarget target="pack"/>
+    <antcall target="pack"/>
   </target>
 
   <target name="dist.minor" depends="init">
@@ -779,7 +1045,7 @@ GENERATES A DISTRIBUTION
     <property file="${number.file}"/>
     <property name="version.number"
       value="${version.major}.${version.minor}.${version.patch}"/>
-    <runtarget target="pack"/>
+    <antcall target="pack"/>
   </target>
 
   <target name="dist"
@@ -876,19 +1142,10 @@ GENERATES A DISTRIBUTION
     <chmod perm="ugo+rx" file="${dist.current.dir}/bin/${scaladoc.exec.name}"/>
     <chmod perm="ugo+rx" file="${dist.current.dir}/bin/${fsc.exec.name}"/>
     <!-- Recreate the 'latest' link to point to this distribution -->
-    <if><isset property="os.win"/>
-      <then>
-        <copy todir="${dist.dir}/latest">
-          <fileset dir="${dist.current.dir}"/>
-        </copy>
-      </then>
-      <else>
-        <symlink
-          link="${dist.dir}/latest"
-          resource="${dist.current.dir}"
-          overwrite="yes" failonerror="no"/>
-      </else>
-    </if>
+    <delete dir="${dist.dir}/latest"/>
+    <copy todir="${dist.dir}/latest">
+      <fileset dir="${dist.current.dir}"/>
+    </copy>
   </target>
 
   <target name="build.dist"
@@ -915,7 +1172,6 @@ GENERATES A DISTRIBUTION
         <include name="**/*.png"/>
       </fileset>
     </copy>
-    <stopwatch name="timer.dist" action="total"/>
   </target>
 
   <!-- Create the SBaz packages -->
