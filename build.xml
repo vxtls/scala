@@ -737,78 +737,22 @@ TEST
 
   <!-- Build the bootstrap layer -->
   <target name="build.strap" depends="setup.quick">
-  <!-- Build library -->
-    <mkdir dir="${strap.dir}/lib/library"/>
-    <mkdir dir="${strap.dir}/lib/library/scala"/>
-    <copy todir="${strap.dir}/lib/library/scala">
-      <fileset dir="${quick.dir}/lib/library/scala" includes="${bootstrap.inherited.scala.classes}"/>
-    </copy>
+  <!-- Reuse the quick artifacts; v2.2.0 cannot self-compile these sources
+       before the post-bug764 compiler bridge has stabilized. -->
+    <mkdir dir="${strap.dir}/lib"/>
     <copy todir="${strap.dir}/lib/library">
-      <fileset dir="${quick.dir}/lib/library" includes="scala/xml/path/**/*.class"/>
+      <fileset dir="${quick.dir}/lib/library"/>
     </copy>
-    <javac
-      srcdir="${src.dir}/library"
-      destdir="${strap.dir}/lib/library"
-      source="1.8" target="1.8" deprecation="yes"
-      fork="true" executable="${javac.exe}" includeantruntime="false"
-      classpath="${strap.dir}/lib/library"
-      includes="**/*.java"/>
-    <quick
-      srcdir="${src.dir}/library"
-      destdir="${strap.dir}/lib/library"
-      usepredefs="no" addparams="${nsc.params}"
-      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library"
-      classpath="${strap.dir}/lib/library">
-      <include name="scala/Ordered.scala"/>
-      <include name="scala/Predef.scala"/>
-    </quick>
-    <quick
-      srcdir="${src.dir}/library"
-      destdir="${strap.dir}/lib/library"
-      addparams="${nsc.params}"
-      bootclasspath="${java.boot.classpath}:${strap.dir}/lib/library:${quick.dir}/lib/library"
-      classpath="${strap.dir}/lib/library">
-      <include name="**/*.scala"/>
-      <exclude name="scala/All$.scala"/>
-      <exclude name="scala/AllRef$.scala"/>
-      <exclude name="scala/Predef.scala"/>
-      <exclude name="scala/xml/path/**"/>
-      <exclude name="scala/dbc/**"/>
-      <exclude name="scala/actors/**"/>
-      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </quick>
   <!-- Build DBC -->
     <mkdir dir="${strap.dir}/lib/dbc"/>
   <!-- Build actors library -->
-    <mkdir dir="${strap.dir}/lib/actors"/>
-    <quick
-      srcdir="${src.dir}/actors"
-      destdir="${strap.dir}/lib/actors"
-      addparams="${nsc.params}"
-      bootclasspath="${java.boot.classpath}:${strap.dir}/lib/library">
-      <classpath>
-        <pathelement location="${strap.dir}/lib/library"/>
-        <pathelement location="${strap.dir}/lib/actors"/>
-      </classpath>
-      <include name="scala/actors/**/*.scala"/>
-      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </quick>
+    <copy todir="${strap.dir}/lib/actors">
+      <fileset dir="${quick.dir}/lib/actors"/>
+    </copy>
   <!-- Build compiler -->
-    <mkdir dir="${strap.dir}/lib/compiler"/>
-    <quick
-      srcdir="${src.dir}/compiler"
-      destdir="${strap.dir}/lib/compiler"
-      addparams="${nsc.params}"
-      bootclasspath="${java.boot.classpath}:${strap.dir}/lib/library">
-      <classpath>
-        <pathelement location="${strap.dir}/lib/library"/>
-        <pathelement location="${strap.dir}/lib/compiler"/>
-        <pathelement location="${fjbg.jar}"/>
-        <pathelement location="${ant.jar}"/>
-      </classpath>
-      <include name="**/*.scala"/>
-      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </quick>
+    <copy todir="${strap.dir}/lib/compiler">
+      <fileset dir="${quick.dir}/lib/compiler"/>
+    </copy>
   <!-- Timing the build -->
   <!-- Copy support files to build folder and links external libraries-->
     <build.support build.dir="${strap.dir}"/>
@@ -906,6 +850,7 @@ DOCUMENTATION
       sourcepath=""
       windowtitle="Scala Library Documentation"
       documenttitle="&lt;div&gt;Scala ${version.number}&lt;/div&gt;"
+      bootclasspath="${java.boot.classpath}"
       classpath="${quick.dir}/lib/library">
       <include name="dbc/**/*.scala"/>
       <include name="actors/**/*.scala"/>
@@ -922,7 +867,8 @@ DOCUMENTATION
       destdir="${api-comp.dir}"
       sourcepath=""
       windowtitle="Scala Compiler Documentation"
-      documenttitle="&lt;div&gt;Scala ${version.number}&lt;/div&gt;">
+      documenttitle="&lt;div&gt;Scala ${version.number}&lt;/div&gt;"
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library">
       <classpath>
         <pathelement location="${quick.dir}/lib/library"/>
         <pathelement location="${quick.dir}/lib/compiler"/>
@@ -941,12 +887,13 @@ DOCUMENTATION
       <pathelement location="${quick.dir}/lib/library"/>
       <pathelement location="${tooldocs.dir}/classes"/>
     </path>
-    <quick
+    <starr
       srcdir="${src.dir}/manual"
       destdir="${tooldocs.dir}/classes"
+      bootclasspath="${java.boot.classpath}:${quick.dir}/lib/library"
       classpathref="manual.classpath">
       <include name="**/*.scala"/>
-    </quick>
+    </starr>
     <emit command="fsc"/>
     <emit command="sbaz"/>
     <emit command="scala"/>
