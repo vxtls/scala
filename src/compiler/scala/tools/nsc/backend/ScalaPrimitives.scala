@@ -514,75 +514,32 @@ abstract class ScalaPrimitives {
   }
 
   def addCoercions(cls: Symbol): Unit = {
-    val OverloadedType(_, coercions) = cls.info.member(nme.coerce).info;
-    if (cls == ByteClass)
-      coercions foreach ((m) =>
-        if (m.info.resultType == ShortClass.tpe)
-          addPrimitive(m, B2S)
-        else if (m.info.resultType == IntClass.tpe)
-          addPrimitive(m, B2I)
-        else if (m.info.resultType == LongClass.tpe)
-          addPrimitive(m, B2L)
-        else if (m.info.resultType == FloatClass.tpe)
-          addPrimitive(m, B2F)
-        else if (m.info.resultType == DoubleClass.tpe)
-          addPrimitive(m, B2D)
-        else
-          abort("Unknown coercion method: " + m.info)
-      )
-    else if (cls == ShortClass)
-        coercions foreach ((m) =>
-          if (m.info.resultType == IntClass.tpe)
-            addPrimitive(m, S2I)
-          else if (m.info.resultType == LongClass.tpe)
-            addPrimitive(m, S2L)
-          else if (m.info.resultType == FloatClass.tpe)
-            addPrimitive(m, S2F)
-          else if (m.info.resultType == DoubleClass.tpe)
-            addPrimitive(m, S2D)
-          else
-            abort("Unknown coercion method: " + m.fullNameString)
-        )
-    else if (cls == CharClass)
-        coercions foreach ((m) =>
-          if (m.info.resultType == IntClass.tpe)
-            addPrimitive(m, C2I)
-          else if (m.info.resultType == LongClass.tpe)
-            addPrimitive(m, C2L)
-          else if (m.info.resultType == FloatClass.tpe)
-            addPrimitive(m, C2F)
-          else if (m.info.resultType == DoubleClass.tpe)
-            addPrimitive(m, C2D)
-          else
-            abort("Unknown coercion method: " + m.fullNameString)
-        )
-    else if (cls == IntClass)
-        coercions foreach ((m) =>
-          if (m.info.resultType == LongClass.tpe)
-            addPrimitive(m, I2L)
-          else if (m.info.resultType == FloatClass.tpe)
-            addPrimitive(m, I2F)
-          else if (m.info.resultType == DoubleClass.tpe)
-            addPrimitive(m, I2D)
-          else
-            abort("Unknown coercion method: " + m.fullNameString)
-        )
-    else if (cls == LongClass)
-        coercions foreach ((m) =>
-          if (m.info.resultType == FloatClass.tpe)
-            addPrimitive(m, L2F)
-          else if (m.info.resultType == DoubleClass.tpe)
-            addPrimitive(m, L2D)
-          else
-            abort("Unknown coercion method: " + m.fullNameString)
-        )
+    if (cls == ByteClass) {
+      addPrimitive(cls.info.member(nme.coerceToShort), B2S);
+      addPrimitive(cls.info.member(nme.coerceToInt), B2I);
+      addPrimitive(cls.info.member(nme.coerceToLong), B2L);
+      addPrimitive(cls.info.member(nme.coerceToFloat), B2F);
+      addPrimitive(cls.info.member(nme.coerceToDouble), B2D);
+    } else if (cls == ShortClass) {
+      addPrimitive(cls.info.member(nme.coerceToInt), S2I);
+      addPrimitive(cls.info.member(nme.coerceToLong), S2L);
+      addPrimitive(cls.info.member(nme.coerceToFloat), S2F);
+      addPrimitive(cls.info.member(nme.coerceToDouble), S2D);
+    } else if (cls == CharClass) {
+      addPrimitive(cls.info.member(nme.coerceToInt), C2I);
+      addPrimitive(cls.info.member(nme.coerceToLong), C2L);
+      addPrimitive(cls.info.member(nme.coerceToFloat), C2F);
+      addPrimitive(cls.info.member(nme.coerceToDouble), C2D);
+    } else if (cls == IntClass) {
+      addPrimitive(cls.info.member(nme.coerceToLong), I2L);
+      addPrimitive(cls.info.member(nme.coerceToFloat), I2F);
+      addPrimitive(cls.info.member(nme.coerceToDouble), I2D);
+    } else if (cls == LongClass) {
+      addPrimitive(cls.info.member(nme.coerceToFloat), L2F);
+      addPrimitive(cls.info.member(nme.coerceToDouble), L2D);
+    }
     else if (cls == FloatClass)
-        coercions foreach ((m) =>
-          if (m.info.resultType == DoubleClass.tpe)
-            addPrimitive(m, F2D)
-          else
-            abort("Unknown coercion method: " + m.fullNameString)
-        )
+        addPrimitive(cls.info.member(nme.coerce), F2D)
     else
         abort("Unknown value type: " + cls.fullNameString);
   }

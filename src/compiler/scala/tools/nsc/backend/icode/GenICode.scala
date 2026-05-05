@@ -216,7 +216,7 @@ abstract class GenICode extends SubComponent  {
 
             ctx1 = genLoad(larg, ctx1, resKind);
             ctx1 = genLoad(rarg,
-                           ctx1,  // check .NET size of shift arguments!
+                           ctx1,
                            if (scalaPrimitives.isShiftOp(code)) INT else resKind);
 
             generatedType = resKind;
@@ -1369,7 +1369,7 @@ abstract class GenICode extends SubComponent  {
      *  same as the value parameters of the current method.
      */
     def isTailCallLabel(tree: LabelDef, ctx: Context) = (
-      tree.params.length == ctx.defdef.vparamss.head &&
+      tree.params.length == ctx.defdef.vparamss.head.length &&
       List.forall2(tree.params, ctx.defdef.vparamss.head)
         { (x, y) => x.symbol == y.symbol }
     );

@@ -3,7 +3,7 @@
 //############################################################################
 // $Id$
 
-import java.lang.System; // to avoid name clash with .NET's library
+import java.lang.System; // to avoid name clash with platform libraries
 
 object M0 {
 

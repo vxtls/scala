@@ -3,7 +3,7 @@
 //############################################################################
 // $Id$
 
-import java.lang.System; // to avoid name clash with .NET's library
+import java.lang.System; // to avoid name clash with platform libraries
 
 //############################################################################
 // Test 0
@@ -32,4 +32,3 @@ class Test2_2(i: Int) {
     0
   }
 }
-
