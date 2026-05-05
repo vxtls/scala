@@ -32,7 +32,6 @@ PROPERTIES
   <property name="fjbg.name"          value="fjbg.jar"/>
   <property name="fjbg.jar"           value="${lib.dir}/${fjbg.name}"/>
   <property name="ant.jar"            value="${ant.home}/lib/ant.jar"/>
-  <property name="ant-contrib.jar"    value="${lib.dir}/ant-contrib.jar"/>
   <!-- -->
   <property name="build.dir"          value="${basedir}/build"/>
   <property name="build.examples.dir" value="${build.dir}/examples"/>
@@ -90,15 +89,6 @@ INITIALISATION
       </not></condition>
     </fail>
     <echo level="verbose" message="ant.jar=${ant.jar}"/>
-    <echo level="verbose" message="ant-contrib.jar=${ant-contrib.jar}"/>
-    <fail message="Additional Ant tasks in '${lib.dir}/' is not available">
-      <condition><not>
-        <available
-          classname="net.sf.antcontrib.AntContribVersion"
-          classpath="${ant-contrib.jar}"
-        />
-      </not></condition>
-    </fail>
     <!-- Creating class-pathes -->
     <path id="common.classpath">
       <pathelement location="${fjbg.jar}"/>
@@ -108,50 +98,23 @@ INITIALISATION
       <pathelement location="${scala.comp.jar}"/>
       <path refid="common.classpath"/>
     </path>
-    <!-- Creating boot-level tasks -->
-    <taskdef resource="net/sf/antcontrib/antlib.xml">
-      <classpath>
-        <pathelement location="${ant-contrib.jar}"/>
-      </classpath>
-    </taskdef>
     <!-- Finding out what system architecture is being used -->
     <condition property="os.win">
       <os family="windows"/>
     </condition>
-    <if><isset property="os.win"/>
-      <then>
-        <exec
-          executable="cygpath"
-          vmlauncher="no"
-          errorproperty="cygpath.err"
-          outputproperty="cygpath.out"
-        >
-          <arg value="--windir"/>
-        </exec>
-        <condition property="os.cygwin">
-          <equals arg1="${cygpath.err}" arg2=""/>
-        </condition>
-      </then>
-    </if>
     <condition property="os.unix">
       <or>
         <os family="unix"/>
         <os family="mac"/>
-        <isset property="os.cygwin"/>
       </or>
     </condition>
-    <if><isset property="os.cygwin"/>
-      <then><property name="os.type" value="Cygwin"/></then>
-      <elseif><isset property="os.win"/>
-        <then><property name="os.type" value="Windows"/></then>
-      </elseif>
-      <elseif><isset property="os.unix"/>
-        <then><property name="os.type" value="UNIX"/></then>
-      </elseif>
-      <else>
-        <fail>System environment could not be determined</fail>
-      </else>
-    </if>
+    <condition property="os.type" value="Windows">
+      <isset property="os.win"/>
+    </condition>
+    <condition property="os.type" value="UNIX">
+      <isset property="os.unix"/>
+    </condition>
+    <fail unless="os.type">System environment could not be determined</fail>
     <echo
       level="info"
       message="OS:   ${os.type} (${os.name} ${os.arch} ${os.version});"
