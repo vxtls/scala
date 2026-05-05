@@ -88,7 +88,10 @@ INITIALISATION
 
   <target name="init" unless="init.avail">
   <!-- Making sure lib/ contains everything that is needed -->
-    <fail message="A required library is missing in 'lib/'. The README file describes what should be there.">
+    <fail message="Missing bootstrap compiler libraries.
+Provide scala-library, scala-compiler, and fjbg either in lib/ or with Ant properties.
+Example:
+  JAVA_HOME=/path/to/jdk8 PATH=/path/to/jdk8/bin:$PATH ANT_OPTS=-Xmx512M ant -Dlib.starr.jar=../v2.1.8-bootstrap/build/quick/lib/library -Dcomp.starr.jar=../v2.1.8-bootstrap/build/quick/lib/compiler -Dfjbg.jar=../v2.1.8-bootstrap/build/quick/lib/fjbg.jar dist">
       <condition><not><and>
         <available file="${lib.starr.jar}"/>
         <available file="${comp.starr.jar}"/>
