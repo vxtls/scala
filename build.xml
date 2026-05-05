@@ -226,6 +226,7 @@ public interface Comparator {
 package java.util.regex;
 public final class Pattern {
   public static final int MULTILINE = 8;
+  public static Pattern compile(String regex) { return null; }
   public static Pattern compile(String regex, int flags) { return null; }
   public Matcher matcher(CharSequence input) { return null; }
 }
@@ -234,7 +235,9 @@ public final class Pattern {
 package java.util.regex;
 public final class Matcher {
   public boolean find() { return false; }
+  public boolean matches() { return false; }
   public int end() { return 0; }
+  public String group(int group) { return null; }
   public String replaceFirst(String replacement) { return null; }
 }
 ]]></echo>
@@ -247,17 +250,24 @@ public class ObjectInputStream extends InputStream {
   public Object readObject() throws IOException, ClassNotFoundException { return null; }
 }
 ]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/Buffer.java"><![CDATA[
+package java.nio;
+public abstract class Buffer {
+  public final Buffer clear() { return this; }
+  public final Buffer flip() { return this; }
+  public final int capacity() { return 0; }
+  public final int position() { return 0; }
+  public final Buffer position(int newPosition) { return this; }
+}
+]]></echo>
     <echo file="${java8.stubs.dir}/src/java/nio/CharBuffer.java"><![CDATA[
 package java.nio;
-public abstract class CharBuffer implements CharSequence {
+public abstract class CharBuffer extends Buffer implements CharSequence {
   public static CharBuffer allocate(int capacity) { return null; }
-  public CharBuffer clear() { return this; }
   public CharBuffer compact() { return this; }
-  public CharBuffer flip() { return this; }
   public CharBuffer put(CharBuffer src) { return this; }
   public CharBuffer put(char c) { return this; }
   public CharBuffer get(char[] dst) { return this; }
-  public int capacity() { return 0; }
   public int length() { return 0; }
   public char charAt(int index) { return 0; }
   public CharSequence subSequence(int start, int end) { return this; }
