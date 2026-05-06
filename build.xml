@@ -185,9 +185,9 @@
   <target name="build.nsc" depends="build.java">
     <delete dir="${build.bootstrap.classes.dir}"/>
     <mkdir dir="${build.bootstrap.classes.dir}"/>
-    <exec executable="/bin/zsh" failonerror="true">
+    <exec executable="/bin/sh" failonerror="true">
       <env key="JAVA_HOME" value="${bootstrap.java.home}"/>
-      <arg value="-lc"/>
+      <arg value="-c"/>
       <arg value="if [ -f '${ant.jar}' ]; then find src/compiler/scala/tools/nsc src/library/scala/reflect src/library/scala/runtime -type f -name '*.scala' -print | xargs '${java.exe}' -Xbootclasspath/a:'${bootstrap.library.classes}' -Dscala.product='${scalac.exec.name}' -Dscala.version='${distrib.version}' -Dscala.home='${build.dir}' -Dscala.source.path='${bootstrap.sources}' -Dscala.library.source.path='${bootstrap.sources}' -Dscala.library.class.path='${bootstrap.library.classes}' -cp '${previous.compiler.classpath}' scala.tools.nsc.Main -d '${build.bootstrap.classes.dir}' -classpath '${build.java.classes.dir}:${build.bootstrap.classes.dir}:${bootstrap.library.classes}:${bootstrap.tools.classes}:${bootstrap.fjbg.jar}:${ant.jar}' -sourcepath '${bootstrap.sources}' -bootclasspath '${java.rt.jar}'; else find src/compiler/scala/tools/nsc src/library/scala/reflect src/library/scala/runtime -type f -name '*.scala' ! -path 'src/compiler/scala/tools/nsc/ant/*' -print | xargs '${java.exe}' -Xbootclasspath/a:'${bootstrap.library.classes}' -Dscala.product='${scalac.exec.name}' -Dscala.version='${distrib.version}' -Dscala.home='${build.dir}' -Dscala.source.path='${bootstrap.sources}' -Dscala.library.source.path='${bootstrap.sources}' -Dscala.library.class.path='${bootstrap.library.classes}' -cp '${previous.compiler.classpath}' scala.tools.nsc.Main -d '${build.bootstrap.classes.dir}' -classpath '${build.java.classes.dir}:${build.bootstrap.classes.dir}:${bootstrap.library.classes}:${bootstrap.tools.classes}:${bootstrap.fjbg.jar}' -sourcepath '${bootstrap.sources}' -bootclasspath '${java.rt.jar}'; fi"/>
     </exec>
   </target>
@@ -240,9 +240,9 @@
   <target name="build.nslib" depends="build.bootstrap.jar">
     <delete dir="${build.nslib.dir}"/>
     <mkdir dir="${build.nslib.dir}"/>
-    <exec executable="/bin/zsh" failonerror="true">
+    <exec executable="/bin/sh" failonerror="true">
       <env key="JAVA_HOME" value="${bootstrap.java.home}"/>
-      <arg value="-lc"/>
+      <arg value="-c"/>
       <arg value="'${java.exe}' -Xbootclasspath/a:'${bootstrap.library.classes}' -Dscala.product='${scalac.exec.name}' -Dscala.version='${distrib.version}' -Dscala.home='${build.dir}' -Dscala.source.path='${runtime.source.path}' -Dscala.library.source.path='${runtime.source.path}' -Dscala.library.class.path='${build.nslib.dir}' -cp '${current.compiler.classpath}' scala.tools.nsc.Main -nopredefs -d '${build.nslib.dir}' -classpath '${build.java.classes.dir}:${build.nslib.dir}' -sourcepath '${runtime.source.path}' -bootclasspath '${java.rt.jar}' '${library.src.dir}/scala/Array.scala' '${library.src.dir}/scala/ScalaObject.scala' '${library.src.dir}/scala/CaseClass.scala' '${library.src.dir}/scala/MatchError.scala' '${library.src.dir}/scala/Predef.scala' '${library.src.dir}/scala/runtime/ScalaRunTime.scala' &amp;&amp; find '${library.src.dir}' -type f -name '*.scala' ! -path '${library.src.dir}/scala/Predef.scala' ! -path '${library.src.dir}/scala/runtime/ScalaRunTime.scala' ! -path '${library.src.dir}/scala/Array.scala' ! -path '${library.src.dir}/scala/ScalaObject.scala' ! -path '${library.src.dir}/scala/CaseClass.scala' ! -path '${library.src.dir}/scala/MatchError.scala' -print | xargs '${java.exe}' -Xbootclasspath/a:'${bootstrap.library.classes}' -Dscala.product='${scalac.exec.name}' -Dscala.version='${distrib.version}' -Dscala.home='${build.dir}' -Dscala.source.path='${runtime.source.path}' -Dscala.library.source.path='${runtime.source.path}' -Dscala.library.class.path='${build.nslib.dir}' -cp '${current.compiler.classpath}' scala.tools.nsc.Main -d '${build.nslib.dir}' -classpath '${build.java.classes.dir}:${build.nslib.dir}' -sourcepath '${runtime.source.path}' -bootclasspath '${java.rt.jar}'"/>
     </exec>
     <copy todir="${build.nslib.dir}">
@@ -262,9 +262,9 @@
   <target name="build.nstools" depends="build.nslib">
     <delete dir="${build.classes.dir}"/>
     <mkdir dir="${build.classes.dir}"/>
-    <exec executable="/bin/zsh" failonerror="true">
+    <exec executable="/bin/sh" failonerror="true">
       <env key="JAVA_HOME" value="${bootstrap.java.home}"/>
-      <arg value="-lc"/>
+      <arg value="-c"/>
       <arg value="if [ -f '${ant.jar}' ]; then find src/compiler/scala/tools/nsc src/library/scala/reflect src/library/scala/runtime -type f -name '*.scala' -print | xargs '${java.exe}' -Xbootclasspath/a:'${bootstrap.library.classes}' -Dscala.product='${scalac.exec.name}' -Dscala.version='${distrib.version}' -Dscala.home='${build.dir}' -Dscala.source.path='${runtime.source.path}' -Dscala.library.source.path='${runtime.source.path}' -Dscala.library.class.path='${build.nslib.dir}' -cp '${current.compiler.classpath}' scala.tools.nsc.Main -d '${build.classes.dir}' -classpath '${build.java.classes.dir}:${build.nslib.dir}:${build.classes.dir}:${bootstrap.fjbg.jar}:${ant.jar}' -sourcepath '${runtime.source.path}' -bootclasspath '${java.rt.jar}'; else find src/compiler/scala/tools/nsc src/library/scala/reflect src/library/scala/runtime -type f -name '*.scala' ! -path 'src/compiler/scala/tools/nsc/ant/*' -print | xargs '${java.exe}' -Xbootclasspath/a:'${bootstrap.library.classes}' -Dscala.product='${scalac.exec.name}' -Dscala.version='${distrib.version}' -Dscala.home='${build.dir}' -Dscala.source.path='${runtime.source.path}' -Dscala.library.source.path='${runtime.source.path}' -Dscala.library.class.path='${build.nslib.dir}' -cp '${current.compiler.classpath}' scala.tools.nsc.Main -d '${build.classes.dir}' -classpath '${build.java.classes.dir}:${build.nslib.dir}:${build.classes.dir}:${bootstrap.fjbg.jar}' -sourcepath '${runtime.source.path}' -bootclasspath '${java.rt.jar}'; fi"/>
     </exec>
   </target>
