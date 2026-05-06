@@ -85,11 +85,9 @@ class Settings(error: String => Unit) {
   val extdirs       = StringSetting ("-extdirs", "dirs", "Override location of installed extensions", extdirsDefault)
   val outdir        = StringSetting ("-d", "directory", "Specify where to place generated class files", ".")
   val encoding      = new StringSetting ("-encoding", "encoding", "Specify character encoding used by source files", encodingDefault) { override def hiddenToIDE = false }
-  val target        = ChoiceSetting ("-target", "Specify which backend to use", List("jvm-1.5", "jvm-1.4", "msil", "cldc"), "jvm-1.4")
+  val target        = ChoiceSetting ("-target", "Specify which backend to use", List("jvm-1.5", "jvm-1.4", "cldc"), "jvm-1.4")
   val checknull     = BooleanSetting("-checknull", "Emit warning on selection of nullable reference")
   val migrate       = BooleanSetting("-migrate", "Assist in migrating from Scala version 1.0")
-  val assemname     = StringSetting ("-o", "file", "Name of the output assembly (only relevant with -target:msil)", "").dependsOn(target, "msil")
-  val assemrefs     = StringSetting ("-r", "path", "List of assemblies referenced by the program (only relevant with -target:msil)", ".").dependsOn(target, "msil")
   val debug         = new BooleanSetting("-debug", "Output debugging messages") { override def hiddenToIDE = true }
   val deprecation   = BooleanSetting ("-deprecation", "enable detailed deprecation warnings")
   val unchecked     = BooleanSetting ("-unchecked", "enable detailed unchecked warnings")

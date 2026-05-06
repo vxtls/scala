@@ -140,11 +140,6 @@ class Scalac extends MatchingTask {
   /** Instruct the compiler to generate unchecked information. */
   private var unchecked: Option[Boolean] = None
 
-  // Name of the output assembly (only relevant with -target:msil)
-  private var assemname: Option[String] = None
-  // List of assemblies referenced by the program (only relevant with -target:msil)
-  private var assemrefs: Option[String] = None
-
   /** Whether the compiler is being debuged. Prints more information in case
    *  in case of failure. */
   private var scalacDebugging: Boolean = false
@@ -322,12 +317,6 @@ class Scalac extends MatchingTask {
    *  @param input The specified flag */
   def setScalacdebugging(input: Boolean): Unit =
     scalacDebugging = input
-
-  def setAssemname(input: String): Unit =
-    assemname = Some(input)
-
-  def setAssemrefs(input: String): Unit =
-    assemrefs = Some(input)
 
 /*============================================================================*\
 **                             Properties getters                             **
@@ -513,9 +502,6 @@ class Scalac extends MatchingTask {
     if (!debugInfo.isEmpty) settings.debuginfo.value = debugInfo.get
     if (!deprecation.isEmpty) settings.deprecation.value = deprecation.get
     if (!unchecked.isEmpty) settings.unchecked.value = unchecked.get
-
-    if (!assemname.isEmpty) settings.assemname.value = assemname.get
-    if (!assemrefs.isEmpty) settings.assemrefs.value = assemrefs.get
 
     log("Scalac params = '" + addParams + "'", Project.MSG_DEBUG)
     var args =
