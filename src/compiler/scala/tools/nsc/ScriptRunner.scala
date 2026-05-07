@@ -269,7 +269,7 @@ object ScriptRunner {
       scriptArgs: List[String]): Unit =
   {
     if(!(new File(scriptFile)).exists) {
-      Console.println("no such file: " + scriptFile)
+      scala.Console.println("no such file: " + scriptFile)
       return ()
     }
 
