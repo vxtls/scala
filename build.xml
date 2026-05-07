@@ -701,6 +701,7 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
       destdir="${locker.dir}/lib/library"
       source="1.4" target="1.4" deprecation="yes"
       classpath="${locker.dir}/lib/library"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       includes="**/*.java"/>
     <starr
       srcdir="${src.dir}/library"
@@ -834,6 +835,7 @@ BUILD QUICK-TEST LAYER
       destdir="${quick.dir}/lib/library"
       source="1.4" target="1.4" deprecation="yes"
       classpath="${quick.dir}/lib/library"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       includes="**/*.java"/>
     <copy todir="${quick.dir}/lib/library" overwrite="true">
       <fileset dir="${locker.dir}/lib/library"/>
@@ -896,6 +898,7 @@ BUILD QUICK-TEST LAYER
       destdir="${quick.dir}/lib/actors"
       source="1.4" target="1.4" deprecation="yes"
       classpath="${quick.dir}/lib/actors"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       includes="scala/actors/**/*.java"/>
     <locker
       srcdir="${src.dir}/actors"
@@ -1194,6 +1197,7 @@ ANDROID
       srcdir="${android.dir}/src"
       destdir="${android.dir}/lib/library"
       deprecation="${jc.deprecation}"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
     >
       <bootclasspath>
         <pathelement location="${android.home}/android.jar}"/>
@@ -1407,6 +1411,7 @@ OPTIMIZE
       destdir="${optimised.dir}/lib/library"
       source="1.4" target="1.4" deprecation="yes"
       classpath="${optimised.dir}/lib/library"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       includes="**/*.java"/>
     <quick
       srcdir="${src.dir}/library"
@@ -1545,6 +1550,7 @@ TEST
       destdir="${strap.dir}/lib/library"
       source="1.4" target="1.4" deprecation="yes"
       classpath="${strap.dir}/lib/library"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       includes="**/*.java"/>
     <copy todir="${strap.dir}/lib/library" overwrite="true">
       <fileset dir="${quick.dir}/lib/library"/>
@@ -1602,6 +1608,7 @@ TEST
       destdir="${strap.dir}/lib/actors"
       source="1.4" target="1.4" deprecation="yes"
       classpath="${strap.dir}/lib/actors"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
       includes="scala/actors/**/*.java"/>
     <quick
       srcdir="${src.dir}/actors"
