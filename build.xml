@@ -42,8 +42,16 @@ PROPERTIES
   <condition property="comp.starr.jar" value="${starr.comp.jar}">
     <isset property="starr.comp.jar"/>
   </condition>
+  <condition property="lib.bridge.jar" value="${bridge.lib.jar}">
+    <isset property="bridge.lib.jar"/>
+  </condition>
+  <condition property="comp.bridge.jar" value="${bridge.comp.jar}">
+    <isset property="bridge.comp.jar"/>
+  </condition>
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
+  <property name="lib.bridge.jar" value="../v2.3.0+v2.3.3-product-bootstrap/build/quick/lib/library"/>
+  <property name="comp.bridge.jar" value="../v2.3.0+v2.3.3-product-bootstrap/build/quick/lib/compiler"/>
   <property name="comp.starr.extra.jar" location="${comp.starr.jar}/../../../locker/lib/compiler"/>
   <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
   <condition property="ant.jar" value="${ant.core.lib}">
@@ -96,10 +104,12 @@ INITIALISATION
     <fail message="Missing bootstrap compiler libraries.
 Provide scala-library, scala-compiler, and fjbg either in lib/ or with Ant properties.
 Example:
-  JAVA_HOME=/path/to/jdk8 PATH=/path/to/jdk8/bin:$PATH ANT_OPTS=-Xmx1024M ant -Dlib.starr.jar=../v2.3.0-bootstrap/build/quick/lib/library -Dcomp.starr.jar=../v2.3.0-bootstrap/build/quick/lib/compiler -Dfjbg.jar=../v2.3.0-bootstrap/build/quick/lib/fjbg.jar dist">
+  JAVA_HOME=/path/to/jdk8 PATH=/path/to/jdk8/bin:$PATH ANT_OPTS=-Xmx1024M ant -Dlib.starr.jar=../v2.3.0-bootstrap/build/quick/lib/library -Dcomp.starr.jar=../v2.3.0-bootstrap/build/quick/lib/compiler -Dlib.bridge.jar=../v2.3.0+v2.3.3-product-bootstrap/build/quick/lib/library -Dcomp.bridge.jar=../v2.3.0+v2.3.3-product-bootstrap/build/quick/lib/compiler -Dfjbg.jar=../v2.3.0-bootstrap/build/quick/lib/fjbg.jar dist">
       <condition><not><and>
         <available file="${lib.starr.jar}"/>
         <available file="${comp.starr.jar}"/>
+        <available file="${lib.bridge.jar}"/>
+        <available file="${comp.bridge.jar}"/>
         <available file="${fjbg.jar}"/>
       </and></not></condition>
     </fail>
@@ -204,6 +214,8 @@ SETUP
     <mkdir dir="${java8.stubs.dir}/src/java/util/concurrent"/>
     <mkdir dir="${java8.stubs.dir}/src/java/util/logging"/>
     <mkdir dir="${java8.stubs.dir}/src/java/util/regex"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt/event"/>
     <mkdir dir="${java8.stubs.dir}/src/javax/swing"/>
     <mkdir dir="${java8.stubs.dir}/src/javax/swing/border"/>
     <mkdir dir="${java8.stubs.dir}/src/javax/swing/event"/>
@@ -395,6 +407,84 @@ public abstract class CharBuffer extends Buffer implements CharSequence {
   public CharSequence subSequence(int start, int end) { return this; }
 }
 ]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/BorderLayout.java"><![CDATA[
+package java.awt;
+public class BorderLayout implements LayoutManager {
+  public static final String CENTER = "Center";
+  public BorderLayout() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Component.java"><![CDATA[
+package java.awt;
+public class Component {
+  public void setFont(Font font) {}
+  public void setVisible(boolean visible) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Container.java"><![CDATA[
+package java.awt;
+public class Container extends Component {
+  public Component add(Component component) { return component; }
+  public void add(Component component, Object constraints) {}
+  public void remove(Component component) {}
+  public LayoutManager getLayout() { return null; }
+  public void setLayout(LayoutManager layout) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Font.java"><![CDATA[
+package java.awt;
+public class Font {
+  public static final int PLAIN = 0;
+  public Font(String name, int style, int size) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Frame.java"><![CDATA[
+package java.awt;
+public class Frame extends Container {
+  public void addWindowListener(java.awt.event.WindowListener listener) {}
+  public void pack() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/LayoutManager.java"><![CDATA[
+package java.awt;
+public interface LayoutManager {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/List.java"><![CDATA[
+package java.awt;
+public class List extends Component {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionEvent.java"><![CDATA[
+package java.awt.event;
+public class ActionEvent extends java.util.EventObject {
+  public ActionEvent(Object source, int id, String command) { super(source); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionListener.java"><![CDATA[
+package java.awt.event;
+public interface ActionListener extends java.util.EventListener {
+  public void actionPerformed(ActionEvent event);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowAdapter.java"><![CDATA[
+package java.awt.event;
+public abstract class WindowAdapter implements WindowListener {
+  public void windowClosed(WindowEvent event) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowEvent.java"><![CDATA[
+package java.awt.event;
+public class WindowEvent extends java.util.EventObject {
+  public WindowEvent(Object source, int id) { super(source); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowListener.java"><![CDATA[
+package java.awt.event;
+public interface WindowListener extends java.util.EventListener {
+  public void windowClosed(WindowEvent event);
+}
+]]></echo>
     <echo file="${java8.stubs.dir}/src/javax/swing/border/Border.java"><![CDATA[
 package javax.swing.border;
 public interface Border {
@@ -452,6 +542,8 @@ public class JFrame extends java.awt.Frame {
   public JFrame(String title) {}
   public static void setDefaultLookAndFeelDecorated(boolean decorated) {}
   public void setDefaultCloseOperation(int operation) {}
+  public String getTitle() { return null; }
+  public void setTitle(String title) {}
   public java.awt.Container getContentPane() { return null; }
   public JRootPane getRootPane() { return null; }
 }
@@ -651,11 +743,11 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
     description="Rebuilds LOCKER from the current sources"/>
 
   <target name="build.bridge" depends="setup, build.java8.stubs">
-  <!-- Build a temporary compiler that can understand the v2.3 case-class and
-       typed-pattern source before LOCKER is rebuilt from clean v2.3 outputs. -->
+  <!-- Use the v2.3.3 Product transition compiler as the bridge layer,
+       with only the minimal current library classes needed on its classpath. -->
     <mkdir dir="${bridge.dir}/lib/library"/>
     <copy todir="${bridge.dir}/lib/library">
-      <fileset dir="${lib.starr.jar}"/>
+      <fileset dir="${lib.bridge.jar}"/>
     </copy>
     <mkdir dir="${bridge.dir}/current-library"/>
     <starr
@@ -679,6 +771,7 @@ BUILD LOCAL REFERENCE (LOCKER) LAYER
       <include name="scala/Product9.scala"/>
     </starr>
     <mkdir dir="${bridge.dir}/stubs/scala/collection/immutable"/>
+    <mkdir dir="${bridge.dir}/stubs/scala/collection/mutable"/>
     <echo file="${bridge.dir}/stubs/scala/collection/immutable/Map.scala"><![CDATA[
 package scala.collection.immutable
 trait Map[A, +B]
@@ -686,6 +779,16 @@ object Map {}
 ]]></echo>
     <echo file="${bridge.dir}/stubs/scala/collection/immutable/Set.scala"><![CDATA[
 package scala.collection.immutable
+trait Set[A]
+object Set {}
+]]></echo>
+    <echo file="${bridge.dir}/stubs/scala/collection/mutable/Map.scala"><![CDATA[
+package scala.collection.mutable
+trait Map[A, B]
+object Map {}
+]]></echo>
+    <echo file="${bridge.dir}/stubs/scala/collection/mutable/Set.scala"><![CDATA[
+package scala.collection.mutable
 trait Set[A]
 object Set {}
 ]]></echo>
@@ -697,6 +800,8 @@ object Set {}
       classpath="${bridge.dir}/current-library:${bridge.dir}/lib/library">
       <include name="scala/collection/immutable/Map.scala"/>
       <include name="scala/collection/immutable/Set.scala"/>
+      <include name="scala/collection/mutable/Map.scala"/>
+      <include name="scala/collection/mutable/Set.scala"/>
     </starr>
     <starr
       srcdir="${src.dir}/library"
@@ -705,6 +810,8 @@ object Set {}
       bootclasspath="${java.boot.classpath}:${bridge.dir}/current-library:${bridge.dir}/lib/library"
       classpath="${bridge.dir}/current-library:${bridge.dir}/lib/library">
       <include name="scala/Math.scala"/>
+      <include name="scala/Attribute.scala"/>
+      <include name="scala/deprecated.scala"/>
       <include name="scala/Predef.scala"/>
       <include name="scala/compat/Platform.scala"/>
       <include name="scala/runtime/RichBoolean.scala"/>
@@ -725,60 +832,86 @@ object Set {}
       <fileset dir="${bridge.dir}/current-library">
         <exclude name="scala/collection/immutable/Map.class"/>
         <exclude name="scala/collection/immutable/Set.class"/>
+        <exclude name="scala/collection/mutable/Map.class"/>
+        <exclude name="scala/collection/mutable/Set.class"/>
       </fileset>
     </copy>
-    <copy todir="${bridge.dir}/compiler-src" overwrite="true">
+    <mkdir dir="${bridge.dir}/external-compiler"/>
+    <copy todir="${bridge.dir}/external-compiler">
+      <fileset dir="${comp.bridge.jar}"/>
+    </copy>
+    <path id="bridge.bootstrap.compiler.classpath">
+      <pathelement location="${bridge.dir}/lib/library"/>
+      <pathelement location="${bridge.dir}/current-compiler"/>
+      <pathelement location="${bridge.dir}/external-compiler"/>
+      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${ant.jar}"/>
+    </path>
+    <path id="bridge.bootstrap.compiler.sources">
       <fileset dir="${src.dir}/compiler">
         <include name="**/*.scala"/>
+        <exclude name="scala/tools/ant/ScalaTool.scala"/>
+        <exclude name="scala/tools/nsc/MainGenericRunner.scala"/>
+        <exclude name="scala/tools/nsc/typechecker/Namers.scala"/>
+        <exclude name="scala/tools/nsc/typechecker/Typers.scala"/>
+        <exclude name="scala/tools/nsc/doc/**"/>
+        <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
       </fileset>
-      <filterchain>
-        <replacestring
-          from="{left,right}"
-          to="Pair(left, right)"/>
-        <replacestring
-          from="def freshArgType(tp: Type): {Type, List[Symbol]} ="
-          to="def freshArgType(tp: Type): Pair[Type, List[Symbol]] ="/>
-        <replacestring
-          from="{formals(0), List()}"
-          to="Pair(formals(0), List())"/>
-        <replacestring
-          from="{freshArgType(restype)._1.substSym(tparams, tparams1), tparams1}"
-          to="Pair(freshArgType(restype)._1.substSym(tparams, tparams1), tparams1)"/>
-        <replacestring
-          from="val {unappFormal, freeVars} = freshArgType(unappType)"
-          to="val freshArgTypeResult = freshArgType(unappType)&#10;            val unappFormal = freshArgTypeResult._1&#10;            val freeVars = freshArgTypeResult._2"/>
-        <replacestring
-          from='vars transform { (x, vari) => vari.replaceAll("#([^#]*)#", "\\$$1") }'
-          to='vars.map { case Pair(x, vari) => vari.replaceAll("#([^#]*)#", "\\$$1") }'/>
-        <replacestring
-          from='vars transform { (x, vari) => vari.replaceAll("#([^#]*)#", "%_$1%") }'
-          to='vars.map { case Pair(x, vari) => vari.replaceAll("#([^#]*)#", "%_$1%") }'/>
-        <replacestring
-          from="vars transform { (x, vari) =&gt;"
-          to="vars.map { case Pair(x, vari) =&gt;"/>
-        <replacestring
-          from="val jar &lt;- libdir.listFiles; jar.isFile; jar.getName.endsWith(&quot;.jar&quot;)"
-          to="val jar &lt;- libdir.listFiles.toList; jar.isFile; jar.getName.endsWith(&quot;.jar&quot;)"/>
-        <replacestring
-          from="names.retain(sym =&gt; sym.name != nme.value)"
-          to="names.filter(sym =&gt; sym.name != nme.value)"/>
-      </filterchain>
+    </path>
+    <path id="bridge.compiler.classpath">
+      <pathelement location="${bridge.dir}/lib/library"/>
+      <pathelement location="${bridge.dir}/current-compiler"/>
+      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${ant.jar}"/>
+    </path>
+    <path id="bridge.compiler.sources">
+      <fileset dir="${src.dir}/compiler">
+        <include name="**/*.scala"/>
+        <exclude name="scala/tools/ant/**"/>
+        <exclude name="scala/tools/nsc/Global.scala"/>
+        <exclude name="scala/tools/nsc/doc/**"/>
+        <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
+      </fileset>
+    </path>
+    <pathconvert property="bridge.bootstrap.compiler.classpath.value" refid="bridge.bootstrap.compiler.classpath"/>
+    <pathconvert property="bridge.bootstrap.compiler.sources.value" refid="bridge.bootstrap.compiler.sources" pathsep=" "/>
+    <pathconvert property="bridge.compiler.classpath.value" refid="bridge.compiler.classpath"/>
+    <pathconvert property="bridge.compiler.sources.value" refid="bridge.compiler.sources" pathsep=" "/>
+    <mkdir dir="${bridge.dir}/current-compiler"/>
+    <copy todir="${bridge.dir}/current-compiler">
+      <fileset dir="${bridge.dir}/external-compiler"/>
     </copy>
-    <mkdir dir="${bridge.dir}/lib/compiler"/>
-    <starr
-      srcdir="${bridge.dir}/compiler-src"
-      destdir="${bridge.dir}/lib/compiler"
-      addparams="-Xexperimental"
-      bootclasspath="${java.boot.classpath}:${bridge.dir}/lib/library">
+    <java
+      fork="true"
+      jvm="${bootstrap.java.home}/bin/java"
+      classname="scala.tools.nsc.Main"
+      maxmemory="512m"
+      failonerror="true">
       <classpath>
         <pathelement location="${bridge.dir}/lib/library"/>
-        <pathelement location="${bridge.dir}/lib/compiler"/>
+        <pathelement location="${bridge.dir}/external-compiler"/>
         <pathelement location="${fjbg.jar}"/>
         <pathelement location="${ant.jar}"/>
       </classpath>
-      <include name="**/*.scala"/>
-      <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-    </starr>
+      <arg value="-d"/>
+      <arg file="${bridge.dir}/current-compiler"/>
+      <arg value="-bootclasspath"/>
+      <arg value="${java.boot.classpath}:${bridge.dir}/lib/library"/>
+      <arg value="-classpath"/>
+      <arg value="${bridge.bootstrap.compiler.classpath.value}"/>
+      <arg value="-Xexperimental"/>
+      <arg line="${bridge.bootstrap.compiler.sources.value}"/>
+    </java>
+    <mkdir dir="${bridge.dir}/lib/compiler"/>
+    <copy todir="${bridge.dir}/lib/compiler">
+      <fileset dir="${bridge.dir}/external-compiler">
+        <include name="scala/tools/ant/**"/>
+        <include name="scala/tools/nsc/doc/**"/>
+      </fileset>
+    </copy>
+    <copy todir="${bridge.dir}/lib/compiler">
+      <fileset dir="${bridge.dir}/current-compiler"/>
+    </copy>
     <build.support build.dir="${bridge.dir}"/>
     <build.links build.dir="${bridge.dir}"/>
   </target>
@@ -799,7 +932,7 @@ object Set {}
       classpath="${locker.dir}/lib/library"
       includes="**/*.java"/>
     <copy todir="${locker.dir}/lib/library" overwrite="true">
-      <fileset dir="${bridge.dir}/current-library"/>
+      <fileset dir="${bridge.dir}/lib/library"/>
     </copy>
     <bridge
       srcdir="${src.dir}/library"
