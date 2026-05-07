@@ -50,8 +50,8 @@ PROPERTIES
   </condition>
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
-  <property name="lib.bridge.jar" value="../v2.3.0+v2.3.3-product-bootstrap/build/quick/lib/library"/>
-  <property name="comp.bridge.jar" value="../v2.3.0+v2.3.3-product-bootstrap/build/quick/lib/compiler"/>
+  <property name="lib.bridge.jar" value="../v2.3.0+v2.3.3-pattern-bootstrap/build/quick/lib/library"/>
+  <property name="comp.bridge.jar" value="../v2.3.0+v2.3.3-pattern-bootstrap/build/quick/lib/compiler"/>
   <property name="comp.starr.extra.jar" location="${comp.starr.jar}/../../../locker/lib/compiler"/>
   <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
   <condition property="ant.jar" value="${ant.core.lib}">
@@ -104,7 +104,7 @@ INITIALISATION
     <fail message="Missing bootstrap compiler libraries.
 Provide scala-library, scala-compiler, and fjbg either in lib/ or with Ant properties.
 Example:
-  JAVA_HOME=/path/to/jdk8 PATH=/path/to/jdk8/bin:$PATH ANT_OPTS=-Xmx1024M ant -Dlib.starr.jar=../v2.3.0-bootstrap/build/quick/lib/library -Dcomp.starr.jar=../v2.3.0-bootstrap/build/quick/lib/compiler -Dlib.bridge.jar=../v2.3.0+v2.3.3-product-bootstrap/build/quick/lib/library -Dcomp.bridge.jar=../v2.3.0+v2.3.3-product-bootstrap/build/quick/lib/compiler -Dfjbg.jar=../v2.3.0-bootstrap/build/quick/lib/fjbg.jar dist">
+  JAVA_HOME=/path/to/jdk8 PATH=/path/to/jdk8/bin:$PATH ANT_OPTS=-Xmx1024M ant -Dlib.starr.jar=../v2.3.0-bootstrap/build/quick/lib/library -Dcomp.starr.jar=../v2.3.0-bootstrap/build/quick/lib/compiler -Dlib.bridge.jar=../v2.3.0+v2.3.3-pattern-bootstrap/build/quick/lib/library -Dcomp.bridge.jar=../v2.3.0+v2.3.3-pattern-bootstrap/build/quick/lib/compiler -Dfjbg.jar=../v2.3.0-bootstrap/build/quick/lib/fjbg.jar dist">
       <condition><not><and>
         <available file="${lib.starr.jar}"/>
         <available file="${comp.starr.jar}"/>
@@ -836,81 +836,9 @@ object Set {}
         <exclude name="scala/collection/mutable/Set.class"/>
       </fileset>
     </copy>
-    <mkdir dir="${bridge.dir}/external-compiler"/>
-    <copy todir="${bridge.dir}/external-compiler">
-      <fileset dir="${comp.bridge.jar}"/>
-    </copy>
-    <path id="bridge.bootstrap.compiler.classpath">
-      <pathelement location="${bridge.dir}/lib/library"/>
-      <pathelement location="${bridge.dir}/current-compiler"/>
-      <pathelement location="${bridge.dir}/external-compiler"/>
-      <pathelement location="${fjbg.jar}"/>
-      <pathelement location="${ant.jar}"/>
-    </path>
-    <path id="bridge.bootstrap.compiler.sources">
-      <fileset dir="${src.dir}/compiler">
-        <include name="**/*.scala"/>
-        <exclude name="scala/tools/ant/ScalaTool.scala"/>
-        <exclude name="scala/tools/nsc/MainGenericRunner.scala"/>
-        <exclude name="scala/tools/nsc/typechecker/Namers.scala"/>
-        <exclude name="scala/tools/nsc/typechecker/Typers.scala"/>
-        <exclude name="scala/tools/nsc/doc/**"/>
-        <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-      </fileset>
-    </path>
-    <path id="bridge.compiler.classpath">
-      <pathelement location="${bridge.dir}/lib/library"/>
-      <pathelement location="${bridge.dir}/current-compiler"/>
-      <pathelement location="${fjbg.jar}"/>
-      <pathelement location="${ant.jar}"/>
-    </path>
-    <path id="bridge.compiler.sources">
-      <fileset dir="${src.dir}/compiler">
-        <include name="**/*.scala"/>
-        <exclude name="scala/tools/ant/**"/>
-        <exclude name="scala/tools/nsc/Global.scala"/>
-        <exclude name="scala/tools/nsc/doc/**"/>
-        <excludesfile name="${nsc.excludes.file}" if="excludes.avail"/>
-      </fileset>
-    </path>
-    <pathconvert property="bridge.bootstrap.compiler.classpath.value" refid="bridge.bootstrap.compiler.classpath"/>
-    <pathconvert property="bridge.bootstrap.compiler.sources.value" refid="bridge.bootstrap.compiler.sources" pathsep=" "/>
-    <pathconvert property="bridge.compiler.classpath.value" refid="bridge.compiler.classpath"/>
-    <pathconvert property="bridge.compiler.sources.value" refid="bridge.compiler.sources" pathsep=" "/>
-    <mkdir dir="${bridge.dir}/current-compiler"/>
-    <copy todir="${bridge.dir}/current-compiler">
-      <fileset dir="${bridge.dir}/external-compiler"/>
-    </copy>
-    <java
-      fork="true"
-      jvm="${bootstrap.java.home}/bin/java"
-      classname="scala.tools.nsc.Main"
-      maxmemory="512m"
-      failonerror="true">
-      <classpath>
-        <pathelement location="${bridge.dir}/lib/library"/>
-        <pathelement location="${bridge.dir}/external-compiler"/>
-        <pathelement location="${fjbg.jar}"/>
-        <pathelement location="${ant.jar}"/>
-      </classpath>
-      <arg value="-d"/>
-      <arg file="${bridge.dir}/current-compiler"/>
-      <arg value="-bootclasspath"/>
-      <arg value="${java.boot.classpath}:${bridge.dir}/lib/library"/>
-      <arg value="-classpath"/>
-      <arg value="${bridge.bootstrap.compiler.classpath.value}"/>
-      <arg value="-Xexperimental"/>
-      <arg line="${bridge.bootstrap.compiler.sources.value}"/>
-    </java>
     <mkdir dir="${bridge.dir}/lib/compiler"/>
     <copy todir="${bridge.dir}/lib/compiler">
-      <fileset dir="${bridge.dir}/external-compiler">
-        <include name="scala/tools/ant/**"/>
-        <include name="scala/tools/nsc/doc/**"/>
-      </fileset>
-    </copy>
-    <copy todir="${bridge.dir}/lib/compiler">
-      <fileset dir="${bridge.dir}/current-compiler"/>
+      <fileset dir="${comp.bridge.jar}"/>
     </copy>
     <build.support build.dir="${bridge.dir}"/>
     <build.links build.dir="${bridge.dir}"/>
