@@ -28,7 +28,6 @@ import transform._
 import backend.icode.{ICodes, GenICode, Checkers}
 import backend.ScalaPrimitives
 import backend.jvm.GenJVM
-import backend.msil.GenMSIL
 import backend.opt.{Inliners, ClosureElimination, DeadCodeElimination}
 import backend.icode.analysis._
 
@@ -187,16 +186,12 @@ class Global(var settings: Settings, var reporter: Reporter) extends Trees
   lazy val classPath0 = new ClassPath(false && onlyPresentation)
 
   lazy val classPath =
-    if (forMSIL)
-      new classPath0.Build(settings.sourcepath.value, settings.outdir.value)
-    else
-      new classPath0.Build(settings.classpath.value, settings.sourcepath.value,
-                           settings.outdir.value, settings.bootclasspath.value,
-                           settings.extdirs.value, settings.Xcodebase.value)
+    new classPath0.Build(settings.classpath.value, settings.sourcepath.value,
+                         settings.outdir.value, settings.bootclasspath.value,
+                         settings.extdirs.value, settings.Xcodebase.value)
 
   if (settings.verbose.value) {
     inform("[Classpath = " + classPath + "]")
-    if (forMSIL) inform("[AssemRefs = " + settings.assemrefs.value + "]")
   }
 
   def getSourceFile(f: AbstractFile): SourceFile =
@@ -221,8 +216,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends Trees
   }
 
   def rootLoader: LazyType =
-    if (forMSIL) new loaders.NamespaceLoader(classPath.root)
-    else new loaders.PackageLoader(classPath.root /* getRoot() */)
+    new loaders.PackageLoader(classPath.root /* getRoot() */)
 
 // Phases ------------------------------------------------------------
 
@@ -367,10 +361,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends Trees
     val global: Global.this.type = Global.this
   }
 
-  object genMSIL extends GenMSIL {
-    val global: Global.this.type = Global.this
-  }
-
   object icodeChecker extends checkers.ICodeChecker()
 
   object typer extends analyzer.Typer(
@@ -403,7 +393,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends Trees
     inliner,         // optimization: do inlining
     closureElimination, // optimization: get rid of uncalled closures
     deadCode,           // optimization: get rid of dead cpde
-    if (forMSIL) genMSIL else genJVM, // generate .class files
+    genJVM, // generate .class files
     sampleTransform)
 
 
@@ -688,7 +678,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends Trees
   }
 
   def forCLDC: Boolean = settings.target.value == "cldc"
-  def forMSIL: Boolean = settings.target.value == "msil"
+  def forMSIL: Boolean = false
   def onlyPresentation = settings.doc.value
   // used to disable caching in lampion IDE.
   def inIDE = false
