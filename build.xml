@@ -196,6 +196,8 @@ SETUP
     <mkdir dir="${java8.stubs.dir}/src/java/nio"/>
     <mkdir dir="${java8.stubs.dir}/src/java/util"/>
     <mkdir dir="${java8.stubs.dir}/src/java/util/regex"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt/event"/>
     <mkdir dir="${java8.stubs.dir}/src/javax/swing"/>
     <mkdir dir="${java8.stubs.dir}/src/javax/swing/border"/>
     <mkdir dir="${java8.stubs.dir}/src/javax/swing/event"/>
@@ -280,6 +282,84 @@ public abstract class CharBuffer extends Buffer implements CharSequence {
   public CharSequence subSequence(int start, int end) { return this; }
 }
 ]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/BorderLayout.java"><![CDATA[
+package java.awt;
+public class BorderLayout implements LayoutManager {
+  public static final String CENTER = "Center";
+  public BorderLayout() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Component.java"><![CDATA[
+package java.awt;
+public class Component {
+  public void setFont(Font font) {}
+  public void setVisible(boolean visible) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Container.java"><![CDATA[
+package java.awt;
+public class Container extends Component {
+  public Component add(Component component) { return component; }
+  public void add(Component component, Object constraints) {}
+  public void remove(Component component) {}
+  public LayoutManager getLayout() { return null; }
+  public void setLayout(LayoutManager layout) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Font.java"><![CDATA[
+package java.awt;
+public class Font {
+  public static final int PLAIN = 0;
+  public Font(String name, int style, int size) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Frame.java"><![CDATA[
+package java.awt;
+public class Frame extends Container {
+  public void addWindowListener(java.awt.event.WindowListener listener) {}
+  public void pack() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/LayoutManager.java"><![CDATA[
+package java.awt;
+public interface LayoutManager {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/List.java"><![CDATA[
+package java.awt;
+public class List extends Component {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionEvent.java"><![CDATA[
+package java.awt.event;
+public class ActionEvent extends java.util.EventObject {
+  public ActionEvent(Object source, int id, String command) { super(source); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionListener.java"><![CDATA[
+package java.awt.event;
+public interface ActionListener extends java.util.EventListener {
+  public void actionPerformed(ActionEvent event);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowAdapter.java"><![CDATA[
+package java.awt.event;
+public abstract class WindowAdapter implements WindowListener {
+  public void windowClosed(WindowEvent event) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowEvent.java"><![CDATA[
+package java.awt.event;
+public class WindowEvent extends java.util.EventObject {
+  public WindowEvent(Object source, int id) { super(source); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowListener.java"><![CDATA[
+package java.awt.event;
+public interface WindowListener extends java.util.EventListener {
+  public void windowClosed(WindowEvent event);
+}
+]]></echo>
     <echo file="${java8.stubs.dir}/src/javax/swing/border/Border.java"><![CDATA[
 package javax.swing.border;
 public interface Border {
@@ -337,6 +417,8 @@ public class JFrame extends java.awt.Frame {
   public JFrame(String title) {}
   public static void setDefaultLookAndFeelDecorated(boolean decorated) {}
   public void setDefaultCloseOperation(int operation) {}
+  public String getTitle() { return null; }
+  public void setTitle(String title) {}
   public java.awt.Container getContentPane() { return null; }
   public JRootPane getRootPane() { return null; }
 }
