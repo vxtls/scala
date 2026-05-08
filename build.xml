@@ -106,15 +106,25 @@ PROPERTIES
   <!-- Loads custom properties definitions -->
   <property file="${basedir}/build.properties"/>
 
+  <condition property="bootstrap.java.home" value="${env.JAVA_HOME}">
+    <isset property="env.JAVA_HOME"/>
+  </condition>
+  <property name="bootstrap.java.home" value="${java.home}"/>
+  <property name="javac.cmd" location="${bootstrap.java.home}/bin/javac"/>
+  <property name="javac.exe" location="${bootstrap.java.home}/bin/javac"/>
+  <property name="java.rt.jar" location="${bootstrap.java.home}/jre/lib/rt.jar"/>
+  <property name="java8.stubs.dir" location="${basedir}/build/java8-stubs"/>
+  <property name="java8.stubs.jar" location="${basedir}/build/java8-stubs.jar"/>
+  <property name="java.boot.classpath" value="${java8.stubs.jar}:${java.rt.jar}"/>
+
   <!-- Additional command line arguments for scalac. They are added to all build targets -->
-  <property name="scalac.args" value=""/>
+  <property name="scalac.args" value="-Xno-varargs-conversion -bootclasspath ${java.boot.classpath}"/>
   <property name="javac.args" value=""/>
 
   <!-- Sets location of pre-compiled libraries -->
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
   <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
-  <property name="msil.jar" value="${lib.dir}/msil.jar"/>
   <property name="jline.jar" value="${lib.dir}/jline.jar"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
 
@@ -139,15 +149,12 @@ PROPERTIES
       name="scalacfork.jvmargs"
       value="-Xms512M -Xmx512M -Xss1M -XX:MaxPermSize=128M"/>
 
-  <property name="javac.cmd" value="${env.JAVA_HOME}/bin/javac"/>
 
 <!-- ===========================================================================
 INITIALISATION
 ============================================================================ -->
 
   <target name="init">
-  <!-- Setting-up Ant contrib tasks -->
-    <taskdef resource="net/sf/antcontrib/antlib.xml" classpath="${lib.dir}/ant/ant-contrib.jar"/>
   <!-- This is the start time for the distribution -->
     <tstamp prefix="time">
       <format property="human" pattern="d MMMM yyyy, HH:mm:ss"/>
@@ -158,14 +165,7 @@ INITIALISATION
       <os family="windows"/>
     </condition>
   <!-- Finding out SVN revision -->
-    <exec executable="svn" outputproperty="svn.out"
-      failifexecutionfails="false">
-      <arg line=" info ${basedir}"/>
-    </exec>
-    <propertyregex
-      property="svn.number" input="${svn.out}" select="\1"
-      regexp="Revision: ([0-9]+)"
-      defaultValue="0"/>
+    <property name="svn.number" value="x"/>
     <property name="init.avail" value="yes"/>
   <!-- Generating version number -->
     <property file="${basedir}/build.number"/>
@@ -185,11 +185,609 @@ INITIALISATION
     <taskdef resource="scala/tools/ant/sabbus/antlib.xml" classpathref="starr.classpath"/>
   </target>
 
+  <macrodef name="stopwatch">
+    <attribute name="name"/>
+    <attribute name="action" default=""/>
+    <sequential/>
+  </macrodef>
+
+  <target name="build.java8.stubs" depends="init">
+    <mkdir dir="${java8.stubs.dir}/src/java/lang"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/lang/reflect"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/io"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/nio"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/concurrent"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/function"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/logging"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/regex"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt/event"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/border"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/event"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/tree"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/text"/>
+    <mkdir dir="${java8.stubs.dir}/src/jline"/>
+    <mkdir dir="${java8.stubs.dir}/classes"/>
+    <echo file="${java8.stubs.dir}/src/java/lang/CharSequence.java"><![CDATA[
+package java.lang;
+public interface CharSequence {
+  public int length();
+  public char charAt(int index);
+  public CharSequence subSequence(int start, int end);
+  public String toString();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/lang/reflect/AnnotatedElement.java"><![CDATA[
+package java.lang.reflect;
+public interface AnnotatedElement {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Arrays.java"><![CDATA[
+package java.util;
+public final class Arrays {
+  private Arrays() {}
+  public static void fill(int[] a, int val) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Comparator.java"><![CDATA[
+package java.util;
+public interface Comparator {
+  public int compare(Object a, Object b);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Map.java"><![CDATA[
+package java.util;
+public interface Map {
+  public int size();
+  public boolean isEmpty();
+  public boolean containsKey(Object key);
+  public boolean containsValue(Object value);
+  public Object get(Object key);
+  public Object put(Object key, Object value);
+  public Object remove(Object key);
+  public void putAll(Map map);
+  public void clear();
+  public Set keySet();
+  public Collection values();
+  public Set entrySet();
+  public interface Entry<K,V> {
+    public K getKey();
+    public V getValue();
+  }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Collection.java"><![CDATA[
+package java.util;
+public interface Collection {
+  public Iterator iterator();
+  public int size();
+  public boolean isEmpty();
+  public boolean contains(Object value);
+  public boolean add(Object value);
+  public boolean addAll(Collection values);
+  public boolean remove(Object value);
+  public boolean containsAll(Collection values);
+  public boolean removeAll(Collection values);
+  public boolean retainAll(Collection values);
+  public void clear();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/List.java"><![CDATA[
+package java.util;
+public interface List extends Collection {
+  public boolean addAll(int index, Collection values);
+  public ListIterator listIterator();
+  public int indexOf(Object value);
+  public Object get(int index);
+  public Object set(int index, Object value);
+  public List subList(int fromIndex, int toIndex);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/ListIterator.java"><![CDATA[
+package java.util;
+public interface ListIterator extends Iterator {
+  public void add(Object value);
+  public void set(Object value);
+  public boolean hasPrevious();
+  public Object previous();
+  public int previousIndex();
+  public int nextIndex();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Set.java"><![CDATA[
+package java.util;
+public interface Set extends Collection {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/SortedMap.java"><![CDATA[
+package java.util;
+public interface SortedMap extends Map {
+  public Comparator comparator();
+  public Object firstKey();
+  public Object lastKey();
+  public SortedMap headMap(Object toKey);
+  public SortedMap tailMap(Object fromKey);
+  public SortedMap subMap(Object fromKey, Object toKey);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/SortedSet.java"><![CDATA[
+package java.util;
+public interface SortedSet extends Set {
+  public Comparator comparator();
+  public Object first();
+  public Object last();
+  public SortedSet headSet(Object toElement);
+  public SortedSet tailSet(Object fromElement);
+  public SortedSet subSet(Object fromElement, Object toElement);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/HashSet.java"><![CDATA[
+package java.util;
+public class HashSet implements Set {
+  public HashSet() {}
+  public HashSet(Collection values) {}
+  public Object clone() { return null; }
+  public Iterator iterator() { return null; }
+  public int size() { return 0; }
+  public boolean isEmpty() { return false; }
+  public boolean contains(Object value) { return false; }
+  public boolean add(Object value) { return false; }
+  public boolean addAll(Collection values) { return false; }
+  public boolean remove(Object value) { return false; }
+  public boolean containsAll(Collection values) { return false; }
+  public boolean removeAll(Collection values) { return false; }
+  public boolean retainAll(Collection values) { return false; }
+  public void clear() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/LinkedHashSet.java"><![CDATA[
+package java.util;
+public class LinkedHashSet extends HashSet {
+  public LinkedHashSet() {}
+  public LinkedHashSet(int initialCapacity) {}
+  public LinkedHashSet(Collection values) {}
+  public Object clone() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/TreeMap.java"><![CDATA[
+package java.util;
+public class TreeMap implements SortedMap {
+  public TreeMap() {}
+  public TreeMap(Comparator comparator) {}
+  public TreeMap(Map map) {}
+  public TreeMap(SortedMap map) {}
+  public Object clone() { return null; }
+  public int size() { return 0; }
+  public boolean isEmpty() { return false; }
+  public boolean containsKey(Object key) { return false; }
+  public boolean containsValue(Object value) { return false; }
+  public Object get(Object key) { return null; }
+  public Object put(Object key, Object value) { return null; }
+  public Object remove(Object key) { return null; }
+  public void putAll(Map map) {}
+  public void clear() {}
+  public Set keySet() { return null; }
+  public Collection values() { return null; }
+  public Set entrySet() { return null; }
+  public Comparator comparator() { return null; }
+  public Object firstKey() { return null; }
+  public Object lastKey() { return null; }
+  public SortedMap headMap(Object toKey) { return null; }
+  public SortedMap tailMap(Object fromKey) { return null; }
+  public SortedMap subMap(Object fromKey, Object toKey) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/TreeSet.java"><![CDATA[
+package java.util;
+public class TreeSet extends HashSet implements SortedSet {
+  public TreeSet() {}
+  public TreeSet(Comparator comparator) {}
+  public TreeSet(Collection values) {}
+  public TreeSet(SortedSet values) {}
+  public Object clone() { return null; }
+  public Comparator comparator() { return null; }
+  public Object first() { return null; }
+  public Object last() { return null; }
+  public SortedSet headSet(Object toElement) { return null; }
+  public SortedSet tailSet(Object fromElement) { return null; }
+  public SortedSet subSet(Object fromElement, Object toElement) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Iterator.java"><![CDATA[
+package java.util;
+public interface Iterator {
+  public boolean hasNext();
+  public Object next();
+  public void remove();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/Consumer.java"><![CDATA[
+package java.util.function;
+public interface Consumer<T> {
+  public void accept(T value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/BiConsumer.java"><![CDATA[
+package java.util.function;
+public interface BiConsumer<T,U> {
+  public void accept(T first, U second);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/Function.java"><![CDATA[
+package java.util.function;
+public interface Function<T,R> {
+  public R apply(T value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/BiFunction.java"><![CDATA[
+package java.util.function;
+public interface BiFunction<T,U,R> {
+  public R apply(T first, U second);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/Predicate.java"><![CDATA[
+package java.util.function;
+public interface Predicate<T> {
+  public boolean test(T value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ConcurrentMap.java"><![CDATA[
+package java.util.concurrent;
+public interface ConcurrentMap extends java.util.Map {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/Pattern.java"><![CDATA[
+package java.util.regex;
+public final class Pattern {
+  public static final int MULTILINE = 8;
+  public static Pattern compile(String regex) { return null; }
+  public static Pattern compile(String regex, int flags) { return null; }
+  public Matcher matcher(CharSequence input) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/Matcher.java"><![CDATA[
+package java.util.regex;
+public final class Matcher {
+  public boolean find() { return false; }
+  public boolean matches() { return false; }
+  public boolean lookingAt() { return false; }
+  public int start() { return 0; }
+  public int start(int group) { return 0; }
+  public int end() { return 0; }
+  public int end(int group) { return 0; }
+  public int groupCount() { return 0; }
+  public String group() { return null; }
+  public String group(int group) { return null; }
+  public String replaceAll(String replacement) { return null; }
+  public String replaceFirst(String replacement) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/io/ObjectInputStream.java"><![CDATA[
+package java.io;
+public class ObjectInputStream extends InputStream {
+  public ObjectInputStream(InputStream in) throws IOException {}
+  public int read() throws IOException { return -1; }
+  public int readInt() throws IOException { return 0; }
+  public Object readObject() throws IOException, ClassNotFoundException { return null; }
+  public void defaultReadObject() throws IOException, ClassNotFoundException {}
+  protected Class resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/io/ObjectStreamClass.java"><![CDATA[
+package java.io;
+public class ObjectStreamClass {
+  public String getName() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/Buffer.java"><![CDATA[
+package java.nio;
+public abstract class Buffer {
+  public final Buffer clear() { return this; }
+  public final Buffer flip() { return this; }
+  public final int capacity() { return 0; }
+  public final int limit() { return 0; }
+  public final Buffer limit(int newLimit) { return this; }
+  public final int position() { return 0; }
+  public final Buffer position(int newPosition) { return this; }
+  public final int remaining() { return 0; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/ByteBuffer.java"><![CDATA[
+package java.nio;
+public abstract class ByteBuffer extends Buffer {
+  public static ByteBuffer allocate(int capacity) { return null; }
+  public ByteBuffer compact() { return this; }
+  public ByteBuffer put(ByteBuffer src) { return this; }
+  public ByteBuffer put(byte value) { return this; }
+  public ByteBuffer putShort(short value) { return this; }
+  public ByteBuffer putShort(int index, short value) { return this; }
+  public ByteBuffer get(byte[] dst) { return this; }
+  public byte get() { return 0; }
+  public byte[] array() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/CharBuffer.java"><![CDATA[
+package java.nio;
+public abstract class CharBuffer extends Buffer implements CharSequence {
+  public static CharBuffer allocate(int capacity) { return null; }
+  public CharBuffer compact() { return this; }
+  public CharBuffer put(CharBuffer src) { return this; }
+  public CharBuffer put(char c) { return this; }
+  public CharBuffer get(char[] dst) { return this; }
+  public char get() { return 0; }
+  public int length() { return 0; }
+  public char charAt(int index) { return 0; }
+  public CharSequence subSequence(int start, int end) { return this; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/BorderLayout.java"><![CDATA[
+package java.awt;
+public class BorderLayout implements LayoutManager {
+  public static final String CENTER = "Center";
+  public BorderLayout() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Component.java"><![CDATA[
+package java.awt;
+public class Component {
+  public Component() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Container.java"><![CDATA[
+package java.awt;
+public class Container extends Component {
+  public Component add(Component comp) { return comp; }
+  public void add(Component comp, Object constraints) {}
+  public void remove(Component comp) {}
+  public LayoutManager getLayout() { return null; }
+  public void setLayout(LayoutManager layout) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Font.java"><![CDATA[
+package java.awt;
+public class Font {
+  public static final int PLAIN = 0;
+  public Font(String name, int style, int size) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Frame.java"><![CDATA[
+package java.awt;
+public class Frame extends Container {
+  public Frame() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/LayoutManager.java"><![CDATA[
+package java.awt;
+public interface LayoutManager {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/List.java"><![CDATA[
+package java.awt;
+public class List extends Component {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionEvent.java"><![CDATA[
+package java.awt.event;
+public class ActionEvent {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionListener.java"><![CDATA[
+package java.awt.event;
+public interface ActionListener {
+  public void actionPerformed(ActionEvent event);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowAdapter.java"><![CDATA[
+package java.awt.event;
+public abstract class WindowAdapter implements WindowListener {
+  public void windowClosed(WindowEvent event) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowEvent.java"><![CDATA[
+package java.awt.event;
+public class WindowEvent {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowListener.java"><![CDATA[
+package java.awt.event;
+public interface WindowListener {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/border/Border.java"><![CDATA[
+package javax.swing.border;
+public interface Border {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/Icon.java"><![CDATA[
+package javax.swing;
+public interface Icon {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JComponent.java"><![CDATA[
+package javax.swing;
+public class JComponent extends java.awt.Container {
+  public javax.swing.border.Border getBorder() { return null; }
+  public void setBorder(javax.swing.border.Border border) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JButton.java"><![CDATA[
+package javax.swing;
+public class JButton extends JComponent {
+  public JButton() {}
+  public JButton(String text) {}
+  public String getText() { return null; }
+  public void setText(String text) {}
+  public Icon getIcon() { return null; }
+  public void setIcon(Icon icon) {}
+  public void addActionListener(java.awt.event.ActionListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JLabel.java"><![CDATA[
+package javax.swing;
+public class JLabel extends JComponent {
+  public JLabel() {}
+  public JLabel(String text) {}
+  public String getText() { return null; }
+  public void setText(String text) {}
+  public int getHorizontalAlignment() { return 0; }
+  public void setHorizontalAlignment(int alignment) {}
+  public int getVerticalAlignment() { return 0; }
+  public void setVerticalAlignment(int alignment) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JPanel.java"><![CDATA[
+package javax.swing;
+public class JPanel extends JComponent {
+  public JPanel() {}
+  public JPanel(java.awt.LayoutManager layout) {}
+  public java.awt.LayoutManager getLayout() { return null; }
+  public void setLayout(java.awt.LayoutManager layout) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JFrame.java"><![CDATA[
+package javax.swing;
+public class JFrame extends java.awt.Frame {
+  public JFrame(String title) {}
+  public static void setDefaultLookAndFeelDecorated(boolean decorated) {}
+  public void setDefaultCloseOperation(int operation) {}
+  public void addWindowListener(java.awt.event.WindowListener listener) {}
+  public void pack() {}
+  public void setVisible(boolean visible) {}
+  public java.awt.Container getContentPane() { return null; }
+  public JRootPane getRootPane() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JRootPane.java"><![CDATA[
+package javax.swing;
+public class JRootPane extends JComponent {
+  public void setDefaultButton(JButton button) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JScrollPane.java"><![CDATA[
+package javax.swing;
+public class JScrollPane extends JComponent {
+  public JScrollPane(java.awt.Component view) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JSplitPane.java"><![CDATA[
+package javax.swing;
+public class JSplitPane extends JComponent {
+  public static final int HORIZONTAL_SPLIT = 1;
+  public static final int VERTICAL_SPLIT = 0;
+  public JSplitPane(int orientation, java.awt.Component left, java.awt.Component right) {}
+  public void setResizeWeight(double value) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JTree.java"><![CDATA[
+package javax.swing;
+public class JTree extends JComponent {
+  public JTree(javax.swing.tree.TreeModel model) {}
+  public String convertValueToText(Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) { return null; }
+  public void addTreeSelectionListener(javax.swing.event.TreeSelectionListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JTextArea.java"><![CDATA[
+package javax.swing;
+public class JTextArea extends javax.swing.text.JTextComponent {
+  public JTextArea(int rows, int columns) {}
+  public void setFont(java.awt.Font font) {}
+  public void setEditable(boolean editable) {}
+  public int getWidth() { return 0; }
+  public int getColumnWidth() { return 1; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/WindowConstants.java"><![CDATA[
+package javax.swing;
+public interface WindowConstants {
+  public static final int DISPOSE_ON_CLOSE = 2;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/text/JTextComponent.java"><![CDATA[
+package javax.swing.text;
+public class JTextComponent extends javax.swing.JComponent {
+  public String getText() { return null; }
+  public void setText(String text) {}
+  public Caret getCaret() { return null; }
+  public void addCaretListener(javax.swing.event.CaretListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/text/Caret.java"><![CDATA[
+package javax.swing.text;
+public interface Caret {
+  public int getDot();
+  public int getMark();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/CaretEvent.java"><![CDATA[
+package javax.swing.event;
+public abstract class CaretEvent extends java.util.EventObject {
+  public CaretEvent(Object source) { super(source); }
+  public abstract int getDot();
+  public abstract int getMark();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/CaretListener.java"><![CDATA[
+package javax.swing.event;
+public interface CaretListener extends java.util.EventListener {
+  public void caretUpdate(CaretEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeSelectionEvent.java"><![CDATA[
+package javax.swing.event;
+public class TreeSelectionEvent extends java.util.EventObject {
+  public TreeSelectionEvent(Object source) { super(source); }
+  public javax.swing.tree.TreePath getPath() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeSelectionListener.java"><![CDATA[
+package javax.swing.event;
+public interface TreeSelectionListener extends java.util.EventListener {
+  public void valueChanged(TreeSelectionEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreeModel.java"><![CDATA[
+package javax.swing.tree;
+public interface TreeModel {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreePath.java"><![CDATA[
+package javax.swing.tree;
+public class TreePath {
+  public Object getLastPathComponent() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/jline/History.java"><![CDATA[
+package jline;
+public class History {
+  public History() {}
+  public History(java.io.File file) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/jline/ConsoleReader.java"><![CDATA[
+package jline;
+public class ConsoleReader {
+  public ConsoleReader() {}
+  public void setHistory(History history) {}
+  public void setBellEnabled(boolean enabled) {}
+  public String readLine(String prompt) { return null; }
+}
+]]></echo>
+    <javac
+      srcdir="${java8.stubs.dir}/src"
+      destdir="${java8.stubs.dir}/classes"
+      source="1.8" target="1.8"
+      fork="true" executable="${javac.exe}" includeantruntime="false"
+      includes="**/*.java"/>
+    <jar destfile="${java8.stubs.jar}" basedir="${java8.stubs.dir}/classes"/>
+  </target>
+
 <!-- ===========================================================================
 LOCAL REFERENCE BUILD (LOCKER)
 ============================================================================ -->
 
-  <target name="locker.start" depends="init">
+  <target name="locker.start" depends="build.java8.stubs">
     <condition property="locker.available">
       <available file="${build-locker.dir}/all.complete"/>
     </condition>
@@ -217,8 +815,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       compilerpathref="starr.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args}"
-      srcdir="${src.dir}/library"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/library">
       <include name="scala/Predef.scala"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
@@ -229,9 +826,10 @@ LOCAL REFERENCE BUILD (LOCKER)
       compilerpathref="starr.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args}"
-      srcdir="${src.dir}/library"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/library">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <exclude name="scala/Predef.scala"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
@@ -267,14 +865,14 @@ LOCAL REFERENCE BUILD (LOCKER)
       compilerpathref="starr.classpath"
       srcpath="${src.dir}/compiler"
       params="${scalac.args}"
-      srcdir="${src.dir}/compiler"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/compiler">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
-        <pathelement location="${msil.jar}"/>
         <pathelement location="${jline.jar}"/>
         <pathelement location="${ant.jar}"/>
       </compilationpath>
@@ -326,7 +924,6 @@ QUICK BUILD (QUICK)
         <include name="library/**"/>
         <include name="dbc/**"/>
         <include name="actors/**"/>
-        <include name="swing/**"/>
       </srcfiles>
     </uptodate>
   </target>
@@ -355,8 +952,7 @@ QUICK BUILD (QUICK)
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args}"
-      srcdir="${src.dir}/library"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/library">
       <include name="scala/Predef.scala"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
@@ -367,9 +963,10 @@ QUICK BUILD (QUICK)
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args}"
-      srcdir="${src.dir}/library"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/library">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <exclude name="scala/Predef.scala"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
@@ -380,9 +977,10 @@ QUICK BUILD (QUICK)
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args}"
-      srcdir="${src.dir}/actors"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/actors">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
       </compilationpath>
@@ -392,21 +990,10 @@ QUICK BUILD (QUICK)
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args}"
-      srcdir="${src.dir}/dbc"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/dbc">
       <include name="**/*.scala"/>
-      <compilationpath>
-        <pathelement location="${build-quick.dir}/classes/library"/>
-      </compilationpath>
-    </scalacfork>
-    <scalacfork
-      destdir="${build-quick.dir}/classes/library"
-      compilerpathref="locker.classpath"
-      srcpath="${src.dir}/library"
-      params="${scalac.args}"
-      srcdir="${src.dir}/swing"
-      jvmargs="${scalacfork.jvmargs}">
-      <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
       </compilationpath>
@@ -441,14 +1028,14 @@ QUICK BUILD (QUICK)
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/compiler"
       params="${scalac.args}"
-      srcdir="${src.dir}/compiler"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/compiler">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
         <pathelement location="${build-quick.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
-        <pathelement location="${msil.jar}"/>
         <pathelement location="${jline.jar}"/>
         <pathelement location="${ant.jar}"/>
       </compilationpath>
@@ -495,9 +1082,10 @@ QUICK BUILD (QUICK)
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/partest"
       params="${scalac.args}"
-      srcdir="${src.dir}/partest"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/partest">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
         <pathelement location="${build-quick.dir}/classes/compiler"/>
@@ -623,8 +1211,6 @@ PACKED QUICK BUILD (PACK)
       <fileset dir="${build-quick.dir}/classes/compiler"/>
       <!-- filemode / dirmode: see trac ticket #1294 -->
       <zipfileset dirmode="755" filemode="644" src="${fjbg.jar}"/>
-      <zipfileset dirmode="755" filemode="644" src="${msil.jar}"/>
-      <zipfileset dirmode="755" filemode="644" src="${jline.jar}"/>
     </jar>
   </target>
   
@@ -707,7 +1293,6 @@ BOOTSTRAPPING BUILD (STRAP)
         <include name="library/**"/>
         <include name="dbc/**"/>
         <include name="actors/**"/>
-        <include name="swing/**"/>
       </srcfiles>
     </uptodate>
   </target>
@@ -747,6 +1332,8 @@ BOOTSTRAPPING BUILD (STRAP)
       target="jvm-1.5"
       addparams="${scalac.args}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <exclude name="scala/Predef.scala"/>
     </scalac>
     <scalac
@@ -756,6 +1343,8 @@ BOOTSTRAPPING BUILD (STRAP)
       target="jvm-1.5"
       addparams="${scalac.args}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
     </scalac>
     <scalac
       srcdir="${src.dir}/dbc"
@@ -764,6 +1353,8 @@ BOOTSTRAPPING BUILD (STRAP)
       target="jvm-1.5"
       addparams="${scalac.args}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
     </scalac>
     <scalac
       srcdir="${src.dir}/swing"
@@ -772,6 +1363,8 @@ BOOTSTRAPPING BUILD (STRAP)
       target="jvm-1.5"
       addparams="${scalac.args}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
     </scalac>
     <propertyfile file="${build-strap.dir}/classes/library/library.properties">
       <entry key="version.number" value="${version.number}"/>
@@ -804,11 +1397,12 @@ BOOTSTRAPPING BUILD (STRAP)
       target="jvm-1.5"
       addparams="${scalac.args}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <classpath>
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
-        <pathelement location="${msil.jar}"/>
         <pathelement location="${jline.jar}"/>
         <pathelement location="${ant.jar}"/>
       </classpath>
@@ -856,6 +1450,8 @@ BOOTSTRAPPING BUILD (STRAP)
       target="jvm-1.5"
       addparams="${scalac.args}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <classpath>
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>
@@ -890,7 +1486,6 @@ OPTIMISED COMPILER
         <include name="library/**"/>
         <include name="dbc/**"/>
         <include name="actors/**"/>
-        <include name="swing/**"/>
       </srcfiles>
     </uptodate>
   </target>
@@ -919,8 +1514,7 @@ OPTIMISED COMPILER
       compilerpathref="quick.classpath"
       srcpath="${src.dir}/library"
       params="-optimise ${scalac.args}"
-      srcdir="${src.dir}/library"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/library">
       <include name="scala/Predef.scala"/>
       <compilationpath>
         <pathelement location="${build-optimised.dir}/classes/library"/>
@@ -931,9 +1525,10 @@ OPTIMISED COMPILER
       compilerpathref="quick.classpath"
       srcpath="${src.dir}/library"
       params="-optimise ${scalac.args}"
-      srcdir="${src.dir}/library"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/library">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <exclude name="scala/Predef.scala"/>
       <compilationpath>
         <pathelement location="${build-optimised.dir}/classes/library"/>
@@ -944,9 +1539,10 @@ OPTIMISED COMPILER
       compilerpathref="quick.classpath"
       srcpath="${src.dir}/library"
       params="-optimise ${scalac.args}"
-      srcdir="${src.dir}/actors"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/actors">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-optimised.dir}/classes/library"/>
       </compilationpath>
@@ -956,21 +1552,10 @@ OPTIMISED COMPILER
       compilerpathref="quick.classpath"
       srcpath="${src.dir}/library"
       params="-optimise ${scalac.args}"
-      srcdir="${src.dir}/dbc"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/dbc">
       <include name="**/*.scala"/>
-      <compilationpath>
-        <pathelement location="${build-optimised.dir}/classes/library"/>
-      </compilationpath>
-    </scalacfork>
-    <scalacfork
-      destdir="${build-optimised.dir}/classes/library"
-      compilerpathref="quick.classpath"
-      srcpath="${src.dir}/library"
-      params="-optimise ${scalac.args}"
-      srcdir="${src.dir}/swing"
-      jvmargs="${scalacfork.jvmargs}">
-      <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-optimised.dir}/classes/library"/>
       </compilationpath>
@@ -1005,14 +1590,14 @@ OPTIMISED COMPILER
       compilerpathref="quick.classpath"
       srcpath="${src.dir}/compiler"
       params="-optimise ${scalac.args}"
-      srcdir="${src.dir}/compiler"
-      jvmargs="${scalacfork.jvmargs}">
+      srcdir="${src.dir}/compiler">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-optimised.dir}/classes/library"/>
         <pathelement location="${build-optimised.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
-        <pathelement location="${msil.jar}"/>
         <pathelement location="${jline.jar}"/>
         <pathelement location="${ant.jar}"/>
       </compilationpath>
@@ -1062,6 +1647,8 @@ OPTIMISED COMPILER
       srcdir="${src.dir}/partest"
       maxmemory="${scalacfork.maxmemory}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-optimised.dir}/classes/library"/>
         <pathelement location="${build-optimised.dir}/classes/compiler"/>
@@ -1138,7 +1725,6 @@ DOCUMENTATION
         <include name="library/**"/>
         <include name="dbc/**"/>
         <include name="actors/**"/>
-        <include name="swing/**"/>
       </srcfiles>
     </uptodate>
   </target>
@@ -1157,6 +1743,8 @@ DOCUMENTATION
         <files includes="${src.dir}/swing"/>
       </src>
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <exclude name="reflect/Code.scala"/>
       <exclude name="reflect/Manifest.scala"/>
       <exclude name="reflect/Print.scala"/>
@@ -1236,6 +1824,8 @@ DOCUMENTATION
       classpathref="pack.classpath"
       srcdir="${src.dir}/compiler">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
     </scaladoc>
     <touch file="${build-docs.dir}/compiler.complete" verbose="no"/>
     <stopwatch name="docs.comp.timer" action="total"/>
@@ -1457,24 +2047,6 @@ FORWARDED TARGETS FOR JVM 1.4 BUILD
   </target>
 
 <!-- ===========================================================================
-FORWARDED TARGETS FOR MSIL BUILD
-============================================================================ -->
-
-  <target name="msil" depends="pack.done">
-    <ant antfile="${src.dir}/build/msil.xml" target="msil-pack.done" inheritall="yes" inheritrefs="yes"/>
-  </target>
-
-  <target name="msiltest"/>
-
-  <target name="msildist" depends="pack.done">
-    <ant antfile="${src.dir}/build/msil.xml" target="msil-all.done" inheritall="yes" inheritrefs="yes"/>
-  </target>
-
-  <target name="msilclean">
-    <ant antfile="${src.dir}/build/msil.xml" target="msil-all.clean" inheritall="yes" inheritrefs="yes"/>
-  </target>
-
-<!-- ===========================================================================
 FORWARDED TARGETS FOR PACKAGING
 ============================================================================ -->
   
@@ -1486,15 +2058,9 @@ FORWARDED TARGETS FOR PACKAGING
     <ant antfile="${src.dir}/build/four.xml" target="four-dist.done" inheritall="yes" inheritrefs="yes"/>
     <ant antfile="${src.dir}/build/pack.xml" target="fourpack-all.done" inheritall="yes" inheritrefs="yes"/>
   </target>
-
-  <target name="msildistpack" depends="pack.done">
-    <ant antfile="${src.dir}/build/msil.xml" target="msil-dist.done" inheritall="yes" inheritrefs="yes"/>
-    <ant antfile="${src.dir}/build/pack.xml" target="msilpack-all.done" inheritall="yes" inheritrefs="yes"/>
-  </target>
-
   <!-- Used by the scala-installer script -->
-  <target name="alldistpack" depends="distpack, fourdistpack, msildistpack"/>
-  <target name="allallclean" depends="all.clean, fourclean, msilclean"/>
+  <target name="alldistpack" depends="distpack, fourdistpack"/>
+  <target name="allallclean" depends="all.clean, fourclean"/>
 
 <!-- ===========================================================================
 FORWARDED TARGETS FOR NIGHTLY BUILDS
@@ -1512,12 +2078,6 @@ FORWARDED TARGETS FOR NIGHTLY BUILDS
   <target name="fourfournightly">
     <ant antfile="${src.dir}/build/four.xml" target="fourfour-test.done"/>
   </target>
-
-  <target name="msilnightly" depends="pack.done">
-    <ant antfile="${src.dir}/build/msil.xml" target="msil-all.done" inheritall="yes" inheritrefs="yes"/>
-    <ant antfile="${src.dir}/build/pack.xml" target="msilpack-all.done" inheritall="yes" inheritrefs="yes"/>
-  </target>
-
 <!-- ===========================================================================
 MISCELLANEOUS
 ============================================================================ -->
