@@ -28,7 +28,6 @@ import transform._
 import backend.icode.{ICodes, GenICode, Checkers}
 import backend.ScalaPrimitives
 import backend.jvm.GenJVM
-import backend.msil.GenMSIL
 import backend.opt.{Inliners, ClosureElimination, DeadCodeElimination}
 import backend.icode.analysis._
 
@@ -230,8 +229,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   } with SymbolLoaders
 
   def rootLoader: LazyType =
-    if (forMSIL) new loaders.NamespaceLoader(classPath.root)
-    else new loaders.PackageLoader(classPath.root /* getRoot() */)
+    new loaders.PackageLoader(classPath.root /* getRoot() */)
 
 // Phases ------------------------------------------------------------}
 
@@ -451,19 +449,11 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     val runsAfter = List("jvm")
     val runsRightAfter = None
   } with DependencyAnalysis
-
-  // phaseName = "msil"
-  object genMSIL extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List[String]("dce")
-    val runsRightAfter = None
-  } with GenMSIL
-
   // phaseName = "terminal"
   object terminal extends {
     val global: Global.this.type = Global.this
     val phaseName = "terminal"
-    val runsAfter = List[String]("jvm","msil")
+    val runsAfter = List[String]("jvm")
     val runsRightAfter = None
   } with SubComponent {
     private var cache: Option[GlobalPhase] = None
@@ -489,7 +479,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     val runsAfter = List[String]()
     val runsRightAfter = None
   } with SampleTransform
-
   object icodeChecker extends checkers.ICodeChecker()
 
   object typer extends analyzer.Typer(
@@ -537,9 +526,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
         }
         phasesSet += dependencyAnalysis
       }
-    }
-    if (forMSIL) {
-      phasesSet += genMSIL			       // generate .msil files
     }
   }
 
@@ -865,7 +851,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
 
   def forCLDC: Boolean = settings.target.value == "cldc"
   def forJVM : Boolean = settings.target.value startsWith "jvm"
-  def forMSIL: Boolean = settings.target.value == "msil"
+  def forMSIL: Boolean = false
   def onlyPresentation = inIDE
   private val unpickleIDEHook0 : (( => Type) => Type) = f => f
   def unpickleIDEHook : (( => Type) => Type) = unpickleIDEHook0
