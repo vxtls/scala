@@ -8,8 +8,6 @@ package scala.tools.nsc.symtab
 
 import java.io.{File, IOException}
 
-import ch.epfl.lamp.compiler.msil.{Type => MSILType, Attribute => MSILAttribute}
-
 import scala.collection.mutable.{HashMap, HashSet}
 import scala.compat.Platform.currentTime
 import scala.tools.nsc.io.AbstractFile
@@ -214,64 +212,6 @@ abstract class SymbolLoaders {
     }
   }
 
-  class NamespaceLoader(directory: global.classPath0.Context) extends PackageLoader(directory) {
-
-    override protected def kindString: String = "namespace " + namespace
-
-    override protected def sourceString = ""
-
-    override def newPackageLoader(dir: global.classPath0.Context): PackageLoader =
-      new NamespaceLoader(dir)
-
-    val types = new HashMap[String, MSILType]()
-
-    val namespaces = new HashSet[String]()
-
-    def namespace: String = if (root.isRoot) "" else root.fullNameString
-
-    // TODO: Add check whether the source is newer than the assembly
-    override protected def checkSource(name: String, source: AbstractFile): Boolean =
-      !types.contains(name)
-
-    override protected def doComplete(root: Symbol) {
-      clrTypes.collectMembers(root, types, namespaces)
-
-      super.doComplete(root)
-
-      for (namespace <- namespaces.elements) {
-        val oldPkg = root.info.decls lookup newTermName(namespace)
-        if (oldPkg == NoSymbol)
-          enterPackage(namespace, new NamespaceLoader(new classPath0.Context(List())))
-        //else System.out.println("PackageLoader: package already in scope: " + oldPkg.fullNameString)
-      }
-
-      // import the CLR types contained in the package (namespace)
-      for ((name, typ) <- types.elements) {
-        assert(namespace == typ.Namespace, typ.FullName)
-
-        if (typ.IsDefined(clrTypes.SCALA_SYMTAB_ATTR, false)) {
-          val attrs = typ.GetCustomAttributes(clrTypes.SCALA_SYMTAB_ATTR, false)
-          assert (attrs.length == 1, attrs.length)
-          val a = attrs(0).asInstanceOf[MSILAttribute]
-          if (a.getConstructor() == clrTypes.SYMTAB_CONSTR)
-            enterClassAndModule(name, new MSILTypeLoader(typ))
-        }
-        else
-          enterClassAndModule(name, new MSILTypeLoader(typ))
-      }
-    }
-  }  // NamespaceLoader
-
-  class MSILTypeLoader(typ: MSILType) extends SymbolLoader {
-    private object typeParser extends clr.TypeParser {
-      val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-    }
-    protected def doComplete(root: Symbol) {
-      typeParser.parse(typ, root.asInstanceOf[typeParser.global.loaders.clrTypes.global.Symbol]) // don't check this
-    }
-    protected def kindString: String = typ.FullName
-    protected def sourceString = typ.Assembly.FullName
-  }
   // IDE hook.
   protected def completeClassfile(root : Symbol, loader : ClassfileLoader)(f : => Unit) : Unit = f
   import scala.collection.jcl
@@ -316,11 +256,6 @@ abstract class SymbolLoaders {
     protected def doComplete(root: Symbol) { root.sourceModule.initialize }
     protected def kindString: String = ""
     protected def sourceString = ""
-  }
-
-  object clrTypes extends clr.CLRTypes {
-    val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-    if (global.forMSIL) init()
   }
 
 }
