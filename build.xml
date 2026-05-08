@@ -1359,16 +1359,6 @@ BOOTSTRAPPING BUILD (STRAP)
       <exclude name="scala/tools/nsc/backend/msil/**"/>
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
     </scalac>
-    <scalac
-      srcdir="${src.dir}/swing"
-      destdir="${build-strap.dir}/classes/library"
-      classpath="${build-strap.dir}/classes/library"
-      target="jvm-1.5"
-      addparams="${scalac.args}">
-      <include name="**/*.scala"/>
-      <exclude name="scala/tools/nsc/backend/msil/**"/>
-      <exclude name="scala/tools/nsc/symtab/clr/**"/>
-    </scalac>
     <propertyfile file="${build-strap.dir}/classes/library/library.properties">
       <entry key="version.number" value="${version.number}"/>
       <entry key="copyright.string" value="${copyright.string}"/>
