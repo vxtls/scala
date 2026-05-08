@@ -1319,46 +1319,57 @@ BOOTSTRAPPING BUILD (STRAP)
       target="1.5" source="1.5">
       <compilerarg line="${javac.args}"/>
     </javac>
-    <scalac
-      srcdir="${src.dir}/library"
+    <scalacfork
       destdir="${build-strap.dir}/classes/library"
-      classpath="${build-strap.dir}/classes/library"
-      sourcepath="${src.dir}/library"
-      target="jvm-1.5"
-      addparams="${scalac.args}">
+      compilerpathref="quick.classpath"
+      srcpath="${src.dir}/library"
+      params="${scalac.args}"
+      srcdir="${src.dir}/library">
       <include name="scala/Predef.scala"/>
-    </scalac>
-    <scalac
-      srcdir="${src.dir}/library"
+      <compilationpath>
+        <pathelement location="${build-strap.dir}/classes/library"/>
+      </compilationpath>
+    </scalacfork>
+    <scalacfork
       destdir="${build-strap.dir}/classes/library"
-      classpath="${build-strap.dir}/classes/library"
-      target="jvm-1.5"
-      addparams="${scalac.args}">
+      compilerpathref="quick.classpath"
+      srcpath="${src.dir}/library"
+      params="${scalac.args}"
+      srcdir="${src.dir}/library">
       <include name="**/*.scala"/>
       <exclude name="scala/tools/nsc/backend/msil/**"/>
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <exclude name="scala/Predef.scala"/>
-    </scalac>
-    <scalac
-      srcdir="${src.dir}/actors"
+      <compilationpath>
+        <pathelement location="${build-strap.dir}/classes/library"/>
+      </compilationpath>
+    </scalacfork>
+    <scalacfork
       destdir="${build-strap.dir}/classes/library"
-      classpath="${build-strap.dir}/classes/library"
-      target="jvm-1.5"
-      addparams="${scalac.args}">
+      compilerpathref="quick.classpath"
+      srcpath="${src.dir}/library"
+      params="${scalac.args}"
+      srcdir="${src.dir}/actors">
       <include name="**/*.scala"/>
       <exclude name="scala/tools/nsc/backend/msil/**"/>
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
-    </scalac>
-    <scalac
-      srcdir="${src.dir}/dbc"
+      <compilationpath>
+        <pathelement location="${build-strap.dir}/classes/library"/>
+      </compilationpath>
+    </scalacfork>
+    <scalacfork
       destdir="${build-strap.dir}/classes/library"
-      classpath="${build-strap.dir}/classes/library"
-      target="jvm-1.5"
-      addparams="${scalac.args}">
+      compilerpathref="quick.classpath"
+      srcpath="${src.dir}/library"
+      params="${scalac.args}"
+      srcdir="${src.dir}/dbc">
       <include name="**/*.scala"/>
       <exclude name="scala/tools/nsc/backend/msil/**"/>
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
-    </scalac>
+      <compilationpath>
+        <pathelement location="${build-strap.dir}/classes/library"/>
+      </compilationpath>
+    </scalacfork>
     <propertyfile file="${build-strap.dir}/classes/library/library.properties">
       <entry key="version.number" value="${version.number}"/>
       <entry key="copyright.string" value="${copyright.string}"/>
@@ -1384,22 +1395,23 @@ BOOTSTRAPPING BUILD (STRAP)
   <target name="strap.comp" depends="strap.pre-comp" unless="strap.comp.available">
     <stopwatch name="strap.comp.timer"/>
     <mkdir dir="${build-strap.dir}/classes/compiler"/>
-    <scalac
-      srcdir="${src.dir}/compiler"
+    <scalacfork
       destdir="${build-strap.dir}/classes/compiler"
-      target="jvm-1.5"
-      addparams="${scalac.args}">
+      compilerpathref="quick.classpath"
+      srcpath="${src.dir}/compiler"
+      params="${scalac.args}"
+      srcdir="${src.dir}/compiler">
       <include name="**/*.scala"/>
       <exclude name="scala/tools/nsc/backend/msil/**"/>
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
-      <classpath>
+      <compilationpath>
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
         <pathelement location="${jline.jar}"/>
         <pathelement location="${ant.jar}"/>
-      </classpath>
-    </scalac>
+      </compilationpath>
+    </scalacfork>
     <propertyfile file="${build-strap.dir}/classes/compiler/compiler.properties">
       <entry key="version.number" value="${version.number}"/>
       <entry key="copyright.string" value="${copyright.string}"/>
@@ -1437,21 +1449,22 @@ BOOTSTRAPPING BUILD (STRAP)
       <include name="**/*.java"/>
       <compilerarg line="${javac.args}"/>
     </javac>
-    <scalac
-      srcdir="${src.dir}/partest"
+    <scalacfork
       destdir="${build-strap.dir}/classes/partest"
-      target="jvm-1.5"
-      addparams="${scalac.args}">
+      compilerpathref="quick.classpath"
+      srcpath="${src.dir}/partest"
+      params="${scalac.args}"
+      srcdir="${src.dir}/partest">
       <include name="**/*.scala"/>
       <exclude name="scala/tools/nsc/backend/msil/**"/>
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
-      <classpath>
+      <compilationpath>
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>
         <pathelement location="${build-strap.dir}/classes/partest"/>
         <pathelement location="${ant.jar}"/>
-      </classpath>
-    </scalac>
+      </compilationpath>
+    </scalacfork>
     <copy todir="${build-strap.dir}/classes/partest">
       <fileset dir="${src.dir}/partest">
         <include name="**/*.xml"/>
