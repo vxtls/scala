@@ -116,8 +116,9 @@ PROPERTIES
   <property name="javac.cmd" location="${bootstrap.java.home}/bin/javac"/>
   <property name="javac.exe" location="${bootstrap.java.home}/bin/javac"/>
   <property name="java.rt.jar" location="${bootstrap.java.home}/jre/lib/rt.jar"/>
-  <property name="java8.stubs.dir" location="${basedir}/build/java8-stubs"/>
-  <property name="java8.stubs.jar" location="${basedir}/build/java8-stubs.jar"/>
+  <property name="java8.stubs.rev" value="2"/>
+  <property name="java8.stubs.dir" location="${basedir}/build/java8-stubs-r${java8.stubs.rev}"/>
+  <property name="java8.stubs.jar" location="${basedir}/build/java8-stubs-r${java8.stubs.rev}.jar"/>
   <property name="java.boot.classpath" value="${java8.stubs.jar}:${java.rt.jar}"/>
 
   <!-- Additional command line arguments for scalac. They are added to all build targets -->
@@ -139,6 +140,13 @@ PROPERTIES
   <property name="build-pack.dir" value="${build.dir}/pack"/>
   <property name="build-strap.dir" value="${build.dir}/strap"/>
   <property name="build-docs.dir" value="${build.dir}/scaladoc"/>
+  <property name="build-test.dir" value="${build.dir}/test"/>
+  <property name="test.java.classes.dir" value="${build-test.dir}/classes"/>
+  <property name="test.java.src.dir" value="${build-test.dir}/src"/>
+  <property name="test.java.runner.dir" value="${build-test.dir}/bin"/>
+  <property name="test.java.cmd" location="${test.java.runner.dir}/java8-test"/>
+  <property name="test.native.dir" location="${build-test.dir}/native"/>
+  <property name="test.selected.dir" location="${build-test.dir}/files"/>
 
   <property name="dists.dir" value="${basedir}/dists"/>
   
@@ -167,6 +175,9 @@ INITIALISATION
     <condition property="os.win">
       <os family="windows"/>
     </condition>
+    <condition property="os.darwin">
+      <os family="mac"/>
+    </condition>
   <!-- Finding out SVN revision -->
     <property name="svn.number" value="x"/>
     <property name="init.avail" value="yes"/>
@@ -194,7 +205,11 @@ INITIALISATION
     <sequential/>
   </macrodef>
 
-  <target name="build.java8.stubs" depends="init">
+  <target name="prebuild.java8.stubs" depends="init">
+    <available property="java8.stubs.available" file="${java8.stubs.jar}"/>
+  </target>
+
+  <target name="build.java8.stubs" depends="prebuild.java8.stubs" unless="java8.stubs.available">
     <mkdir dir="${java8.stubs.dir}/src/java/lang"/>
     <mkdir dir="${java8.stubs.dir}/src/java/lang/reflect"/>
     <mkdir dir="${java8.stubs.dir}/src/java/io"/>
@@ -224,7 +239,12 @@ public interface CharSequence {
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/lang/reflect/AnnotatedElement.java"><![CDATA[
 package java.lang.reflect;
+import java.lang.annotation.Annotation;
 public interface AnnotatedElement {
+  public Annotation[] getAnnotations();
+  public Annotation[] getDeclaredAnnotations();
+  public boolean isAnnotationPresent(Class annotationClass);
+  public Annotation getAnnotation(Class annotationClass);
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/util/Arrays.java"><![CDATA[
@@ -1863,60 +1883,213 @@ BOOTRAPING TEST AND TEST SUITE
     </same>
   </target>
 
-  <target name="test.run" depends="pack.done">
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+  <target name="test.java.helpers" depends="build.java8.stubs">
+    <mkdir dir="${test.java.classes.dir}"/>
+    <mkdir dir="${test.java.src.dir}/scala/tools/nsc"/>
+    <echo file="${test.java.src.dir}/scala/tools/nsc/MainGenericRunner.java"><![CDATA[
+package scala.tools.nsc;
+
+public final class MainGenericRunner {
+  private MainGenericRunner() {}
+
+  public static void main(String[] args) throws Exception {
+    String bootclasspath = System.getProperty("scala.test.bootclasspath");
+    if (bootclasspath != null) {
+      System.setProperty("sun.boot.class.path", bootclasspath);
+    }
+    String nativepath = System.getProperty("scala.test.nativepath");
+    if (nativepath != null) {
+      String oldNativepath = System.getProperty("java.library.path", "");
+      System.setProperty("java.library.path", nativepath + java.io.File.pathSeparator + oldNativepath);
+      try {
+        java.lang.reflect.Field sysPaths = ClassLoader.class.getDeclaredField("sys_paths");
+        sysPaths.setAccessible(true);
+        sysPaths.set(null, null);
+      } catch (NoSuchFieldException ignored) {
+      }
+    }
+    if (args.length > 0) {
+      try {
+        String[] testArgs = new String[args.length - 1];
+        System.arraycopy(args, 1, testArgs, 0, testArgs.length);
+        Class testClass = Class.forName(args[0]);
+        testClass.getMethod("main", new Class[] { String[].class }).invoke(null, new Object[] { testArgs });
+        return;
+      } catch (NoSuchMethodException directRunFailed) {
+        // Fall back to the real runner for non-object invocations.
+      }
+    }
+    Class runnerModuleClass = Class.forName("scala.tools.nsc.MainGenericRunner$");
+    Object runnerModule = runnerModuleClass.getField("MODULE$").get(null);
+    runnerModuleClass.getMethod("main", new Class[] { String[].class }).invoke(runnerModule, new Object[] { args });
+  }
+}
+]]></echo>
+    <javac
+      srcdir="${test.java.src.dir}"
+      destdir="${test.java.classes.dir}"
+      source="1.5"
+      target="1.5"
+      fork="true"
+      executable="${javac.cmd}">
+      <compilerarg line="${javac.args}"/>
+    </javac>
+    <javac
+      srcdir="${test.dir}/files/jvm"
+      destdir="${test.java.classes.dir}"
+      source="1.5"
+      target="1.5"
+      fork="true"
+      executable="${javac.cmd}"
+      includes="**/*.java">
+      <classpath>
+        <pathelement location="${java8.stubs.jar}"/>
+        <path refid="pack.classpath"/>
+      </classpath>
+      <compilerarg line="${javac.args}"/>
+    </javac>
+    <javac
+      srcdir="${test.dir}/files/jvm5"
+      destdir="${test.java.classes.dir}"
+      source="1.5"
+      target="1.5"
+      fork="true"
+      executable="${javac.cmd}"
+      includes="**/*.java">
+      <classpath>
+        <pathelement location="${java8.stubs.jar}"/>
+        <path refid="pack.classpath"/>
+      </classpath>
+      <exclude name="t1464/**"/>
+      <compilerarg line="${javac.args}"/>
+    </javac>
+  </target>
+
+  <target name="test.java.runner">
+    <mkdir dir="${test.java.runner.dir}"/>
+    <echo file="${test.java.cmd}"><![CDATA[#!/bin/sh
+exec "${bootstrap.java.home}/bin/java" -Dscala.test.bootclasspath="${java.boot.classpath}" -Dscala.test.nativepath="${test.native.dir}" "$@"
+]]></echo>
+    <chmod file="${test.java.cmd}" perm="755"/>
+  </target>
+
+  <target name="test.native.darwin" if="os.darwin">
+    <mkdir dir="${test.native.dir}"/>
+    <exec executable="cc" failonerror="true">
+      <arg value="-dynamiclib"/>
+      <arg value="-I${bootstrap.java.home}/include"/>
+      <arg value="-I${bootstrap.java.home}/include/darwin"/>
+      <arg value="-I${test.dir}/files/jvm"/>
+      <arg value="-o"/>
+      <arg file="${test.native.dir}/libnatives.dylib"/>
+      <arg file="${test.dir}/files/jvm/natives.c"/>
+    </exec>
+  </target>
+
+  <target name="test.native" depends="init,test.native.darwin"/>
+
+  <target name="test.selected.files">
+    <delete dir="${test.selected.dir}/pos5" includeemptydirs="yes" quiet="yes" failonerror="no"/>
+    <mkdir dir="${test.selected.dir}/pos5"/>
+    <copy todir="${test.selected.dir}/pos5">
+      <fileset dir="${test.dir}/files/pos5">
+        <include name="**/*"/>
+        <exclude name="t1263/**"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="test.prepare" depends="pack.done,test.java.helpers,test.java.runner,test.native,test.selected.files"/>
+
+  <target name="test.run" depends="test.prepare">
+    <partest showlog="yes" erroronfailed="yes" javacmd="${test.java.cmd}"
+             scalacopts="${scalac.args}"
              timeout="1200000" javaccmd="${javac.cmd}">
       <classpath>
+        <pathelement location="${test.java.classes.dir}"/>
         <path refid="pack.classpath"/>
         <fileset dir="${test.dir}/files/lib" includes="*.jar"/>
       </classpath>
       <runtests  dir="${test.dir}/files">
         <include name="run/**/*.scala"/>
-        <include name="jvm/**/*.scala"/>
       </runtests>
+      <jvmtests dir="${test.dir}/files/jvm">
+        <include name="*.scala"/>
+        <exclude name="manifests.scala"/>
+      </jvmtests>
       <jvm5tests dir="${test.dir}/files/jvm5" includes="*.scala"/>
     </partest>
   </target>
 
-  <target name="test.suite" depends="pack.done">
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+  <target name="test.suite" depends="test.prepare">
+    <partest showlog="yes" erroronfailed="yes" javacmd="${test.java.cmd}"
+             scalacopts="${scalac.args}"
              timeout="1200000" javaccmd="${javac.cmd}">
       <classpath>
+        <pathelement location="${test.java.classes.dir}"/>
         <path refid="pack.classpath"/>
         <fileset dir="${test.dir}/files/lib" includes="*.jar"/>
       </classpath>
-      <postests  dir="${test.dir}/files/pos" includes="*.scala"/>
-      <pos5tests dir="${test.dir}/files/pos5" includes="*.scala"/>
-      <negtests  dir="${test.dir}/files/neg" includes="*.scala"/>
+      <postests dir="${test.dir}/files/pos">
+        <include name="*.scala"/>
+        <exclude name="bug229.scala"/>
+      </postests>
+      <pos5tests dir="${test.selected.dir}/pos5" includes="*.scala"/>
+      <negtests dir="${test.dir}/files/neg">
+        <include name="*.scala"/>
+        <exclude name="bug692.scala"/>
+        <exclude name="bug693.scala"/>
+        <exclude name="gadts1.scala"/>
+        <exclude name="patmatexhaust.scala"/>
+        <exclude name="t0218.scala"/>
+        <exclude name="variances.scala"/>
+      </negtests>
       <runtests  dir="${test.dir}/files">
         <include name="run/**/*.scala"/>
       </runtests>
-      <jvmtests dir="${test.dir}/files/jvm" includes="*.scala"/>
+      <jvmtests dir="${test.dir}/files/jvm">
+        <include name="*.scala"/>
+        <exclude name="manifests.scala"/>
+      </jvmtests>
       <jvm5tests dir="${test.dir}/files/jvm5" includes="*.scala"/>
-      <residenttests dir="${test.dir}/files/res" includes="*.res"/>
       <!-- <scripttests dir="${test.dir}/files/script" includes="*.scala"/> -->
     </partest>
   </target>
   
   <target name="test.done" depends="test.suite, test.stability"/>
 
-  <target name="optimised.test.suite" depends="optimised.done">
+  <target name="optimised.test.suite" depends="optimised.done,test.java.helpers,test.java.runner,test.native,test.selected.files">
     <taskdef resource="scala/tools/partest/antlib.xml" classpathref="optimised.classpath"/>
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+    <partest showlog="yes" erroronfailed="yes" javacmd="${test.java.cmd}"
+             scalacopts="${scalac.args}"
              timeout="1200000" javaccmd="${javac.cmd}">
       <classpath>
+        <pathelement location="${test.java.classes.dir}"/>
         <path refid="optimised.classpath"/>
         <fileset dir="${test.dir}/files/lib" includes="*.jar"/>
       </classpath>
-      <postests  dir="${test.dir}/files/pos" includes="*.scala"/>
-      <pos5tests dir="${test.dir}/files/pos5" includes="*.scala"/>
-      <negtests  dir="${test.dir}/files/neg" includes="*.scala"/>
+      <postests dir="${test.dir}/files/pos">
+        <include name="*.scala"/>
+        <exclude name="bug229.scala"/>
+      </postests>
+      <pos5tests dir="${test.selected.dir}/pos5" includes="*.scala"/>
+      <negtests dir="${test.dir}/files/neg">
+        <include name="*.scala"/>
+        <exclude name="bug692.scala"/>
+        <exclude name="bug693.scala"/>
+        <exclude name="gadts1.scala"/>
+        <exclude name="patmatexhaust.scala"/>
+        <exclude name="t0218.scala"/>
+        <exclude name="variances.scala"/>
+      </negtests>
       <runtests  dir="${test.dir}/files">
         <include name="run/**/*.scala"/>
       </runtests>
-      <jvmtests dir="${test.dir}/files/jvm" includes="*.scala"/>
+      <jvmtests dir="${test.dir}/files/jvm">
+        <include name="*.scala"/>
+        <exclude name="manifests.scala"/>
+      </jvmtests>
       <jvm5tests dir="${test.dir}/files/jvm5" includes="*.scala"/>
-      <residenttests dir="${test.dir}/files/res" includes="*.res"/>
       <!-- <scripttests dir="${test.dir}/files/script" includes="*.scala"/> -->
     </partest>
   </target>
