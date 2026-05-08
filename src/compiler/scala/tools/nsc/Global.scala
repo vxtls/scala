@@ -27,7 +27,6 @@ import transform._
 import backend.icode.{ICodes, GenICode, Checkers}
 import backend.ScalaPrimitives
 import backend.jvm.GenJVM
-import backend.msil.GenMSIL
 import backend.opt.{Inliners, ClosureElimination, DeadCodeElimination}
 import backend.icode.analysis._
 
@@ -185,26 +184,13 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   lazy val classPath0 = new ClassPath(false && onlyPresentation)
 
   lazy val classPath =
-    if (forMSIL)
-      new classPath0.Build(settings.sourcepath.value, settings.outdir.value)
-    else
-      new classPath0.Build(settings.classpath.value, settings.sourcepath.value,
-                           settings.outdir.value, settings.bootclasspath.value,
-                           settings.extdirs.value, settings.Xcodebase.value)
-  /* .NET's equivalent of a classpath */
-  lazy val assemrefs = {
-    import java.util.{StringTokenizer}
-    val set = new HashSet[File]
-    val assems = new StringTokenizer(settings.assemrefs.value, File.pathSeparator)
-    while (assems.hasMoreTokens())
-      set += new java.io.File(assems.nextToken())
-    set
-  }
+    new classPath0.Build(settings.classpath.value, settings.sourcepath.value,
+                         settings.outdir.value, settings.bootclasspath.value,
+                         settings.extdirs.value, settings.Xcodebase.value)
 
 
   if (settings.verbose.value) {
     inform("[Classpath = " + classPath + "]")
-    if (forMSIL) inform("[AssemRefs = " + settings.assemrefs.value + "]")
   }
 
   def getSourceFile(f: AbstractFile): SourceFile =
@@ -229,8 +215,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   } with SymbolLoaders
 
   def rootLoader: LazyType =
-    if (forMSIL) new loaders.NamespaceLoader(classPath.root)
-    else new loaders.PackageLoader(classPath.root /* getRoot() */)
+    new loaders.PackageLoader(classPath.root /* getRoot() */)
 
 // Phases ------------------------------------------------------------}
 
@@ -385,10 +370,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     val global: Global.this.type = Global.this
   } with GenJVM
 
-  object genMSIL extends {
-    val global: Global.this.type = Global.this
-  } with GenMSIL
-
   object icodeChecker extends checkers.ICodeChecker()
 
   object typer extends analyzer.Typer(
@@ -420,9 +401,8 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     lambdaLift,      // move nested functions to top level
 //    detach,
     constructors     // move field definitions into constructors
-  ) ::: (
-    if (forMSIL) List() else List(flatten) // get rid of inner classes
   ) ::: List(
+    flatten,         // get rid of inner classes
     mixer,           // do mixin composition, translate lazy fields
     cleanup,         // some platform-specific cleanups
 
@@ -430,7 +410,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     inliner,         // optimization: do inlining
     closureElimination, // optimization: get rid of uncalled closures
     deadCode,           // optimization: get rid of dead cpde
-    if (forMSIL) genMSIL else genJVM, // generate .class files
+    genJVM,          // generate .class files
     sampleTransform
   )
 
@@ -742,7 +722,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
 
   def forCLDC: Boolean = settings.target.value == "cldc"
   def forJVM : Boolean = settings.target.value startsWith "jvm"
-  def forMSIL: Boolean = settings.target.value == "msil"
+  def forMSIL: Boolean = false
   def onlyPresentation = inIDE
   private val unpickleIDEHook0 : (( => Type) => Type) = f => f
   def unpickleIDEHook : (( => Type) => Type) = unpickleIDEHook0
