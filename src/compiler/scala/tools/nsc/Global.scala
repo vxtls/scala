@@ -28,7 +28,6 @@ import transform._
 import backend.icode.{ICodes, GenICode, Checkers}
 import backend.ScalaPrimitives
 import backend.jvm.GenJVM
-import backend.msil.GenMSIL
 import backend.opt.{Inliners, ClosureElimination, DeadCodeElimination}
 import backend.icode.analysis._
 
@@ -247,25 +246,12 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   lazy val classPath0 = new ClassPath(false && onlyPresentation)
 
   lazy val classPath =
-    if (forMSIL)
-      new classPath0.Build(settings.sourcepath.value, settings.outdir.value)
-    else
-      new classPath0.Build(settings.classpath.value, settings.sourcepath.value,
-                           settings.outdir.value, settings.bootclasspath.value,
-                           settings.extdirs.value, settings.Xcodebase.value)
-  /* .NET's equivalent of a classpath */
-  lazy val assemrefs = {
-    import java.util.{StringTokenizer}
-    val set = new HashSet[File]
-    val assems = new StringTokenizer(settings.assemrefs.value, File.pathSeparator)
-    while (assems.hasMoreTokens())
-      set += new java.io.File(assems.nextToken())
-    set
-  }
+    new classPath0.Build(settings.classpath.value, settings.sourcepath.value,
+                         settings.outdir.value, settings.bootclasspath.value,
+                         settings.extdirs.value, settings.Xcodebase.value)
 
   if (settings.verbose.value) {
     inform("[Classpath = " + classPath + "]")
-    if (forMSIL) inform("[AssemRefs = " + settings.assemrefs.value + "]")
   }
 
   def getSourceFile(f: AbstractFile): BatchSourceFile =
@@ -290,8 +276,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   } with SymbolLoaders
 
   def rootLoader: LazyType =
-    if (forMSIL) new loaders.NamespaceLoader(classPath.root)
-    else new loaders.PackageLoader(classPath.root /* getRoot() */)
+    new loaders.PackageLoader(classPath.root /* getRoot() */)
 
 // ------------ Phases -------------------------------------------}
 
@@ -525,13 +510,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     val runsRightAfter = None
   } with DependencyAnalysis
 
-  // phaseName = "msil"
-  object genMSIL extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List[String]("dce")
-    val runsRightAfter = None
-  } with GenMSIL
-
   // phaseName = "terminal"
   object terminal extends {
     val global: Global.this.type = Global.this
@@ -600,17 +578,12 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     phasesSet += deadCode			       // optimization: get rid of dead cpde
     phasesSet += terminal                              // The last phase in the compiler chain
 
-    if (! forMSIL) {
-      phasesSet += flatten			       // get rid of inner classes
-    }
+    phasesSet += flatten			       // get rid of inner classes
     if (forJVM) {
       phasesSet += liftcode			       // generate reified trees
       phasesSet += genJVM			       // generate .class files
       if (settings.make.value != "all")
         phasesSet += dependencyAnalysis
-    }
-    if (forMSIL) {
-      phasesSet += genMSIL			       // generate .msil files
     }
   }
 
@@ -990,7 +963,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   }
 
   def forJVM : Boolean = settings.target.value startsWith "jvm"
-  def forMSIL: Boolean = settings.target.value == "msil"
+  def forMSIL: Boolean = false
   def onlyPresentation = false
   private val unpickleIDEHook0 : (( => Type) => Type) = f => f
   def unpickleIDEHook : (( => Type) => Type) = unpickleIDEHook0
