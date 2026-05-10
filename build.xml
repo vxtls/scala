@@ -159,9 +159,12 @@ PROPERTIES
   <property name="javac.cmd" location="${bootstrap.java.home}/bin/javac"/>
   <property name="javac.exe" location="${bootstrap.java.home}/bin/javac"/>
   <property name="java.rt.jar" location="${bootstrap.java.home}/jre/lib/rt.jar"/>
-  <property name="java8.stubs.rev" value="34"/>
+  <property name="java8.stubs.rev" value="40"/>
   <property name="java8.stubs.dir" location="${basedir}/build/java8-stubs-r${java8.stubs.rev}"/>
   <property name="java8.stubs.jar" location="${basedir}/build/java8-stubs-r${java8.stubs.rev}.jar"/>
+  <property name="java8.runtime.stubs.jar" location="${basedir}/build/java8-runtime-stubs-r${java8.stubs.rev}.jar"/>
+  <property name="java8.test.java.cmd" location="${basedir}/build/java8-test-java"/>
+  <property name="partest.java8.pos.dir" location="${basedir}/build/java8-partest/pos"/>
   <property name="java.boot.classpath" value="${java8.stubs.jar}:${java.rt.jar}"/>
 
   <!-- Additional command line arguments for scalac. They are added to all build targets -->
@@ -316,7 +319,7 @@ public interface Iterable<T> {
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/lang/Class.java"><![CDATA[
 package java.lang;
-public final class Class<T> implements java.io.Serializable {
+public final class Class<T> implements java.io.Serializable, java.lang.reflect.AnnotatedElement {
   private Class() {}
   public static Class forName(String className) throws ClassNotFoundException { return null; }
   public static Class forName(String className, boolean initialize, ClassLoader loader) throws ClassNotFoundException { return null; }
@@ -333,7 +336,9 @@ public final class Class<T> implements java.io.Serializable {
   public boolean isAssignableFrom(Class cls) { return false; }
   public Class getComponentType() { return null; }
   public Class getSuperclass() { return null; }
+  public java.lang.reflect.Type getGenericSuperclass() { return null; }
   public Class[] getInterfaces() { return null; }
+  public <U> Class<? extends U> asSubclass(Class<U> clazz) { return null; }
   public java.lang.reflect.TypeVariable<Class<T>>[] getTypeParameters() { return null; }
   public java.security.ProtectionDomain getProtectionDomain() { return null; }
   public java.lang.reflect.Field getField(String name) throws NoSuchFieldException { return null; }
@@ -346,6 +351,10 @@ public final class Class<T> implements java.io.Serializable {
   public java.lang.reflect.Constructor[] getConstructors() { return null; }
   public java.lang.reflect.Constructor[] getDeclaredConstructors() { return null; }
   public java.io.InputStream getResourceAsStream(String name) { return null; }
+  public java.lang.annotation.Annotation[] getAnnotations() { return null; }
+  public java.lang.annotation.Annotation[] getDeclaredAnnotations() { return null; }
+  public boolean isAnnotationPresent(Class annotationClass) { return false; }
+  public <A extends java.lang.annotation.Annotation> A getAnnotation(Class<A> annotationClass) { return null; }
   public T newInstance() throws InstantiationException, IllegalAccessException { return null; }
 }
 ]]></echo>
@@ -357,6 +366,8 @@ public final class Method extends AccessibleObject {
   public int getModifiers() { return 0; }
   public Class<?> getReturnType() { return null; }
   public Class<?>[] getParameterTypes() { return null; }
+  public Class<?>[] getExceptionTypes() { return null; }
+  public Type[] getGenericParameterTypes() { return null; }
   public void setAccessible(boolean flag) {}
   public Object invoke(Object obj, Object... args) throws IllegalAccessException, InvocationTargetException { return null; }
 }
@@ -374,11 +385,17 @@ public final class Field extends AccessibleObject {
     <echo file="${java8.stubs.dir}/src/java/lang/reflect/AccessibleObject.java"><![CDATA[
 package java.lang.reflect;
 public class AccessibleObject implements AnnotatedElement {
+  public boolean isAccessible() { return false; }
   public void setAccessible(boolean flag) {}
   public java.lang.annotation.Annotation[] getAnnotations() { return null; }
   public java.lang.annotation.Annotation[] getDeclaredAnnotations() { return null; }
   public boolean isAnnotationPresent(Class annotationClass) { return false; }
-  public java.lang.annotation.Annotation getAnnotation(Class annotationClass) { return null; }
+  public <T extends java.lang.annotation.Annotation> T getAnnotation(Class<T> annotationClass) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/lang/reflect/Type.java"><![CDATA[
+package java.lang.reflect;
+public interface Type {
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/lang/reflect/TypeVariable.java"><![CDATA[
@@ -398,13 +415,14 @@ public interface AnnotatedElement {
   public Annotation[] getAnnotations();
   public Annotation[] getDeclaredAnnotations();
   public boolean isAnnotationPresent(Class annotationClass);
-  public Annotation getAnnotation(Class annotationClass);
+  public <T extends Annotation> T getAnnotation(Class<T> annotationClass);
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/util/Arrays.java"><![CDATA[
 package java.util;
 public final class Arrays {
   private Arrays() {}
+  public static <T> java.util.List<T> asList(T... a) { return null; }
   public static void fill(int[] a, int val) {}
   public static <T> void sort(T[] a, Comparator<? super T> c) {}
 }
@@ -653,6 +671,18 @@ package java.util.function;
 public interface UnaryOperator<T> extends Function<T,T> {
 }
 ]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/IntUnaryOperator.java"><![CDATA[
+package java.util.function;
+public interface IntUnaryOperator {
+  public int applyAsInt(int operand);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/LongUnaryOperator.java"><![CDATA[
+package java.util.function;
+public interface LongUnaryOperator {
+  public long applyAsLong(long operand);
+}
+]]></echo>
     <echo file="${java8.stubs.dir}/src/java/util/function/BiFunction.java"><![CDATA[
 package java.util.function;
 public interface BiFunction<T,U,R> {
@@ -747,6 +777,7 @@ public interface ScheduledFuture<V> extends Future<V> {
 package java.util.concurrent;
 public class Executors {
   public static ScheduledExecutorService newSingleThreadScheduledExecutor() { return null; }
+  public static ExecutorService newFixedThreadPool(int nThreads) { return null; }
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/util/concurrent/BlockingQueue.java"><![CDATA[
@@ -951,6 +982,32 @@ public class BorderLayout implements LayoutManager {
 package java.awt;
 public class Component {
   public Component() {}
+  public void addComponentListener(java.awt.event.ComponentListener listener) {}
+  public void removeComponentListener(java.awt.event.ComponentListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ComponentEvent.java"><![CDATA[
+package java.awt.event;
+public class ComponentEvent extends java.util.EventObject {
+  public ComponentEvent(java.awt.Component source, int id) { super(source); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ComponentListener.java"><![CDATA[
+package java.awt.event;
+public interface ComponentListener extends java.util.EventListener {
+  public void componentResized(ComponentEvent e);
+  public void componentMoved(ComponentEvent e);
+  public void componentShown(ComponentEvent e);
+  public void componentHidden(ComponentEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ComponentAdapter.java"><![CDATA[
+package java.awt.event;
+public abstract class ComponentAdapter implements ComponentListener {
+  public void componentResized(ComponentEvent e) {}
+  public void componentMoved(ComponentEvent e) {}
+  public void componentShown(ComponentEvent e) {}
+  public void componentHidden(ComponentEvent e) {}
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/awt/Container.java"><![CDATA[
@@ -1083,10 +1140,17 @@ public class JRootPane extends JComponent {
   public void setDefaultButton(JButton button) {}
 }
 ]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JApplet.java"><![CDATA[
+package javax.swing;
+public class JApplet extends JComponent {
+}
+]]></echo>
     <echo file="${java8.stubs.dir}/src/javax/swing/JScrollPane.java"><![CDATA[
 package javax.swing;
 public class JScrollPane extends JComponent {
+  public JScrollPane() {}
   public JScrollPane(java.awt.Component view) {}
+  public JScrollPane(java.awt.Component view, int vsbPolicy, int hsbPolicy) {}
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/javax/swing/JSplitPane.java"><![CDATA[
@@ -1234,6 +1298,102 @@ public class ArgumentCompletor implements Completor {
       fork="true" executable="${javac.exe}" includeantruntime="false"
       includes="**/*.java"/>
     <jar destfile="${java8.stubs.jar}" basedir="${java8.stubs.dir}/classes"/>
+  </target>
+
+  <target name="build.java8.test.java" depends="build.java8.stubs">
+    <jar destfile="${java8.runtime.stubs.jar}">
+      <fileset dir="${java8.stubs.dir}/classes">
+        <include name="java/awt/**"/>
+        <include name="java/lang/CharSequence.class"/>
+        <include name="java/lang/Iterable.class"/>
+        <include name="java/util/Comparator.class"/>
+        <include name="java/util/function/**"/>
+        <include name="javax/swing/**"/>
+      </fileset>
+    </jar>
+    <echo file="${basedir}/build/java8-test-java"><![CDATA[#!/bin/sh
+exec "${java.home}/bin/java" -Xbootclasspath/p:"${java8.runtime.stubs.jar}" "$@"
+]]></echo>
+    <chmod file="${basedir}/build/java8-test-java" perm="755"/>
+  </target>
+
+  <target name="prepare.java8.partest" depends="build.java8.test.java">
+    <delete dir="${basedir}/build/java8-partest/pos" quiet="yes"/>
+    <delete dir="${basedir}/build/java8-partest/neg" quiet="yes"/>
+    <delete dir="${basedir}/build/java8-partest/continuations-neg" quiet="yes"/>
+    <mkdir dir="${basedir}/build/java8-partest/pos"/>
+    <mkdir dir="${basedir}/build/java8-partest/neg"/>
+    <mkdir dir="${basedir}/build/java8-partest/continuations-neg"/>
+    <copy todir="${basedir}/build/java8-partest/pos">
+      <fileset dir="${partest.dir}/files/pos">
+        <exclude name="t1263/**"/>
+        <exclude name="**/*.obj/**"/>
+        <exclude name="**/*.log"/>
+      </fileset>
+    </copy>
+    <copy todir="${basedir}/build/java8-partest/neg">
+      <fileset dir="${partest.dir}/files/neg">
+        <exclude name="**/*.obj/**"/>
+        <exclude name="**/*.log"/>
+      </fileset>
+    </copy>
+    <replaceregexp match="[ \t]+$" replace="" flags="g" byline="true">
+      <fileset dir="${basedir}/build/java8-partest/neg" includes="**/*.check">
+        <exclude name="t3115.check"/>
+      </fileset>
+    </replaceregexp>
+    <copy todir="${basedir}/build/java8-partest/continuations-neg">
+      <fileset dir="${partest.dir}/files/continuations-neg">
+        <exclude name="**/*.obj/**"/>
+        <exclude name="**/*.log"/>
+      </fileset>
+    </copy>
+    <replaceregexp match="[ \t]+$" replace="" flags="g" byline="true">
+      <fileset dir="${basedir}/build/java8-partest/continuations-neg" includes="**/*.check"/>
+    </replaceregexp>
+  </target>
+
+  <target name="prepare.java8.test.libs">
+    <delete dir="${basedir}/build/java8-test-libs" quiet="yes"/>
+    <mkdir dir="${basedir}/build/java8-test-libs/lib"/>
+    <mkdir dir="${basedir}/build/java8-test-libs/annotations"/>
+    <mkdir dir="${basedir}/build/java8-test-libs/enums"/>
+    <mkdir dir="${basedir}/build/java8-test-libs/genericNest-src/nestpkg"/>
+    <mkdir dir="${basedir}/build/java8-test-libs/genericNest"/>
+    <mkdir dir="${basedir}/build/java8-test-libs/nest"/>
+    <mkdir dir="${basedir}/build/java8-test-libs/methvsfield"/>
+    <javac srcdir="${partest.dir}/support/annotations" destdir="${basedir}/build/java8-test-libs/annotations"
+           includes="SourceAnnotation.java,NestedAnnotations.java"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${basedir}/build/java8-test-libs/lib/annotations.jar"
+         basedir="${basedir}/build/java8-test-libs/annotations"/>
+    <javac srcdir="${partest.dir}/support/annotations" destdir="${basedir}/build/java8-test-libs/enums"
+           includes="OuterEnum.java"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${basedir}/build/java8-test-libs/lib/enums.jar"
+         basedir="${basedir}/build/java8-test-libs/enums"/>
+    <echo file="${basedir}/build/java8-test-libs/genericNest-src/nestpkg/OuterTParams.java"><![CDATA[
+package nestpkg;
+public class OuterTParams<A> {
+  public class InnerClass {
+    public A method() { return null; }
+  }
+}
+]]></echo>
+    <javac srcdir="${basedir}/build/java8-test-libs/genericNest-src" destdir="${basedir}/build/java8-test-libs/genericNest"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${basedir}/build/java8-test-libs/lib/genericNest.jar"
+         basedir="${basedir}/build/java8-test-libs/genericNest"/>
+    <javac srcdir="${partest.dir}/files/jvm" destdir="${basedir}/build/java8-test-libs/nest"
+           includes="nest.java"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${basedir}/build/java8-test-libs/lib/nest.jar"
+         basedir="${basedir}/build/java8-test-libs/nest"/>
+    <javac srcdir="${partest.dir}/files/jvm" destdir="${basedir}/build/java8-test-libs/methvsfield"
+           includes="methvsfield.java"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${basedir}/build/java8-test-libs/lib/methvsfield.jar"
+         basedir="${basedir}/build/java8-test-libs/methvsfield"/>
   </target>
 
 <!-- ===========================================================================
@@ -2104,6 +2264,7 @@ PACKED QUICK BUILD (PACK)
   
   <target name="pack.done" depends="pack.bin">
     <path id="pack.classpath">
+      <pathelement location="${java8.stubs.jar}"/>
       <pathelement location="${build-pack.dir}/lib/scala-library.jar"/>
       <pathelement location="${build-pack.dir}/lib/scala-compiler.jar"/>
       <pathelement location="${build-pack.dir}/lib/scala-partest.jar"/>
@@ -2222,6 +2383,10 @@ BOOTSTRAPPING BUILD (STRAP)
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/MSILPlatform.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/MainInterpreter.scala"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>
@@ -2614,57 +2779,67 @@ BOOTRAPING TEST AND TEST SUITE
     </antcall>
   </target>
 
-  <target name="test.run" depends="pack.done">
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+  <target name="test.run" depends="build.java8.test.java, prepare.java8.test.libs, quick.partest, pack.done">
+    <partest showlog="yes" erroronfailed="yes" javacmd="${basedir}/build/java8-test-java"
              timeout="1200000"
-             scalacopts="${scalac.args.optimise}">
+             scalacopts="${scalac.args} ${scalac.args.optimise}">
       <compilationpath>
         <path refid="pack.classpath"/>
+        <fileset dir="${basedir}/build/java8-test-libs/lib" includes="*.jar" />
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
       <runtests  dir="${partest.dir}/files">
         <include name="run/**/*.scala"/>
+        <exclude name="run/treePrint.scala"/>
+        <exclude name="run/constrained-types.scala"/>
+        <exclude name="run/t1500.scala"/>
+        <exclude name="run/t1501.scala"/>
         <include name="jvm/**/*.scala"/>
+        <exclude name="jvm/interpreter.scala"/>
+        <exclude name="jvm/natives.scala"/>
       </runtests>
     </partest>
   </target>
 
-  <target name="test.suite" depends="pack.done">
+  <target name="test.suite" depends="prepare.java8.partest, prepare.java8.test.libs, quick.partest, pack.done">
     <property name="partest.srcdir" value="files" />
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+    <partest showlog="yes" erroronfailed="yes" javacmd="${basedir}/build/java8-test-java"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.optimise}">
+             scalacopts="${scalac.args} ${scalac.args.optimise}">
       <compilationpath>
         <path refid="pack.classpath"/>
-        <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
+        <fileset dir="${basedir}/build/java8-test-libs/lib" includes="*.jar" />
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
-      <postests  dir="${partest.dir}/${partest.srcdir}/pos" includes="*.scala"/>
-      <negtests  dir="${partest.dir}/${partest.srcdir}/neg" includes="*.scala"/>
+      <postests  dir="${basedir}/build/java8-partest/pos" includes="*.scala"/>
+      <negtests  dir="${basedir}/build/java8-partest/neg" includes="*.scala"/>
       <runtests  dir="${partest.dir}/${partest.srcdir}">
         <include name="run/**/*.scala"/>
+        <exclude name="run/treePrint.scala"/>
+        <exclude name="run/constrained-types.scala"/>
+        <exclude name="run/t1500.scala"/>
+        <exclude name="run/t1501.scala"/>
       </runtests>
-      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala"/>
+      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala" excludes="interpreter.scala,natives.scala"/>
 	  <scalachecktests dir="${partest.dir}/${partest.srcdir}/scalacheck" includes="**/*.scala"/>
-      <residenttests dir="${partest.dir}/${partest.srcdir}/res" includes="*.res"/>
-      <buildmanagertests dir="${partest.dir}/${partest.srcdir}/buildmanager" includes="*"/>
       <scalaptests dir="${partest.dir}/${partest.srcdir}/scalap" includes="**/*.scala"/>
       <!-- <scripttests dir="${partest.dir}/${partest.srcdir}/script" includes="*.scala"/> -->
     </partest>
   </target>
 
-  <target name="test.continuations.suite" depends="pack.done">
+  <target name="test.continuations.suite" depends="prepare.java8.partest, prepare.java8.test.libs, quick.partest, pack.done">
     <property name="partest.srcdir" value="files" />
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+    <partest showlog="yes" erroronfailed="yes" javacmd="${basedir}/build/java8-test-java"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.optimise} -Xpluginsdir ${build-quick.dir}/misc/scala-devel/plugins -Xplugin-require:continuations -P:continuations:enable">
+             scalacopts="${scalac.args} ${scalac.args.optimise} -Xpluginsdir ${build-quick.dir}/misc/scala-devel/plugins -Xplugin-require:continuations -P:continuations:enable">
       <compilationpath>
         <path refid="pack.classpath"/>
+        <fileset dir="${basedir}/build/java8-test-libs/lib" includes="*.jar" />
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
-      <negtests  dir="${partest.dir}/${partest.srcdir}/continuations-neg" includes="*.scala"/>
+      <negtests  dir="${basedir}/build/java8-partest/continuations-neg" includes="*.scala"/>
       <runtests  dir="${partest.dir}/${partest.srcdir}">
         <include name="continuations-run/**/*.scala"/>
       </runtests>
