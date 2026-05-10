@@ -12,7 +12,7 @@ import java.nio.charset._
 import compat.Platform.currentTime
 import scala.tools.nsc.io.{SourceReader, AbstractFile, Path}
 import scala.tools.nsc.reporters._
-import scala.tools.nsc.util.{ClassPath, MsilClassPath, JavaClassPath, SourceFile, BatchSourceFile, OffsetPosition, RangePosition}
+import scala.tools.nsc.util.{ClassPath, JavaClassPath, SourceFile, BatchSourceFile, OffsetPosition, RangePosition}
 
 import scala.collection.mutable.{HashSet, HashMap, ListBuffer}
 
@@ -28,7 +28,6 @@ import transform._
 import backend.icode.{ICodes, GenICode, Checkers}
 import backend.ScalaPrimitives
 import backend.jvm.GenJVM
-import backend.msil.GenMSIL
 import backend.opt.{Inliners, ClosureElimination, DeadCodeElimination}
 import backend.icode.analysis._
 
@@ -211,17 +210,15 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
         }
     }
 
-  lazy val classPath =
-    if (forMSIL)
-      new MsilClassPath(settings.assemextdirs.value, settings.assemrefs.value, settings.sourcepath.value, settings.XO.value)
-    else
-      new JavaClassPath(settings.bootclasspath.value, settings.extdirs.value,
-                        settings.classpath.value, settings.sourcepath.value,
-                        settings.Xcodebase.value, settings.XO.value)
+  lazy val classPath = {
+    ClassPath.XO = settings.XO.value
+    new JavaClassPath(settings.bootclasspath.value, settings.extdirs.value,
+                      settings.classpath.value, settings.sourcepath.value,
+                      settings.Xcodebase.value, settings.XO.value)
+  }
 
   if (settings.verbose.value) {
     inform("[Classpath = " + classPath + "]")
-    if (forMSIL) inform("[AssemRefs = " + settings.assemrefs.value + "]")
   }
 
   def getSourceFile(f: AbstractFile): BatchSourceFile =
@@ -239,8 +236,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   }
 
   def rootLoader: LazyType =
-    if (forMSIL) new loaders.NamespaceLoader(classPath.asInstanceOf[MsilClassPath])
-    else new loaders.JavaPackageLoader(classPath.asInstanceOf[JavaClassPath])
+    new loaders.JavaPackageLoader(classPath.asInstanceOf[JavaClassPath])
 
 // ------------ Phases -------------------------------------------}
 
@@ -470,18 +466,11 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     val runsRightAfter = None
   } with DependencyAnalysis
 
-  // phaseName = "msil"
-  object genMSIL extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List[String]("dce")
-    val runsRightAfter = None
-  } with GenMSIL
-
   // phaseName = "terminal"
   object terminal extends {
     val global: Global.this.type = Global.this
     val phaseName = "terminal"
-    val runsAfter = List[String]("jvm","msil")
+    val runsAfter = List[String]("jvm")
     val runsRightAfter = None
   } with SubComponent {
     private var cache: Option[GlobalPhase] = None
@@ -546,17 +535,12 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     phasesSet += deadCode			       // optimization: get rid of dead cpde
     phasesSet += terminal                              // The last phase in the compiler chain
 
-    if (! forMSIL) {
-      phasesSet += flatten			       // get rid of inner classes
-    }
+    phasesSet += flatten			       // get rid of inner classes
     if (forJVM) {
       phasesSet += liftcode			       // generate reified trees
       phasesSet += genJVM			       // generate .class files
       if (settings.make.value != "all")
         phasesSet += dependencyAnalysis
-    }
-    if (forMSIL) {
-      phasesSet += genMSIL			       // generate .msil files
     }
   }
 
@@ -961,6 +945,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   }
 
   def forJVM : Boolean = settings.target.value startsWith "jvm"
-  def forMSIL: Boolean = settings.target.value == "msil"
+  def forMSIL: Boolean = false
   def onlyPresentation = false
 }
