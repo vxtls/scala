@@ -25,7 +25,7 @@ import typechecker._
 import transform._
 
 import backend.icode.{ ICodes, GenICode, Checkers }
-import backend.{ ScalaPrimitives, Platform, MSILPlatform, JavaPlatform }
+import backend.{ ScalaPrimitives, Platform, JavaPlatform }
 import backend.jvm.GenJVM
 import backend.opt.{ Inliners, ClosureElimination, DeadCodeElimination }
 import backend.icode.analysis._
@@ -49,8 +49,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   type ThisPlatform = Platform[_] { val global: Global.this.type }
 
   lazy val platform: ThisPlatform =
-    if (forMSIL) new { val global: Global.this.type = Global.this } with MSILPlatform
-    else new { val global: Global.this.type = Global.this } with JavaPlatform
+    new { val global: Global.this.type = Global.this } with JavaPlatform
 
   def classPath: ClassPath[_] = platform.classPath
   def rootLoader: LazyType = platform.rootLoader
@@ -476,7 +475,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   object terminal extends {
     val global: Global.this.type = Global.this
     val phaseName = "terminal"
-    val runsAfter = List[String]("jvm","msil")
+    val runsAfter = List[String]("jvm")
     val runsRightAfter = None
   } with SubComponent {
     private var cache: Option[GlobalPhase] = None
@@ -977,7 +976,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   }
 
   def forJVM : Boolean = settings.target.value startsWith "jvm"
-  def forMSIL: Boolean = settings.target.value == "msil"
+  def forMSIL: Boolean = false
   def onlyPresentation = false
   def createJavadoc = false
 }
