@@ -9,12 +9,10 @@ package symtab
 
 import java.io.{File, IOException}
 
-import ch.epfl.lamp.compiler.msil.{Type => MSILType, Attribute => MSILAttribute}
-
 import scala.collection.mutable.{HashMap, HashSet}
 import scala.compat.Platform.currentTime
 import scala.tools.nsc.io.AbstractFile
-import scala.tools.nsc.util.{Position, NoPosition, ClassPath, ClassRep, JavaClassPath, MsilClassPath}
+import scala.tools.nsc.util.{Position, NoPosition, ClassPath, ClassRep, JavaClassPath}
 import classfile.ClassfileParser
 import Flags._
 
@@ -197,32 +195,6 @@ abstract class SymbolLoaders {
       new JavaPackageLoader(pkg)
   }
 
-  class NamespaceLoader(classpath: ClassPath[MSILType]) extends PackageLoader(classpath) {
-    protected def needCompile(bin: MSILType, src: AbstractFile) =
-      false // always use compiled file on .net
-
-    protected def doLoad(cls: ClassRep[MSILType]) = {
-      if (cls.binary.isDefined) {
-        val typ = cls.binary.get
-        if (typ.IsDefined(clrTypes.SCALA_SYMTAB_ATTR, false)) {
-          val attrs = typ.GetCustomAttributes(clrTypes.SCALA_SYMTAB_ATTR, false)
-          assert (attrs.length == 1, attrs.length)
-          val a = attrs(0).asInstanceOf[MSILAttribute]
-          // symtab_constr takes a byte array argument (the pickle), i.e. typ has a pickle.
-          // otherwise, symtab_default_constr was used, which marks typ as scala-synthetic.
-          a.getConstructor() == clrTypes.SYMTAB_CONSTR
-        } else true // always load non-scala types
-      } else true // always load source
-    }
-
-    protected def newClassLoader(bin: MSILType) =
-      new MSILTypeLoader(bin)
-
-    protected def newPackageLoader(pkg: ClassPath[MSILType]) =
-      new NamespaceLoader(pkg)
-
-  }
-
   class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
 
     /**
@@ -244,11 +216,6 @@ abstract class SymbolLoaders {
     }
   }
 
-  class MSILTypeLoader(typ: MSILType) extends SymbolLoader {
-    protected def description = "MSILType "+ typ.FullName + ", assembly "+ typ.Assembly.FullName
-    protected def doComplete(root: Symbol) { typeParser.parse(typ, root) }
-  }
-
   class SourcefileLoader(val srcfile: AbstractFile) extends SymbolLoader {
     protected def description = "source file "+ srcfile.toString
     override protected def sourcefile = Some(srcfile)
@@ -260,12 +227,4 @@ abstract class SymbolLoaders {
     protected def doComplete(root: Symbol) { root.sourceModule.initialize }
   }
 
-  private object typeParser extends clr.TypeParser {
-    val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-  }
-
-  object clrTypes extends clr.CLRTypes {
-    val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-    if (global.forMSIL) init()
-  }
 }
