@@ -2528,48 +2528,53 @@ self =>
       stats.toList
     }
 
-    /** CompilationUnit ::= [package QualId semi] TopStatSeq
+    /** CompilationUnit ::= {package QualId semi} TopStatSeq
      */
     def compilationUnit(): Tree = checkNoEscapingPlaceholders {
-      val ts = new ListBuffer[Tree]
+      def topstats(): List[Tree] = {
+        val ts = new ListBuffer[Tree]
 
-      // @S: the IDE can insert phantom semi-colons before package during editing
-      // @S: just eat them (doesn't really change the grammar)
-      while (in.token == SEMI) in.nextToken()
-      val start = in.offset
-      if (in.token == PACKAGE) {
-        in.nextToken()
-	if (in.token == OBJECT) {
-	  ts += makePackageObject(start, objectDef(NoMods))
-	  if (in.token != EOF) {
-	    acceptStatSep()
-	    ts ++= topStatSeq()
-	  }
-	} else {
-          val pkg = qualId()
-          newLineOptWhenFollowedBy(LBRACE)
-          if (in.token == EOF) {
-            ts += makePackaging(start, pkg, List())
-          } else if (isStatSep) {
-            in.nextToken()
-            ts += makePackaging(start, pkg, topStatSeq())
-          } else {
-            accept(LBRACE)
-            ts += makePackaging(start, pkg, topStatSeq())
-              accept(RBRACE)
-              ts ++= topStatSeq()
+        // @S: the IDE can insert phantom semi-colons before package during editing
+        // @S: just eat them (doesn't really change the grammar)
+        while (in.token == SEMI) in.nextToken()
+        val start = in.offset
+        if (in.token == PACKAGE) {
+          in.nextToken()
+	  if (in.token == OBJECT) {
+	    ts += makePackageObject(start, objectDef(NoMods))
+	    if (in.token != EOF) {
+	      acceptStatSep()
+	      ts ++= topStatSeq()
+	    }
+	  } else {
+            val pkg = qualId()
+            newLineOptWhenFollowedBy(LBRACE)
+            if (in.token == EOF) {
+              ts += makePackaging(start, pkg, List())
+            } else if (isStatSep) {
+              in.nextToken()
+              ts += makePackaging(start, pkg, topstats())
+            } else {
+              accept(LBRACE)
+              ts += makePackaging(start, pkg, topStatSeq())
+                accept(RBRACE)
+                ts ++= topStatSeq()
+              }
             }
-	  }
         } else {
           ts ++= topStatSeq()
         }
-        val stats = ts.toList
-        atPos(start) {
-          stats match {
-            case List(stat @ PackageDef(_, _)) => stat
-            case _ => makePackaging(start, atPos(o2p(start)) { Ident(nme.EMPTY_PACKAGE_NAME) }, stats)
-          }
+        ts.toList
+      }
+
+      val start = in.offset
+      val stats = topstats()
+      atPos(start) {
+        stats match {
+          case List(stat @ PackageDef(_, _)) => stat
+          case _ => makePackaging(start, atPos(o2p(start)) { Ident(nme.EMPTY_PACKAGE_NAME) }, stats)
         }
+      }
     }
   }
 }
