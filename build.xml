@@ -148,13 +148,12 @@ PROPERTIES
   <property file="${basedir}/build.properties"/>
 
   <!-- Additional command line arguments for scalac. They are added to all build targets -->
-  <property name="scalac.args" value=""/>
   <property name="javac.args" value=""/>
 
   <!-- Sets location of pre-compiled libraries -->
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
-  <property name="jline.jar" value="${lib.dir}/jline.jar"/>
+  <property name="fjbg.jar" value="${comp.starr.jar}"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
 
   <!-- Sets location of build folders -->
@@ -166,6 +165,13 @@ PROPERTIES
   <property name="build-strap.dir" value="${build.dir}/strap"/>
   <property name="build-docs.dir" value="${build.dir}/scaladoc"/>
   <property name="build-libs.dir" value="${build.dir}/libs"/>
+  <property name="java8.stubs.dir" value="${build.dir}/java8-stubs"/>
+  <property name="java8.stubs.jar" value="${build.dir}/java8-stubs.jar"/>
+  <property name="jline.jar" value="${java8.stubs.jar}"/>
+  <property name="msil.jar" value="${java8.stubs.jar}"/>
+  <property name="java.rt.jar" value="${env.JAVA_HOME}/jre/lib/rt.jar"/>
+  <property name="java.boot.classpath" value="${java8.stubs.jar}:${java.rt.jar}"/>
+  <property name="scalac.args" value="-Xno-varargs-conversion -bootclasspath ${java.boot.classpath}"/>
 
   <property name="dists.dir" value="${basedir}/dists"/>
 
@@ -192,7 +198,548 @@ PROPERTIES
 INITIALISATION
 ============================================================================ -->
 
-  <target name="init">
+  <target name="build.java8.stubs">
+    <mkdir dir="${java8.stubs.dir}/src/java/lang"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/lang/reflect"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/io"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/nio"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/concurrent"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/function"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/regex"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt/event"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/border"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/event"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/text"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/tree"/>
+    <mkdir dir="${java8.stubs.dir}/src/ch/epfl/lamp/compiler/msil"/>
+    <mkdir dir="${java8.stubs.dir}/src/jline"/>
+    <mkdir dir="${java8.stubs.dir}/classes"/>
+    <echo file="${java8.stubs.dir}/src/java/lang/CharSequence.java"><![CDATA[
+package java.lang;
+
+public interface CharSequence {
+  int length();
+  char charAt(int index);
+  CharSequence subSequence(int start, int end);
+  String toString();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/lang/reflect/AnnotatedElement.java"><![CDATA[
+package java.lang.reflect;
+
+public interface AnnotatedElement {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/io/ObjectInputStream.java"><![CDATA[
+package java.io;
+
+public class ObjectInputStream extends InputStream {
+  public ObjectInputStream(InputStream in) throws IOException {}
+  public int read() throws IOException { return -1; }
+  public Object readObject() throws IOException, ClassNotFoundException { return null; }
+  public void defaultReadObject() throws IOException, ClassNotFoundException {}
+  protected Class resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException { return null; }
+  protected Class resolveProxyClass(String[] interfaces) throws IOException, ClassNotFoundException { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/io/ObjectStreamClass.java"><![CDATA[
+package java.io;
+
+public class ObjectStreamClass {
+  public String getName() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/Buffer.java"><![CDATA[
+package java.nio;
+
+public abstract class Buffer {
+  public final Buffer clear() { return this; }
+  public final Buffer flip() { return this; }
+  public final int capacity() { return 0; }
+  public final int position() { return 0; }
+  public final int remaining() { return 0; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/ByteBuffer.java"><![CDATA[
+package java.nio;
+
+public abstract class ByteBuffer extends Buffer {
+  public static ByteBuffer allocate(int capacity) { return null; }
+  public static ByteBuffer wrap(byte[] array) { return null; }
+  public ByteBuffer compact() { return this; }
+  public ByteBuffer put(byte value) { return this; }
+  public ByteBuffer put(byte[] value) { return this; }
+  public ByteBuffer putShort(short value) { return this; }
+  public ByteBuffer putShort(int index, short value) { return this; }
+  public ByteBuffer putInt(int value) { return this; }
+  public ByteBuffer putLong(long value) { return this; }
+  public ByteBuffer putFloat(float value) { return this; }
+  public ByteBuffer putDouble(double value) { return this; }
+  public ByteBuffer putChar(char value) { return this; }
+  public ByteBuffer get(byte[] dst) { return this; }
+  public byte get() { return 0; }
+  public byte[] array() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/CharBuffer.java"><![CDATA[
+package java.nio;
+
+public abstract class CharBuffer extends Buffer implements CharSequence {
+  public static CharBuffer allocate(int capacity) { return null; }
+  public static CharBuffer wrap(CharSequence sequence) { return null; }
+  public CharBuffer put(CharBuffer source) { return this; }
+  public CharBuffer get(char[] dst) { return this; }
+  public int length() { return 0; }
+  public char charAt(int index) { return 0; }
+  public CharSequence subSequence(int start, int end) { return this; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Component.java"><![CDATA[
+package java.awt;
+
+public class Component {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Container.java"><![CDATA[
+package java.awt;
+
+public class Container extends Component {
+  public Component add(Component component) { return component; }
+  public void add(Component component, Object constraints) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/BorderLayout.java"><![CDATA[
+package java.awt;
+
+public class BorderLayout {
+  public static final String CENTER = "Center";
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Font.java"><![CDATA[
+package java.awt;
+
+public class Font {
+  public static final int PLAIN = 0;
+  public Font(String name, int style, int size) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Frame.java"><![CDATA[
+package java.awt;
+
+public class Frame extends Container {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionEvent.java"><![CDATA[
+package java.awt.event;
+
+public class ActionEvent {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionListener.java"><![CDATA[
+package java.awt.event;
+
+public interface ActionListener {
+  void actionPerformed(ActionEvent event);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/border/Border.java"><![CDATA[
+package javax.swing.border;
+
+public interface Border {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JComponent.java"><![CDATA[
+package javax.swing;
+
+public class JComponent extends java.awt.Container {
+  public javax.swing.border.Border getBorder() { return null; }
+  public void setBorder(javax.swing.border.Border border) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JPanel.java"><![CDATA[
+package javax.swing;
+
+public class JPanel extends JComponent {
+  public JPanel() {}
+  public JPanel(Object layout) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JFrame.java"><![CDATA[
+package javax.swing;
+
+public class JFrame extends java.awt.Frame {
+  public JFrame(String title) {}
+  public void setDefaultCloseOperation(int operation) {}
+  public void addWindowListener(java.awt.event.WindowListener listener) {}
+  public void pack() {}
+  public void setVisible(boolean visible) {}
+  public java.awt.Container getContentPane() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JScrollPane.java"><![CDATA[
+package javax.swing;
+
+public class JScrollPane extends JComponent {
+  public JScrollPane(java.awt.Component view) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JSplitPane.java"><![CDATA[
+package javax.swing;
+
+public class JSplitPane extends JComponent {
+  public static final int HORIZONTAL_SPLIT = 1;
+  public static final int VERTICAL_SPLIT = 0;
+  public JSplitPane(int orientation, java.awt.Component left, java.awt.Component right) {}
+  public void setResizeWeight(double value) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JTextArea.java"><![CDATA[
+package javax.swing;
+
+public class JTextArea extends javax.swing.text.JTextComponent {
+  public JTextArea(int rows, int columns) {}
+  public void setFont(java.awt.Font font) {}
+  public void setEditable(boolean editable) {}
+  public int getWidth() { return 0; }
+  public int getColumnWidth() { return 1; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JTree.java"><![CDATA[
+package javax.swing;
+
+public class JTree extends JComponent {
+  public JTree(javax.swing.tree.TreeModel model) {}
+  public String convertValueToText(Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) { return null; }
+  public void addTreeSelectionListener(javax.swing.event.TreeSelectionListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/text/JTextComponent.java"><![CDATA[
+package javax.swing.text;
+
+public class JTextComponent extends javax.swing.JComponent {
+  public String getText() { return null; }
+  public void setText(String text) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeSelectionEvent.java"><![CDATA[
+package javax.swing.event;
+
+public class TreeSelectionEvent extends java.util.EventObject {
+  public TreeSelectionEvent(Object source) { super(source); }
+  public javax.swing.tree.TreePath getPath() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeSelectionListener.java"><![CDATA[
+package javax.swing.event;
+
+public interface TreeSelectionListener extends java.util.EventListener {
+  void valueChanged(TreeSelectionEvent event);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreeModel.java"><![CDATA[
+package javax.swing.tree;
+
+public interface TreeModel {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreePath.java"><![CDATA[
+package javax.swing.tree;
+
+public class TreePath {
+  public Object getLastPathComponent() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/ch/epfl/lamp/compiler/msil/Type.java"><![CDATA[
+package ch.epfl.lamp.compiler.msil;
+
+public class Type {
+  public static final Type[] EmptyTypes = new Type[0];
+  public Type DeclaringType = null;
+  public Assembly Assembly = null;
+  public String FullName = "";
+  public String Name = "";
+  public String Namespace = "";
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/ch/epfl/lamp/compiler/msil/Assembly.java"><![CDATA[
+package ch.epfl.lamp.compiler.msil;
+
+public class Assembly {
+  public static Assembly LoadFrom(String path) { return null; }
+  public Type[] GetTypes() { return Type.EmptyTypes; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/jline/History.java"><![CDATA[
+package jline;
+
+public class History {
+  public History() {}
+  public History(java.io.File file) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/jline/ConsoleReader.java"><![CDATA[
+package jline;
+
+public class ConsoleReader {
+  public ConsoleReader() {}
+  public void setHistory(History history) {}
+  public void setBellEnabled(boolean enabled) {}
+  public void setAutoprintThreshhold(int threshold) {}
+  public void addCompletor(Completor completor) {}
+  public String readLine(String prompt) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/jline/Completor.java"><![CDATA[
+package jline;
+
+public interface Completor {
+  int complete(String buffer, int cursor, java.util.List<String> candidates);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/jline/ArgumentCompletor.java"><![CDATA[
+package jline;
+
+public class ArgumentCompletor implements Completor {
+  public ArgumentCompletor(Completor completor) {}
+  public ArgumentCompletor(Completor completor, ArgumentDelimiter delimiter) {}
+  public void setStrict(boolean strict) {}
+  public int complete(String buffer, int cursor, java.util.List<String> candidates) { return -1; }
+  public static interface ArgumentDelimiter {
+    boolean isDelimiterChar(String buffer, int pos);
+  }
+  public static abstract class AbstractArgumentDelimiter implements ArgumentDelimiter {
+  }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Arrays.java"><![CDATA[
+package java.util;
+
+public final class Arrays {
+  private Arrays() {}
+  public static void fill(int[] array, int value) {}
+  public static <T> void sort(T[] array, Comparator<? super T> comparator) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Comparator.java"><![CDATA[
+package java.util;
+
+public interface Comparator<T> {
+  int compare(T first, T second);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Iterator.java"><![CDATA[
+package java.util;
+
+public interface Iterator<E> {
+  boolean hasNext();
+  E next();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Map.java"><![CDATA[
+package java.util;
+
+public interface Map<K,V> {
+  int size();
+  boolean isEmpty();
+  boolean containsKey(Object key);
+  boolean containsValue(Object value);
+  V get(Object key);
+  V put(K key, V value);
+  V remove(Object key);
+  void putAll(Map<? extends K,? extends V> map);
+  void clear();
+  Set<K> keySet();
+  Collection<V> values();
+  Set<Entry<K,V>> entrySet();
+
+  interface Entry<K,V> {
+    K getKey();
+    V getValue();
+  }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ConcurrentMap.java"><![CDATA[
+package java.util.concurrent;
+
+public interface ConcurrentMap<K,V> extends java.util.Map<K,V> {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/Executor.java"><![CDATA[
+package java.util.concurrent;
+
+public interface Executor {
+  void execute(Runnable command);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ExecutorService.java"><![CDATA[
+package java.util.concurrent;
+
+public interface ExecutorService extends Executor {
+  void shutdown();
+  boolean isShutdown();
+  <T> Future<T> submit(Callable<T> task);
+  boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/Callable.java"><![CDATA[
+package java.util.concurrent;
+
+public interface Callable<V> {
+  V call() throws Exception;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/Future.java"><![CDATA[
+package java.util.concurrent;
+
+public interface Future<V> {
+  V get() throws InterruptedException, ExecutionException;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ExecutionException.java"><![CDATA[
+package java.util.concurrent;
+
+public class ExecutionException extends Exception {
+  public ExecutionException() {}
+  public ExecutionException(Throwable cause) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ThreadFactory.java"><![CDATA[
+package java.util.concurrent;
+
+public interface ThreadFactory {
+  Thread newThread(Runnable runnable);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/TimeUnit.java"><![CDATA[
+package java.util.concurrent;
+
+public enum TimeUnit {
+  MILLISECONDS;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/BlockingQueue.java"><![CDATA[
+package java.util.concurrent;
+
+public interface BlockingQueue<E> extends java.util.Collection<E> {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/RejectedExecutionHandler.java"><![CDATA[
+package java.util.concurrent;
+
+public interface RejectedExecutionHandler {
+  void rejectedExecution(Runnable runnable, ThreadPoolExecutor executor);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ThreadPoolExecutor.java"><![CDATA[
+package java.util.concurrent;
+
+public class ThreadPoolExecutor implements ExecutorService {
+  public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, RejectedExecutionHandler handler) {}
+  public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory, RejectedExecutionHandler handler) {}
+  public void execute(Runnable command) {}
+  public void shutdown() {}
+  public java.util.List<Runnable> shutdownNow() { return null; }
+  public boolean isShutdown() { return false; }
+  public boolean isTerminated() { return false; }
+  public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException { return false; }
+  public <T> Future<T> submit(Callable<T> task) { return null; }
+  public <T> Future<T> submit(Runnable task, T result) { return null; }
+  public Future<?> submit(Runnable task) { return null; }
+
+  public static class CallerRunsPolicy implements RejectedExecutionHandler {
+    public CallerRunsPolicy() {}
+    public void rejectedExecution(Runnable runnable, ThreadPoolExecutor executor) {}
+  }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/Consumer.java"><![CDATA[
+package java.util.function;
+
+public interface Consumer<T> {
+  void accept(T value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/BiConsumer.java"><![CDATA[
+package java.util.function;
+
+public interface BiConsumer<T,U> {
+  void accept(T first, U second);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/Function.java"><![CDATA[
+package java.util.function;
+
+public interface Function<T,R> {
+  R apply(T value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/BiFunction.java"><![CDATA[
+package java.util.function;
+
+public interface BiFunction<T,U,R> {
+  R apply(T first, U second);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/Predicate.java"><![CDATA[
+package java.util.function;
+
+public interface Predicate<T> {
+  boolean test(T value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/UnaryOperator.java"><![CDATA[
+package java.util.function;
+
+public interface UnaryOperator<T> extends Function<T,T> {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/Pattern.java"><![CDATA[
+package java.util.regex;
+
+public final class Pattern {
+  public static final int MULTILINE = 8;
+  public static Pattern compile(String regex) { return null; }
+  public static Pattern compile(String regex, int flags) { return null; }
+  public Matcher matcher(CharSequence input) { return null; }
+  public String[] split(CharSequence input) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/Matcher.java"><![CDATA[
+package java.util.regex;
+
+public final class Matcher {
+  public boolean find() { return false; }
+  public boolean matches() { return false; }
+  public boolean lookingAt() { return false; }
+  public int start() { return 0; }
+  public int start(int group) { return 0; }
+  public int end() { return 0; }
+  public int end(int group) { return 0; }
+  public int groupCount() { return 0; }
+  public String group() { return null; }
+  public String group(int group) { return null; }
+  public String replaceAll(String replacement) { return null; }
+  public String replaceFirst(String replacement) { return null; }
+}
+]]></echo>
+    <javac
+      srcdir="${java8.stubs.dir}/src"
+      destdir="${java8.stubs.dir}/classes"
+      source="1.6"
+      target="1.6"
+      includeantruntime="false"/>
+    <unzip src="${lib.starr.jar}" dest="${java8.stubs.dir}/classes">
+      <patternset>
+        <include name="scala/runtime/Boxed*Array*.class"/>
+      </patternset>
+    </unzip>
+    <jar destfile="${java8.stubs.jar}" basedir="${java8.stubs.dir}/classes"/>
+  </target>
+
+  <target name="init" depends="build.java8.stubs">
   <!-- scalac.args.optimise is selectively overridden in certain antcall tasks. -->
     <property name="scalac.args.optimise" value=""/>
   <!-- scalac.args.quickonly are added to quick.* targets but not others (particularly, locker.)
@@ -201,8 +748,12 @@ INITIALISATION
 	
     <property name="scalac.args.all" value="${scalac.args} ${scalac.args.optimise}"/>
 	<property name="scalac.args.quick" value="${scalac.args.all} ${scalac.args.quickonly}"/>
-  <!-- Setting-up Ant contrib tasks -->
-    <taskdef resource="net/sf/antcontrib/antlib.xml" classpath="${lib.dir}/ant/ant-contrib.jar"/>
+  <!-- No-op replacement for ant-contrib stopwatch; timing is not part of the build result. -->
+    <macrodef name="stopwatch">
+      <attribute name="name"/>
+      <attribute name="action" default="start"/>
+      <sequential/>
+    </macrodef>
   <!-- This is the start time for the distribution -->
     <tstamp prefix="time">
       <format property="human" pattern="d MMMM yyyy, HH:mm:ss"/>
@@ -212,15 +763,8 @@ INITIALISATION
     <condition property="os.win">
       <os family="windows"/>
     </condition>
-  <!-- Finding out SVN revision -->
-    <exec executable="svn" outputproperty="svn.out"
-      failifexecutionfails="false">
-      <arg line=" info ${basedir}"/>
-    </exec>
-    <propertyregex
-      property="svn.number" input="${svn.out}" select="\1"
-      regexp="Revision: ([0-9]+)"
-      defaultValue="0"/>
+  <!-- The git bootstrap checkout does not carry the old SVN metadata. -->
+    <property name="svn.number" value="x"/>
     <property name="init.avail" value="yes"/>
   <!-- Generating version number -->
     <property file="${basedir}/build.number"/>
@@ -234,8 +778,8 @@ INITIALISATION
     <path id="starr.classpath">
       <pathelement location="${lib.starr.jar}"/>
       <pathelement location="${comp.starr.jar}"/>
-      <pathelement location="${lib.dir}/fjbg.jar"/>
-      <pathelement location="${lib.dir}/msil.jar"/>
+      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${msil.jar}"/>
       <pathelement location="${ant.jar}"/>
     </path>
     <taskdef resource="scala/tools/ant/sabbus/antlib.xml" classpathref="starr.classpath"/>
@@ -279,6 +823,8 @@ LOCAL REFERENCE BUILD (LOCKER)
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
       </compilationpath>
@@ -315,11 +861,13 @@ LOCAL REFERENCE BUILD (LOCKER)
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
-        <pathelement location="${lib.dir}/fjbg.jar"/>
-        <pathelement location="${lib.dir}/msil.jar"/>
+        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${msil.jar}"/>
         <pathelement location="${jline.jar}"/>
         <pathelement location="${ant.jar}"/>
       </compilationpath>
@@ -345,8 +893,8 @@ LOCAL REFERENCE BUILD (LOCKER)
     <path id="locker.classpath">
       <pathelement location="${build-locker.dir}/classes/library"/>
       <pathelement location="${build-locker.dir}/classes/compiler"/>
-      <pathelement location="${lib.dir}/fjbg.jar"/>
-      <pathelement location="${lib.dir}/msil.jar"/>
+      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${msil.jar}"/>
       <pathelement location="${ant.jar}"/>
     </path>
   </target>
@@ -415,7 +963,6 @@ QUICK BUILD (QUICK)
         <include name="library/**"/>
         <include name="dbc/**"/>
         <include name="actors/**"/>
-        <include name="swing/**"/>
       </srcfiles>
     </uptodate>
   </target>
@@ -447,6 +994,8 @@ QUICK BUILD (QUICK)
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
       </compilationpath>
@@ -467,17 +1016,6 @@ QUICK BUILD (QUICK)
       compilerpathref="locker.classpath"
       params="${scalac.args.quick}"
       srcdir="${src.dir}/dbc"
-      jvmargs="${scalacfork.jvmargs}">
-      <include name="**/*.scala"/>
-      <compilationpath>
-        <pathelement location="${build-quick.dir}/classes/library"/>
-      </compilationpath>
-    </scalacfork>
-    <scalacfork
-      destdir="${build-quick.dir}/classes/library"
-      compilerpathref="locker.classpath"
-      params="${scalac.args.quick}"
-      srcdir="${src.dir}/swing"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
       <compilationpath>
@@ -528,6 +1066,8 @@ QUICK BUILD (QUICK)
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
         <pathelement location="${build-quick.dir}/classes/compiler"/>
@@ -713,20 +1253,11 @@ PACKED QUICK BUILD (PACK)
     <jar destfile="${build-pack.dir}/lib/scala-library.jar">
       <fileset dir="${build-quick.dir}/classes/library">
         <exclude name="scala/dbc/**"/>
-        <exclude name="scala/swing/**"/>
       </fileset>
     </jar>
     <jar destfile="${build-pack.dir}/lib/scala-dbc.jar">
       <fileset dir="${build-quick.dir}/classes/library">
         <include name="scala/dbc/**"/>
-      </fileset>
-    </jar>
-    <jar destfile="${build-pack.dir}/lib/scala-swing.jar">
-      <fileset dir="${build-quick.dir}/classes/library">
-        <include name="scala/swing/**"/>
-      </fileset>
-      <fileset dir="${src.dir}/swing">
-        <include name="scala/swing/test/images/**"/>
       </fileset>
     </jar>
   </target>
@@ -957,6 +1488,8 @@ BOOTSTRAPPING BUILD (STRAP)
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>
