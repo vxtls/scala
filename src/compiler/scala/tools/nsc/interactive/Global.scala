@@ -22,8 +22,6 @@ class Global(settings: Settings, reporter: Reporter)
      with RichCompilationUnits {
 self =>
 
-  settings.XprintPos.value = true
-
   import definitions._
 
   override def onlyPresentation = true
@@ -447,4 +445,3 @@ self =>
 
   assert(globalPhase.id == 0)
 }
-
