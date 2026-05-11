@@ -743,6 +743,10 @@ public final class Matcher {
     <unzip src="${lib.starr.jar}" dest="${java8.stubs.dir}/classes">
       <patternset>
         <include name="scala/runtime/Boxed*Array*.class"/>
+        <include name="scala/annotation/Annotation.class"/>
+        <include name="scala/annotation/ClassfileAnnotation.class"/>
+        <include name="scala/annotation/StaticAnnotation.class"/>
+        <include name="scala/annotation/TypeConstraint.class"/>
       </patternset>
     </unzip>
     <jar destfile="${java8.stubs.jar}" basedir="${java8.stubs.dir}/classes"/>
@@ -847,7 +851,7 @@ LOCAL REFERENCE BUILD (LOCKER)
     </condition>
   </target>
   
-  <target name="locker.pre-lib" depends="locker.comp" unless="locker.available">
+  <target name="locker.pre-lib" depends="locker.start" unless="locker.available">
     <condition property="locker.lib.needed">
       <not><available file="${build-locker.dir}/library.complete"/></not>
     </condition>
@@ -869,7 +873,7 @@ LOCAL REFERENCE BUILD (LOCKER)
          src/build/msil.xml in msil branch for more details. -->
     <scalacfork
       destdir="${build-locker.dir}/classes/library"
-      compilerpathref="locker.bootstrap.compiler.classpath"
+      compilerpathref="starr.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args.all}"
       srcdir="${src.dir}/library"
@@ -900,7 +904,7 @@ LOCAL REFERENCE BUILD (LOCKER)
     <stopwatch name="locker.lib.timer" action="total"/>
   </target>
   
-  <target name="locker.pre-comp" depends="locker.start" unless="locker.available">
+  <target name="locker.pre-comp" depends="locker.lib" unless="locker.available">
     <condition property="locker.comp.needed">
       <not><available file="${build-locker.dir}/compiler.complete"/></not>
     </condition>
@@ -920,26 +924,8 @@ LOCAL REFERENCE BUILD (LOCKER)
       <exclude name="scala/tools/nsc/backend/MSILPlatform.scala"/>
       <exclude name="scala/tools/nsc/util/MsilClassPath.scala"/>
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
-      <exclude name="scala/tools/ant/Scaladoc.scala"/>
       <compilationpath>
-        <pathelement location="${lib.starr.jar}"/>
-        <pathelement location="${forkjoin.jar}"/>
-        <pathelement location="${build-locker.dir}/classes/compiler"/>
-        <pathelement location="${fjbg.jar}"/>
-        <path refid="aux.libs"/>
-        <pathelement location="${jline.jar}"/>
-        <pathelement location="${ant.jar}"/>
-      </compilationpath>
-    </scalacfork>
-    <scalacfork
-      destdir="${build-locker.dir}/classes/compiler"
-      compilerpathref="locker.bootstrap.compiler.classpath"
-      params="${scalac.args.all}"
-      srcdir="${src.dir}/compiler"
-      jvmargs="${scalacfork.jvmargs}">
-      <include name="scala/tools/ant/Scaladoc.scala"/>
-      <compilationpath>
-        <pathelement location="${lib.starr.jar}"/>
+        <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${forkjoin.jar}"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
@@ -969,7 +955,7 @@ LOCAL REFERENCE BUILD (LOCKER)
     <stopwatch name="locker.comp.timer" action="total"/>
   </target>
 
-  <target name="locker.done" depends="locker.lib">
+  <target name="locker.done" depends="locker.comp">
     <touch file="${build-locker.dir}/all.complete" verbose="no"/>
     <path id="locker.classpath">
       <pathelement location="${build-locker.dir}/classes/library"/>
