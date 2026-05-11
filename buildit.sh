@@ -142,7 +142,6 @@ GROUP4=(
   v2.8-diverged+d367ae7-bootstrap
   v2.8-diverged+2b41733-bootstrap
   v2.8.1-bootstrap
-  v2.8-diverged+42123a6-bootstrap
   v2.8-diverged+32ca2f2-bootstrap
   v2.8-diverged+626e389-bootstrap
   v2.8-diverged+77eb8fe-bootstrap
@@ -188,6 +187,7 @@ declare -A GROUP4_PREV=(
   [v2.9.1-bootstrap]=v2.9.0+1-bootstrap
   [v2.9.2-bootstrap]=v2.9.1-bootstrap
   [v2.9.3-bootstrap]=v2.9.2-bootstrap
+  [v2.8-diverged+32ca2f2-bootstrap]=v2.8-diverged+2b41733-bootstrap
 )
 
 declare -A GROUP4_BRIDGE_PREV=(
