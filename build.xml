@@ -170,11 +170,14 @@ PROPERTIES
   <!-- Additional command line arguments for scalac. They are added to all build targets -->
   <property name="scalac.args" value="-javabootclasspath ${java.boot.classpath}"/>
   <property name="scalac.args.starr" value="${scalac.args}"/>
+  <property name="scalac.args.bridge" value="${scalac.args.starr} -no-specialization"/>
   <property name="javac.args" value=""/>
 
   <!-- Sets location of pre-compiled libraries -->
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
+  <property name="lib.bridge.jar" value="${lib.starr.jar}"/>
+  <property name="comp.bridge.jar" value="${comp.starr.jar}"/>
   <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
   <property name="jline.jar" value="${lib.dir}/jline.jar"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
@@ -251,6 +254,12 @@ INITIALISATION
     <path id="starr.classpath">
       <pathelement location="${lib.starr.jar}"/>
       <pathelement location="${comp.starr.jar}"/>
+      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${ant.jar}"/>
+    </path>
+    <path id="bridge.starr.classpath">
+      <pathelement location="${lib.bridge.jar}"/>
+      <pathelement location="${comp.bridge.jar}"/>
       <pathelement location="${fjbg.jar}"/>
       <pathelement location="${ant.jar}"/>
     </path>
@@ -1436,32 +1445,33 @@ LOCAL REFERENCE BUILD (LOCKER)
     <scalacfork
       destdir="${build-bridge.dir}/classes/library"
       compilerpathref="starr.classpath"
-	      params="${scalac.args.starr}"
+      params="${scalac.args.starr}"
       srcdir="${src.dir}/library"
-	      jvmargs="${scalacfork.jvmargs}">
-	      <include name="scala/Product*.scala"/>
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="scala/Product*.scala"/>
       <compilationpath>
         <pathelement location="${build-bridge.dir}/classes/library"/>
         <pathelement location="${java8.stubs.jar}"/>
         <pathelement location="${lib.starr.jar}"/>
       </compilationpath>
-	    </scalacfork>
-	    <delete includeemptydirs="no">
-	      <fileset dir="${build-bridge.dir}/classes/library">
-	        <include name="scala/Product*.class"/>
-	        <include name="scala/Predef*.class"/>
-	        <include name="scala/LowPriorityImplicits*.class"/>
-	      </fileset>
-	    </delete>
-	    <scalacfork
-	      destdir="${build-bridge.dir}/classes/library"
-		      compilerpathref="starr.classpath"
-	      params="${scalac.args.starr}"
-	      srcdir="${src.dir}/library"
-	      jvmargs="${scalacfork.jvmargs}">
+    </scalacfork>
+    <delete includeemptydirs="no">
+      <fileset dir="${build-bridge.dir}/classes/library">
+        <include name="scala/Product*.class"/>
+        <include name="scala/Predef*.class"/>
+        <include name="scala/LowPriorityImplicits*.class"/>
+      </fileset>
+    </delete>
+    <scalacfork
+      destdir="${build-bridge.dir}/classes/library"
+      compilerpathref="starr.classpath"
+      params="${scalac.args.starr}"
+      srcdir="${src.dir}/library"
+      jvmargs="${scalacfork.jvmargs}">
       <include name="scala/Predef.scala"/>
       <include name="scala/LowPriorityImplicits.scala"/>
       <include name="scala/runtime/RichException.scala"/>
+      <include name="scala/collection/mutable/StringBuilder.scala"/>
       <compilationpath>
         <pathelement location="${build-bridge.dir}/classes/library"/>
         <pathelement location="${java8.stubs.jar}"/>
@@ -1479,9 +1489,9 @@ LOCAL REFERENCE BUILD (LOCKER)
     </delete>
     <scalacfork
       destdir="${build-bridge.dir}/classes/library"
-	      compilerpathref="starr.classpath"
+      compilerpathref="starr.classpath"
       srcpath="${build-bridge.dir}/empty-src"
-		      params="${scalac.args.starr}"
+      params="${scalac.args.starr}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -1513,20 +1523,22 @@ LOCAL REFERENCE BUILD (LOCKER)
         <pathelement location="${lib.starr.jar}"/>
       </compilationpath>
     </scalacfork>
-		    <copy todir="${build-bridge.dir}/classes/library" overwrite="true">
-		      <zipfileset src="${lib.starr.jar}">
-		        <include name="scala/Enumeration*.class"/>
-		        <include name="scala/collection/Sequence*.class"/>
-	        <include name="scala/collection/VectorLike*.class"/>
-	        <include name="scala/collection/mutable/MapLikeBase*.class"/>
-	        <include name="scala/collection/mutable/WeakHashMap*.class"/>
+    <copy todir="${build-bridge.dir}/classes/library" overwrite="true">
+      <zipfileset src="${lib.starr.jar}">
+        <include name="scala/deprecatedName*.class"/>
+        <include name="scala/Enumeration*.class"/>
+        <include name="scala/collection/Sequence*.class"/>
+        <include name="scala/collection/VectorLike*.class"/>
+        <include name="scala/collection/mutable/MapLikeBase*.class"/>
+        <include name="scala/collection/mutable/SeqLike*.class"/>
+        <include name="scala/collection/mutable/WeakHashMap*.class"/>
         <include name="scala/math/Ordering*.class"/>
         <include name="scala/math/LowPriorityOrderingImplicits*.class"/>
-	        <include name="scala/runtime/Boxed*Array*.class"/>
-		        <include name="scala/util/matching/Regex*.class"/>
-		      </zipfileset>
-		    </copy>
-	  </target>
+        <include name="scala/runtime/Boxed*Array*.class"/>
+        <include name="scala/util/matching/Regex*.class"/>
+      </zipfileset>
+    </copy>
+  </target>
 
   <target name="bridge.comp" depends="bridge.lib" unless="bridge.available">
     <mkdir dir="${build-bridge.dir}/classes/compiler"/>
@@ -1539,18 +1551,18 @@ LOCAL REFERENCE BUILD (LOCKER)
     </copy>
     <scalacfork
       destdir="${build-bridge.dir}/classes/compiler"
-      compilerpathref="starr.classpath"
+      compilerpathref="bridge.starr.classpath"
       srcpath="${build-bridge.dir}/empty-src"
-      params="${scalac.args.starr}"
+      params="${scalac.args.bridge}"
       srcdir="${src.dir}/compiler"
-		      jvmargs="${scalacfork.jvmargs}">
-		      <include name="**/*.scala"/>
-		      <exclude name="scala/tools/nsc/backend/MSILPlatform.scala"/>
-			      <exclude name="scala/tools/nsc/backend/msil/**"/>
-			      <exclude name="scala/tools/nsc/MainInterpreter.scala"/>
-			      <exclude name="scala/tools/nsc/symtab/clr/**"/>
-			      <exclude name="scala/tools/nsc/util/CommandLineSpec.scala"/>
-			      <compilationpath>
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/MSILPlatform.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**"/>
+      <exclude name="scala/tools/nsc/MainInterpreter.scala"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**"/>
+      <exclude name="scala/tools/nsc/util/CommandLineSpec.scala"/>
+      <compilationpath>
         <pathelement location="${build-bridge.dir}/classes/compiler-lib-overrides"/>
         <pathelement location="${build-bridge.dir}/classes/library"/>
         <pathelement location="${build-bridge.dir}/classes/compiler"/>
@@ -1560,9 +1572,9 @@ LOCAL REFERENCE BUILD (LOCKER)
         <pathelement location="${ant.jar}"/>
       </compilationpath>
     </scalacfork>
-	    <path id="bridge.self.classpath">
-	      <pathelement location="${build-bridge.dir}/classes/library"/>
-	      <pathelement location="${build-bridge.dir}/classes/compiler"/>
+    <path id="bridge.self.classpath">
+      <pathelement location="${build-bridge.dir}/classes/library"/>
+      <pathelement location="${build-bridge.dir}/classes/compiler"/>
       <pathelement location="${fjbg.jar}"/>
       <pathelement location="${java8.stubs.jar}"/>
       <pathelement location="${jline.jar}"/>
@@ -1589,9 +1601,9 @@ LOCAL REFERENCE BUILD (LOCKER)
     <touch file="${build-bridge.dir}/compiler.complete" verbose="no"/>
   </target>
 
-	  <target name="bridge.done" depends="bridge.comp">
-	    <path id="bridge.classpath">
-	      <pathelement location="${build-bridge.dir}/classes/library"/>
+  <target name="bridge.done" depends="bridge.comp">
+    <path id="bridge.classpath">
+      <pathelement location="${build-bridge.dir}/classes/library"/>
       <pathelement location="${build-bridge.dir}/classes/compiler"/>
       <pathelement location="${fjbg.jar}"/>
       <pathelement location="${java8.stubs.jar}"/>
