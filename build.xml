@@ -439,6 +439,9 @@ public class JTree extends JComponent {
 package javax.swing.text;
 
 public class JTextComponent extends javax.swing.JComponent {
+  public static class KeyBinding {
+    public KeyBinding(javax.swing.KeyStroke key, String actionName) {}
+  }
   public String getText() { return null; }
   public void setText(String text) {}
 }
