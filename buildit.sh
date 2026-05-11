@@ -189,6 +189,10 @@ declare -A GROUP4_PREV=(
   [v2.9.3-bootstrap]=v2.9.2-bootstrap
 )
 
+declare -A GROUP4_BRIDGE_PREV=(
+  [v2.8.1-bootstrap]=v2.8-diverged+d367ae7-bootstrap
+)
+
 declare -A GROUP4_JAVABOOTCLASSPATH_PREV=(
   [v2.8.2+1cbe06c-bootstrap]=v2.8-diverged+2bb5d58-bootstrap
   [v2.8-diverged+4253124-bootstrap]=v2.8-diverged+2bb5d58-bootstrap
@@ -584,6 +588,15 @@ build_group4() {
       "-Dlib.starr.jar=$starr_lib"
       "-Dcomp.starr.jar=$starr_comp"
     )
+
+    bridge_prev="${GROUP4_BRIDGE_PREV[$branch]:-}"
+    if [[ -n "$bridge_prev" ]]; then
+      echo ">>> Using explicit bridge compiler: $branch <- $bridge_prev"
+      ant_props+=(
+        "-Dlib.bridge.jar=$(group4_starr_lib "$bridge_prev")"
+        "-Dcomp.bridge.jar=$(group4_starr_comp "$bridge_prev")"
+      )
+    fi
 
     if group4_uses_source_fjbg "$branch"; then
       echo ">>> Building FJBG from current sources: $branch"
