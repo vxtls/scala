@@ -1520,9 +1520,10 @@ LOCAL REFERENCE BUILD (LOCKER)
 		        <include name="scala/Enumeration*.class"/>
 		        <include name="scala/collection/JavaConversions*.class"/>
 		        <include name="scala/collection/Sequence*.class"/>
-	        <include name="scala/collection/VectorLike*.class"/>
-	        <include name="scala/collection/mutable/MapLikeBase*.class"/>
-	        <include name="scala/collection/mutable/WeakHashMap*.class"/>
+		        <include name="scala/collection/VectorLike*.class"/>
+		        <include name="scala/collection/mutable/MapLikeBase*.class"/>
+		        <include name="scala/collection/mutable/SeqLike*.class"/>
+		        <include name="scala/collection/mutable/WeakHashMap*.class"/>
         <include name="scala/math/Ordering*.class"/>
         <include name="scala/math/LowPriorityOrderingImplicits*.class"/>
 	        <include name="scala/runtime/Boxed*Array*.class"/>
