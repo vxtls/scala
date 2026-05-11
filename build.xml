@@ -380,9 +380,14 @@ public interface Border {
 package javax.swing;
 
 public class JComponent extends java.awt.Container {
-  public static class AccessibleJComponent {}
   public javax.swing.border.Border getBorder() { return null; }
   public void setBorder(javax.swing.border.Border border) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JComponent$AccessibleJComponent.java"><![CDATA[
+package javax.swing;
+
+public class JComponent$AccessibleJComponent {
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/javax/swing/JPanel.java"><![CDATA[
