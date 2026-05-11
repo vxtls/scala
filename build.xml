@@ -416,7 +416,22 @@ LOCAL REFERENCE BUILD (LOCKER)
     </condition>
   </target>
 
-  <target name="bridge.comp" depends="bridge.start" unless="bridge.available">
+  <target name="bridge.prelib" depends="bridge.start" unless="bridge.available">
+    <mkdir dir="${build-bridge.dir}/classes/library"/>
+    <scalacfork
+      destdir="${build-bridge.dir}/classes/library"
+      compilerpathref="starr.classpath"
+      params="${scalac.args.all}"
+      srcdir="${src.dir}/library"
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="scala/reflect/generic/*.scala"/>
+      <compilationpath>
+        <pathelement location="${lib.starr.jar}"/>
+      </compilationpath>
+    </scalacfork>
+  </target>
+
+  <target name="bridge.comp" depends="bridge.prelib" unless="bridge.available">
     <mkdir dir="${build-bridge.dir}/classes/compiler"/>
     <scalacfork
       destdir="${build-bridge.dir}/classes/compiler"
@@ -430,6 +445,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       <exclude name="scala/tools/nsc/util/MsilClassPath.scala"/>
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
+        <pathelement location="${build-bridge.dir}/classes/library"/>
         <pathelement location="${lib.starr.jar}"/>
         <pathelement location="${build-bridge.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
@@ -457,6 +473,7 @@ LOCAL REFERENCE BUILD (LOCKER)
 
   <target name="bridge.lib" depends="bridge.comp" unless="bridge.available">
     <path id="bridge.compiler.classpath">
+      <pathelement location="${build-bridge.dir}/classes/library"/>
       <pathelement location="${lib.starr.jar}"/>
       <pathelement location="${build-bridge.dir}/classes/compiler"/>
       <pathelement location="${fjbg.jar}"/>
