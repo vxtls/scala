@@ -587,9 +587,16 @@ package java.util.concurrent;
 
 public interface ExecutorService extends Executor {
   void shutdown();
+  java.util.List<Runnable> shutdownNow();
   boolean isShutdown();
+  boolean isTerminated();
   <T> Future<T> submit(Callable<T> task);
+  <T> Future<T> submit(Runnable task, T result);
   Future<?> submit(Runnable task);
+  <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks) throws InterruptedException;
+  <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException;
+  <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException;
+  <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException;
   boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
 }
 ]]></echo>
@@ -616,6 +623,7 @@ package java.util.concurrent;
 public class ExecutionException extends Exception {
   public ExecutionException() {}
   public ExecutionException(Throwable cause) {}
+  public ExecutionException(String message, Throwable cause) {}
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/util/concurrent/ThreadFactory.java"><![CDATA[
@@ -629,7 +637,30 @@ public interface ThreadFactory {
 package java.util.concurrent;
 
 public enum TimeUnit {
-  MILLISECONDS;
+  NANOSECONDS,
+  MICROSECONDS,
+  MILLISECONDS,
+  SECONDS,
+  MINUTES,
+  HOURS,
+  DAYS;
+
+  public long convert(long sourceDuration, TimeUnit sourceUnit) { return sourceDuration; }
+  public long toNanos(long duration) { return duration; }
+  public long toMicros(long duration) { return duration; }
+  public long toMillis(long duration) { return duration; }
+  public long toSeconds(long duration) { return duration; }
+  public long toMinutes(long duration) { return duration; }
+  public long toHours(long duration) { return duration; }
+  public long toDays(long duration) { return duration; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/TimeoutException.java"><![CDATA[
+package java.util.concurrent;
+
+public class TimeoutException extends Exception {
+  public TimeoutException() {}
+  public TimeoutException(String message) {}
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/util/concurrent/BlockingQueue.java"><![CDATA[
@@ -650,11 +681,13 @@ package java.util.concurrent;
 
 public class ThreadPoolExecutor implements ExecutorService {
   public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, RejectedExecutionHandler handler) {}
+  public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory) {}
   public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory, RejectedExecutionHandler handler) {}
   public void execute(Runnable command) {}
   public int getCorePoolSize() { return 0; }
   public void setCorePoolSize(int corePoolSize) {}
   public BlockingQueue<Runnable> getQueue() { return null; }
+  public void allowCoreThreadTimeOut(boolean value) {}
   public void shutdown() {}
   public java.util.List<Runnable> shutdownNow() { return null; }
   public boolean isShutdown() { return false; }
@@ -663,6 +696,10 @@ public class ThreadPoolExecutor implements ExecutorService {
   public <T> Future<T> submit(Callable<T> task) { return null; }
   public <T> Future<T> submit(Runnable task, T result) { return null; }
   public Future<?> submit(Runnable task) { return null; }
+  public <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks) throws InterruptedException { return null; }
+  public <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException { return null; }
+  public <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException { return null; }
+  public <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException { return null; }
 
   public static class CallerRunsPolicy implements RejectedExecutionHandler {
     public CallerRunsPolicy() {}
