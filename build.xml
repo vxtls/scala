@@ -391,11 +391,13 @@ package javax.swing;
 
 public class JFrame extends java.awt.Frame {
   public JFrame(String title) {}
+  public void setJMenuBar(javax.swing.JMenuBar menuBar) {}
   public void setDefaultCloseOperation(int operation) {}
   public void addWindowListener(java.awt.event.WindowListener listener) {}
   public void pack() {}
   public void setVisible(boolean visible) {}
   public java.awt.Container getContentPane() { return null; }
+  public java.awt.Toolkit getToolkit() { return null; }
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/javax/swing/JScrollPane.java"><![CDATA[
@@ -431,6 +433,9 @@ package javax.swing;
 
 public class JTree extends JComponent {
   public JTree(javax.swing.tree.TreeModel model) {}
+  public javax.swing.tree.TreeModel getModel() { return null; }
+  public void expandPath(javax.swing.tree.TreePath path) {}
+  public void collapsePath(javax.swing.tree.TreePath path) {}
   public String convertValueToText(Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) { return null; }
   public void addTreeSelectionListener(javax.swing.event.TreeSelectionListener listener) {}
 }
@@ -465,13 +470,18 @@ public interface TreeSelectionListener extends java.util.EventListener {
 package javax.swing.tree;
 
 public interface TreeModel {
+  Object getRoot();
+  Object getChild(Object parent, int index);
+  int getChildCount(Object parent);
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreePath.java"><![CDATA[
 package javax.swing.tree;
 
 public class TreePath {
+  public TreePath(Object singlePath) {}
   public Object getLastPathComponent() { return null; }
+  public TreePath pathByAddingChild(Object child) { return this; }
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/ch/epfl/lamp/compiler/msil/Type.java"><![CDATA[
