@@ -382,8 +382,21 @@ ensure_repo() {
 
 already_built() {
   local branch="$1"
+  local marker_commit
+  local current_commit
 
   if [[ -f "$MARKER" ]]; then
+    marker_commit="$(sed -n 's/^commit=//p' "$MARKER" | head -n 1)"
+    current_commit="$(git rev-parse HEAD)"
+
+    if [[ "$marker_commit" != "$current_commit" ]]; then
+      echo ">>> Ignoring stale success marker: $branch"
+      echo ">>> marker commit: ${marker_commit:-<missing>}"
+      echo ">>> current commit: $current_commit"
+      rm -f "$MARKER"
+      return 1
+    fi
+
     echo ">>> Success marker already exists; skipping build: $branch"
     echo ">>> marker: $(pwd)/$MARKER"
     return 0
@@ -412,7 +425,8 @@ create_worktree() {
     || fail "Remote branch does not exist: $REMOTE/$branch"
 
   if [[ -d "../$branch" ]]; then
-    echo ">>> Worktree directory already exists; skipping creation: ../$branch"
+    echo ">>> Worktree directory already exists; syncing to $REMOTE/$branch: ../$branch"
+    run git -C "../$branch" reset --hard "$REMOTE/$branch"
     return
   fi
 
