@@ -345,10 +345,16 @@ public class Font {
   public Font(String name, int style, int size) {}
 }
 ]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Window.java"><![CDATA[
+package java.awt;
+
+public class Window extends Container {
+}
+]]></echo>
     <echo file="${java8.stubs.dir}/src/java/awt/Frame.java"><![CDATA[
 package java.awt;
 
-public class Frame extends Container {
+public class Frame extends Window {
 }
 ]]></echo>
     <echo file="${java8.stubs.dir}/src/java/awt/event/ActionEvent.java"><![CDATA[
