@@ -1223,7 +1223,7 @@ public class ArgumentCompletor implements Completor {
 LOCAL REFERENCE BUILD (LOCKER)
 ============================================================================ -->
 
-  <target name="bridge.start" depends="build.java8.stubs">
+  <target name="bridge.start" depends="build.java8.stubs,libs.done">
     <condition property="bridge.available">
       <available file="${build-bridge.dir}/compiler.complete"/>
     </condition>
@@ -1360,6 +1360,16 @@ LOCAL REFERENCE BUILD (LOCKER)
     <copy todir="${build-bridge.dir}/classes/compiler-lib-overrides">
       <zipfileset src="${lib.starr.jar}">
         <include name="scala/math/package*.class"/>
+        <include name="scala/runtime/AnyValCompanion*.class"/>
+        <include name="scala/runtime/Boolean*.class"/>
+        <include name="scala/runtime/Byte*.class"/>
+        <include name="scala/runtime/Short*.class"/>
+        <include name="scala/runtime/Char*.class"/>
+        <include name="scala/runtime/Int*.class"/>
+        <include name="scala/runtime/Long*.class"/>
+        <include name="scala/runtime/Float*.class"/>
+        <include name="scala/runtime/Double*.class"/>
+        <include name="scala/runtime/Unit*.class"/>
       </zipfileset>
     </copy>
     <scalacfork
@@ -1379,7 +1389,7 @@ LOCAL REFERENCE BUILD (LOCKER)
         <pathelement location="${build-bridge.dir}/classes/compiler-lib-overrides"/>
         <pathelement location="${build-bridge.dir}/classes/library"/>
         <pathelement location="${build-bridge.dir}/classes/compiler"/>
-        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${build-libs.dir}/fjbg.jar"/>
         <pathelement location="${java8.stubs.jar}"/>
         <pathelement location="${jline.jar}"/>
         <pathelement location="${ant.jar}"/>
@@ -1388,7 +1398,7 @@ LOCAL REFERENCE BUILD (LOCKER)
 	    <path id="bridge.self.classpath">
 	      <pathelement location="${build-bridge.dir}/classes/library"/>
 	      <pathelement location="${build-bridge.dir}/classes/compiler"/>
-      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${build-libs.dir}/fjbg.jar"/>
       <pathelement location="${java8.stubs.jar}"/>
       <pathelement location="${jline.jar}"/>
       <pathelement location="${ant.jar}"/>
@@ -1418,7 +1428,7 @@ LOCAL REFERENCE BUILD (LOCKER)
 	    <path id="bridge.classpath">
 	      <pathelement location="${build-bridge.dir}/classes/library"/>
       <pathelement location="${build-bridge.dir}/classes/compiler"/>
-      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${build-libs.dir}/fjbg.jar"/>
       <pathelement location="${java8.stubs.jar}"/>
       <pathelement location="${jline.jar}"/>
       <pathelement location="${ant.jar}"/>
@@ -1518,7 +1528,7 @@ LOCAL REFERENCE BUILD (LOCKER)
 	      <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
-        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${build-libs.dir}/fjbg.jar"/>
             <pathelement location="${ant.jar}"/>
         <pathelement location="${jline.jar}"/>
       </compilationpath>
@@ -1548,7 +1558,7 @@ LOCAL REFERENCE BUILD (LOCKER)
     <path id="locker.classpath">
       <pathelement location="${build-locker.dir}/classes/library"/>
       <pathelement location="${build-locker.dir}/classes/compiler"/>
-      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${build-libs.dir}/fjbg.jar"/>
       <pathelement location="${ant.jar}"/>
     </path>
   </target>
@@ -1741,7 +1751,7 @@ QUICK BUILD (QUICK)
 	      <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
         <pathelement location="${build-quick.dir}/classes/compiler"/>
-        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${build-libs.dir}/fjbg.jar"/>
         <pathelement location="${ant.jar}"/>
         <pathelement location="${jline.jar}"/>
       </compilationpath>
@@ -1900,7 +1910,7 @@ QUICK BUILD (QUICK)
       <pathelement location="${build-quick.dir}/classes/library"/>
       <pathelement location="${build-quick.dir}/classes/compiler"/>
       <pathelement location="${build-quick.dir}/classes/scalap"/>
-      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${build-libs.dir}/fjbg.jar"/>
       <pathelement location="${jline.jar}"/>
     </path>
     <taskdef name="quick-bin" classname="scala.tools.ant.ScalaTool" classpathref="quick.bin.classpath"/>
@@ -1942,7 +1952,7 @@ QUICK BUILD (QUICK)
     <path id="quick.classpath">
       <pathelement location="${build-quick.dir}/classes/library"/>
       <pathelement location="${build-quick.dir}/classes/compiler"/>
-      <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${build-libs.dir}/fjbg.jar"/>
       <pathelement location="${ant.jar}"/>
     </path>
   </target>
@@ -2004,7 +2014,7 @@ PACKED QUICK BUILD (PACK)
     <jar destfile="${build-pack.dir}/lib/scala-compiler.jar" manifest="${build-pack.dir}/META-INF/MANIFEST.MF">
       <fileset dir="${build-quick.dir}/classes/compiler"/>
       <!-- filemode / dirmode: see trac ticket #1294 -->
-      <zipfileset dirmode="755" filemode="644" src="${fjbg.jar}"/>
+      <zipfileset dirmode="755" filemode="644" src="${build-libs.dir}/fjbg.jar"/>
     </jar>
 	    <copy file="${jline.jar}" toDir="${build-pack.dir}/lib" failonerror="false"/>
   </target>
@@ -2249,7 +2259,7 @@ BOOTSTRAPPING BUILD (STRAP)
       <compilationpath>
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>
-        <pathelement location="${fjbg.jar}"/>
+        <pathelement location="${build-libs.dir}/fjbg.jar"/>
         <pathelement location="${ant.jar}"/>
         <pathelement location="${jline.jar}"/>
       </compilationpath>
