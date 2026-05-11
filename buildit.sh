@@ -142,6 +142,7 @@ GROUP4=(
   v2.8-diverged+d367ae7-bootstrap
   v2.8-diverged+2b41733-bootstrap
   v2.8.1-bootstrap
+  v2.8.2-bootstrap
   v2.8-diverged+32ca2f2-bootstrap
   v2.8-diverged+626e389-bootstrap
   v2.8-diverged+77eb8fe-bootstrap
@@ -153,7 +154,6 @@ GROUP4=(
   v2.8-diverged+2bb5d58-bootstrap
   v2.8.2+1cbe06c-bootstrap
   v2.8-diverged+4253124-bootstrap
-  v2.8.2-bootstrap
   v2.8-diverged+v2.9-diverged-bootstrap
   v2.9-diverged-bootstrap
   v2.9-diverged+067030c-bootstrap
@@ -172,7 +172,6 @@ GROUP4=(
 declare -A GROUP4_PREV=(
   [v2.8.2+1cbe06c-bootstrap]=v2.8-diverged+2bb5d58-bootstrap
   [v2.8-diverged+4253124-bootstrap]=v2.8.2+1cbe06c-bootstrap
-  [v2.8.2-bootstrap]=v2.8-diverged+6e15632-bootstrap
   [v2.8-diverged+v2.9-diverged-bootstrap]=v2.8-diverged+4253124-bootstrap
   [v2.7.7+8ff235f-bootstrap]=v2.8-diverged+457a672-bootstrap
   [v2.7.7+f31eaf6-bootstrap]=v2.8-diverged+457a672-bootstrap
