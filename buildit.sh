@@ -142,6 +142,7 @@ GROUP4=(
   v2.8-diverged+d367ae7-bootstrap
   v2.8-diverged+2b41733-bootstrap
   v2.8.1-bootstrap
+  v2.8-diverged+42123a6-bootstrap
   v2.8-diverged+32ca2f2-bootstrap
   v2.8-diverged+626e389-bootstrap
   v2.8-diverged+77eb8fe-bootstrap
