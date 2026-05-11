@@ -380,11 +380,13 @@ public interface Border {
 package javax.swing;
 
 public class JComponent extends java.awt.Container {
+  public static class AccessibleJComponent {}
   public javax.swing.border.Border getBorder() { return null; }
   public void setBorder(javax.swing.border.Border border) {}
 }
 ]]></echo>
-    <echo file="${java8.stubs.dir}/src/javax/swing/JComponent$AccessibleJComponent.java"><![CDATA[
+    <mkdir dir="${java8.stubs.dir}/override/javax/swing"/>
+    <echo file="${java8.stubs.dir}/override/javax/swing/JComponent$AccessibleJComponent.java"><![CDATA[
 package javax.swing;
 
 public class JComponent$AccessibleJComponent {
@@ -765,6 +767,13 @@ public final class Matcher {
 ]]></echo>
     <javac
       srcdir="${java8.stubs.dir}/src"
+      destdir="${java8.stubs.dir}/classes"
+      source="1.6"
+      target="1.6"
+      includeantruntime="false"/>
+    <delete file="${java8.stubs.dir}/classes/javax/swing/JComponent$AccessibleJComponent.class"/>
+    <javac
+      srcdir="${java8.stubs.dir}/override"
       destdir="${java8.stubs.dir}/classes"
       source="1.6"
       target="1.6"
