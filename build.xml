@@ -625,6 +625,9 @@ public class ThreadPoolExecutor implements ExecutorService {
   public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, RejectedExecutionHandler handler) {}
   public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory, RejectedExecutionHandler handler) {}
   public void execute(Runnable command) {}
+  public int getCorePoolSize() { return 0; }
+  public void setCorePoolSize(int corePoolSize) {}
+  public BlockingQueue<Runnable> getQueue() { return null; }
   public void shutdown() {}
   public java.util.List<Runnable> shutdownNow() { return null; }
   public boolean isShutdown() { return false; }
@@ -847,7 +850,7 @@ LOCAL REFERENCE BUILD (LOCKER)
     </condition>
   </target>
   
-  <target name="locker.pre-lib" depends="locker.comp" unless="locker.available">
+  <target name="locker.pre-lib" depends="locker.start" unless="locker.available">
     <condition property="locker.lib.needed">
       <not><available file="${build-locker.dir}/library.complete"/></not>
     </condition>
@@ -869,7 +872,7 @@ LOCAL REFERENCE BUILD (LOCKER)
          src/build/msil.xml in msil branch for more details. -->
     <scalacfork
       destdir="${build-locker.dir}/classes/library"
-      compilerpathref="locker.bootstrap.compiler.classpath"
+      compilerpathref="starr.classpath"
       srcpath="${src.dir}/library"
       params="${scalac.args.all}"
       srcdir="${src.dir}/library"
@@ -881,6 +884,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
+        <pathelement location="${lib.starr.jar}"/>
         <pathelement location="${forkjoin.jar}"/>
       </compilationpath>
     </scalacfork>
@@ -900,7 +904,7 @@ LOCAL REFERENCE BUILD (LOCKER)
     <stopwatch name="locker.lib.timer" action="total"/>
   </target>
   
-  <target name="locker.pre-comp" depends="locker.start" unless="locker.available">
+  <target name="locker.pre-comp" depends="locker.lib" unless="locker.available">
     <condition property="locker.comp.needed">
       <not><available file="${build-locker.dir}/compiler.complete"/></not>
     </condition>
@@ -922,7 +926,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       <exclude name="scala/tools/nsc/symtab/clr/**"/>
       <exclude name="scala/tools/ant/Scaladoc.scala"/>
       <compilationpath>
-        <pathelement location="${lib.starr.jar}"/>
+        <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${forkjoin.jar}"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
@@ -939,7 +943,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       jvmargs="${scalacfork.jvmargs}">
       <include name="scala/tools/ant/Scaladoc.scala"/>
       <compilationpath>
-        <pathelement location="${lib.starr.jar}"/>
+        <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${forkjoin.jar}"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
         <pathelement location="${fjbg.jar}"/>
@@ -969,7 +973,7 @@ LOCAL REFERENCE BUILD (LOCKER)
     <stopwatch name="locker.comp.timer" action="total"/>
   </target>
 
-  <target name="locker.done" depends="locker.lib">
+  <target name="locker.done" depends="locker.comp">
     <touch file="${build-locker.dir}/all.complete" verbose="no"/>
     <path id="locker.classpath">
       <pathelement location="${build-locker.dir}/classes/library"/>
