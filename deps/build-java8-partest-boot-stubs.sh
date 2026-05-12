@@ -10,6 +10,7 @@ stage_dir="$1"
 legacy_stubs_jar="$2"
 work_dir="$stage_dir/build/source-deps/java8-partest-boot-stubs"
 out_jar="$stage_dir/build/java8-partest-boot-stubs.jar"
+buildmanager_out_jar="$stage_dir/build/java8-buildmanager-boot-stubs.jar"
 
 [[ -f "$legacy_stubs_jar" ]] || {
   echo "legacy Java 8 stubs jar does not exist: $legacy_stubs_jar" >&2
@@ -17,15 +18,22 @@ out_jar="$stage_dir/build/java8-partest-boot-stubs.jar"
 }
 
 rm -rf "$work_dir"
-mkdir -p "$work_dir"
+mkdir -p "$work_dir/runtime" "$work_dir/buildmanager"
 
-(cd "$work_dir" && jar xf "$legacy_stubs_jar" \
+(cd "$work_dir/runtime" && jar xf "$legacy_stubs_jar" \
   java/lang/CharSequence.class \
   java/lang/Iterable.class \
   java/lang/reflect/AnnotatedElement.class \
   java/util/Comparator.class \
   java/util/Iterator.class)
 
-jar cf "$out_jar" -C "$work_dir" .
+cp -R "$work_dir/runtime/." "$work_dir/buildmanager/"
+(cd "$work_dir/buildmanager" && jar xf "$legacy_stubs_jar" \
+  'java/io/ObjectInputStream$GetField.class' \
+  java/io/ObjectInputStream.class)
+
+jar cf "$out_jar" -C "$work_dir/runtime" .
+jar cf "$buildmanager_out_jar" -C "$work_dir/buildmanager" .
 
 echo "built $out_jar"
+echo "built $buildmanager_out_jar"

@@ -36,6 +36,7 @@ java8_override_jar="$stage_dir/build/java8-charbuffer-overrides.jar"
 java8_legacy_stubs_jar="$stage_dir/build/java8-legacy-stubs.jar"
 java8_filtered_stubs_jar="$stage_dir/build/java8-filtered-stubs.jar"
 java8_partest_boot_stubs_jar="$stage_dir/build/java8-partest-boot-stubs.jar"
+java8_buildmanager_boot_stubs_jar="$stage_dir/build/java8-buildmanager-boot-stubs.jar"
 legacy_reflect_beans_jar="$stage_dir/build/legacy-reflect-beans.jar"
 legacy_beans_meta_jar="$stage_dir/build/legacy-beans-meta.jar"
 java_bootclasspath="$java8_override_jar:$java8_legacy_stubs_jar:$java8_filtered_stubs_jar:$rt_jar"
@@ -43,11 +44,14 @@ partest_java_cmd="$stage_dir/build/partest-java"
 
 run_ant() {
   local ant_runtime_opts="$ant_opts"
-  local include_ant_boot="${1:-no}"
+  local runtime_mode="${1:-no}"
   shift || true
 
-  if [[ "$include_ant_boot" == "yes" && -f "$java8_partest_boot_stubs_jar" ]]; then
-    ant_runtime_opts="$ant_runtime_opts -Xbootclasspath/p:$java8_partest_boot_stubs_jar"
+  if [[ "$runtime_mode" == "active" ]]; then
+    ant_runtime_opts="$ant_runtime_opts -XX:ActiveProcessorCount=1"
+  fi
+  if [[ "$runtime_mode" == "boot" && -f "$java8_buildmanager_boot_stubs_jar" ]]; then
+    ant_runtime_opts="$ant_runtime_opts -Xbootclasspath/p:$java8_buildmanager_boot_stubs_jar"
   fi
   ant_runtime_opts="$ant_runtime_opts -Dpartest.javacmd=$partest_java_cmd"
 
@@ -82,6 +86,7 @@ EOF
 
 build_test_deps() {
   "$script_dir/deps/build-partest-jvm-deps.sh" "$stage_dir"
+  "$script_dir/deps/build-codelib.sh" "$stage_dir" "$java_bootclasspath"
   if [[ -d "$stage_dir/test/instrumented" ]]; then
     "$script_dir/deps/build-instrumented-speclib.sh" "$stage_dir" "$java_bootclasspath"
   fi
@@ -96,6 +101,16 @@ fi
 if [[ "$mode" == "test" || "$mode" == "all" ]]; then
   build_deps
   build_test_deps
-  run_ant yes test.suite test.continuations.suite test.scaladoc
+  if grep -q 'name="test.suite.no-buildmanager"' "$stage_dir/build.xml"; then
+    run_ant no test.t5293-map.java8
+    run_ant no test.suite.no-buildmanager test.continuations.suite
+    run_ant boot test.scaladoc
+    run_ant boot test.resident.java8
+    run_ant boot test.buildmanager.java8
+    run_ant active test.scalacheck.java8
+  else
+    run_ant no test.suite test.continuations.suite
+    run_ant boot test.scaladoc
+  fi
   run_ant no test.stability
 fi
