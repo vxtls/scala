@@ -5,6 +5,7 @@ REPO_URL="https://github.com/vxtls/scala.git"
 REPO_DIR="scala"
 REMOTE="origin"
 MARKER=".bootstrap-build-ok"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 GROUP1=(
   v1.0.0-b6-bootstrap
@@ -169,6 +170,13 @@ GROUP4=(
   v2.9.3-bootstrap
 )
 
+GROUP5=(
+  v2.9.3+ff5619-bootstrap
+  v2.9.3+55109d-bootstrap
+  v2.9.3+3921e5b-bootstrap
+  v2.10.0-M1-bootstrap
+)
+
 declare -A GROUP4_PREV=(
   [v2.8.2+1cbe06c-bootstrap]=v2.8-diverged+2bb5d58-bootstrap
   [v2.8-diverged+4253124-bootstrap]=v2.8.2+1cbe06c-bootstrap
@@ -209,6 +217,19 @@ declare -A GROUP4_JAVABOOTCLASSPATH_PREV=(
   [v2.9.1-bootstrap]=v2.8-diverged+2bb5d58-bootstrap
   [v2.9.2-bootstrap]=v2.8-diverged+2bb5d58-bootstrap
   [v2.9.3-bootstrap]=v2.8-diverged+2bb5d58-bootstrap
+)
+
+declare -A GROUP5_PREV=(
+  [v2.9.3+ff5619-bootstrap]=v2.9.3-bootstrap
+  [v2.9.3+55109d-bootstrap]=v2.9.3+ff5619-bootstrap
+  [v2.9.3+3921e5b-bootstrap]=v2.9.3+55109d-bootstrap
+  [v2.10.0-M1-bootstrap]=v2.9.3+3921e5b-bootstrap
+)
+
+declare -A GROUP5_MODE=(
+  [v2.9.3+ff5619-bootstrap]=build
+  [v2.9.3+55109d-bootstrap]=build
+  [v2.9.3+3921e5b-bootstrap]=build
 )
 
 EXPECTED_ERROR2=(
@@ -440,7 +461,7 @@ create_worktree() {
 create_all_worktrees() {
   local branch
 
-  for branch in "${GROUP1[@]}" "${GROUP2[@]}" "${GROUP3_MAKE[@]}" "${GROUP3_ANT[@]}" "${GROUP4[@]}"; do
+  for branch in "${GROUP1[@]}" "${GROUP2[@]}" "${GROUP3_MAKE[@]}" "${GROUP3_ANT[@]}" "${GROUP4[@]}" "${GROUP5[@]}"; do
     create_worktree "$branch"
   done
 }
@@ -637,6 +658,39 @@ build_group4() {
   done
 }
 
+build_group5() {
+  local branch
+  local prev="v2.9.3-bootstrap"
+  local effective_prev
+  local mode
+
+  for branch in "${GROUP5[@]}"; do
+    echo
+    echo "========== BUILD GROUP5: $branch =========="
+
+    pushd "../$branch" >/dev/null
+
+    if already_built "$branch"; then
+      popd >/dev/null
+      prev="$branch"
+      continue
+    fi
+
+    effective_prev="${GROUP5_PREV[$branch]:-$prev}"
+    if [[ "$effective_prev" != "$prev" ]]; then
+      echo ">>> Using explicit predecessor: $branch <- $effective_prev"
+    fi
+
+    mode="${GROUP5_MODE[$branch]:-all}"
+    run "$SCRIPT_DIR/build-scala.sh" "$(pwd)" "$(absolute_path "../$effective_prev")" "$mode" "$branch"
+
+    mark_built "$branch"
+
+    popd >/dev/null
+    prev="$branch"
+  done
+}
+
 main() {
   ensure_tools
   ensure_repo
@@ -647,6 +701,7 @@ main() {
   build_group3_make
   build_group3_ant
   build_group4
+  build_group5
 
   echo
   echo "All done."
