@@ -80,9 +80,6 @@ cat > "$partest_java_cmd" <<EOF
 exec "$JAVA_HOME/bin/java" "-noverify" "-Xbootclasspath/p:$java8_partest_boot_stubs_jar" "-Dpartest.debug.settings=-javabootclasspath $java_bootclasspath" "\$@"
 EOF
   chmod +x "$partest_java_cmd"
-  if [[ -d "$stage_dir/src/msil" ]]; then
-    "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number"
-  fi
 }
 
 build_test_deps() {
