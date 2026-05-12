@@ -67,6 +67,7 @@ run_ant() {
 
 build_deps() {
   "$script_dir/deps/build-jansi-1.4.sh" "$stage_dir"
+  "$script_dir/deps/build-typesafe-config-0.3.0.sh" "$stage_dir"
   "$script_dir/deps/build-legacy-reflect-beans.sh" "$stage_dir" "$starr_lib"
   "$script_dir/deps/build-legacy-beans-meta.sh" "$stage_dir" "$starr_lib"
   "$script_dir/deps/build-java8-legacy-stubs.sh" "$stage_dir"
