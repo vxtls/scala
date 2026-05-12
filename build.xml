@@ -22,7 +22,7 @@ END-USER TARGETS
   <target name="clean" depends="quick.clean"
     description="Removes binaries of compiler and library. Distributions are untouched."/>
 
-  <target name="test" depends="test.done"
+  <target name="test" depends="test.fork"
     description="Runs test suite and bootstrapping test on Scala compiler and library."/>
 
   <target name="test-opt"
@@ -157,8 +157,23 @@ PROPERTIES
   <!-- Generating version number -->
   <property file="${basedir}/build.number"/>
 
+  <condition property="bootstrap.java.home" value="${env.JAVA_HOME}">
+    <isset property="env.JAVA_HOME"/>
+  </condition>
+  <property name="bootstrap.java.home" value="${java.home}"/>
+  <property name="java.rt.jar" location="${bootstrap.java.home}/jre/lib/rt.jar"/>
+  <property name="javac.exe" location="${bootstrap.java.home}/bin/javac"/>
+  <property name="java8.stubs.rev" value="9"/>
+  <property name="java8.stubs.dir" location="${basedir}/build/java8-stubs-r${java8.stubs.rev}"/>
+  <property name="java8.stubs.jar" location="${basedir}/build/java8-stubs-r${java8.stubs.rev}.jar"/>
+  <property name="java8.ant.stubs.jar" location="${basedir}/build/java8-ant-stubs-r${java8.stubs.rev}.jar"/>
+  <property name="java8.runtime.stubs.jar" location="${basedir}/build/java8-runtime-stubs-r${java8.stubs.rev}.jar"/>
+  <property name="java8.test.java.cmd" location="${basedir}/build/java8-test-java"/>
+  <property name="java.boot.classpath" value="${java8.stubs.jar}:${java.rt.jar}"/>
+
   <!-- Additional command line arguments for scalac. They are added to all build targets -->
-  <property name="scalac.args" value=""/>
+  <property name="scalac.args" value="-Ydependent-method-types -javabootclasspath ${java.boot.classpath}"/>
+  <property name="partest.scalac.args" value="-javabootclasspath ${java.boot.classpath}"/>
   <property name="javac.args" value=""/>
 
   <!-- Sets location of pre-compiled libraries -->
@@ -166,6 +181,7 @@ PROPERTIES
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
   <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
   <property name="scalacheck.jar" value="${lib.dir}/scalacheck.jar"/>
+  <property name="maven.ant.tasks.jar" location="${lib.dir}/ant/maven-ant-tasks-2.1.1.jar"/>
 
   <!-- Sets location of build folders -->
   <property name="build.dir" value="${basedir}/build"/>
@@ -210,6 +226,917 @@ INITIALISATION
     <attribute name="action" default=""/>
     <sequential/>
   </macrodef>
+
+  <target name="prebuild.java8.stubs">
+    <available property="java8.stubs.available" file="${java8.stubs.jar}"/>
+  </target>
+
+  <target name="build.java8.stubs" depends="prebuild.java8.stubs" unless="java8.stubs.available">
+    <mkdir dir="${java8.stubs.dir}/src/java/lang"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/lang/reflect"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/io"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/nio"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/regex"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/awt/event"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/concurrent"/>
+    <mkdir dir="${java8.stubs.dir}/src/java/util/function"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/tree"/>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/event"/>
+    <mkdir dir="${java8.stubs.dir}/classes"/>
+    <echo file="${java8.stubs.dir}/src/java/lang/CharSequence.java"><![CDATA[
+package java.lang;
+public interface CharSequence {
+  public int length();
+  public char charAt(int index);
+  public CharSequence subSequence(int start, int end);
+  public String toString();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/lang/Iterable.java"><![CDATA[
+package java.lang;
+public interface Iterable<T> {
+  public java.util.Iterator<T> iterator();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/lang/reflect/AnnotatedElement.java"><![CDATA[
+package java.lang.reflect;
+import java.lang.annotation.Annotation;
+public interface AnnotatedElement {
+  public Annotation[] getAnnotations();
+  public Annotation[] getDeclaredAnnotations();
+  public boolean isAnnotationPresent(Class annotationClass);
+  public <T extends Annotation> T getAnnotation(Class<T> annotationClass);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/io/ObjectInputStream.java"><![CDATA[
+package java.io;
+public class ObjectInputStream extends InputStream {
+  public ObjectInputStream(InputStream in) throws IOException {}
+  public int read() throws IOException { return -1; }
+  public int readInt() throws IOException { return 0; }
+  public Object readObject() throws IOException, ClassNotFoundException { return null; }
+  public boolean readBoolean() throws IOException { return false; }
+  public void defaultReadObject() throws IOException, ClassNotFoundException {}
+  protected Class resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException { return null; }
+  protected Class resolveProxyClass(String[] interfaces) throws IOException, ClassNotFoundException { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/io/ObjectStreamClass.java"><![CDATA[
+package java.io;
+public class ObjectStreamClass {
+  public String getName() { return null; }
+  public long getSerialVersionUID() { return 0L; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/Buffer.java"><![CDATA[
+package java.nio;
+public abstract class Buffer {
+  public final Buffer clear() { return this; }
+  public final Buffer flip() { return this; }
+  public final int capacity() { return 0; }
+  public final int limit() { return 0; }
+  public final Buffer limit(int newLimit) { return this; }
+  public final int position() { return 0; }
+  public final Buffer position(int newPosition) { return this; }
+  public final int remaining() { return 0; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/nio/CharBuffer.java"><![CDATA[
+package java.nio;
+public abstract class CharBuffer extends Buffer implements CharSequence {
+  public static CharBuffer allocate(int capacity) { return null; }
+  public static CharBuffer wrap(CharSequence csq) { return null; }
+  public CharBuffer compact() { return this; }
+  public CharBuffer put(CharBuffer src) { return this; }
+  public CharBuffer put(char c) { return this; }
+  public CharBuffer get(char[] dst) { return this; }
+  public char get() { return 0; }
+  public int length() { return 0; }
+  public char charAt(int index) { return 0; }
+  public CharSequence subSequence(int start, int end) { return this; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Map.java"><![CDATA[
+package java.util;
+public interface Map<K,V> {
+  public int size();
+  public boolean isEmpty();
+  public boolean containsKey(Object key);
+  public boolean containsValue(Object value);
+  public V get(Object key);
+  public V put(K key, V value);
+  public V remove(Object key);
+  public void putAll(Map<? extends K,? extends V> map);
+  public void clear();
+  public Set<K> keySet();
+  public Collection<V> values();
+  public Set<Entry<K,V>> entrySet();
+  public interface Entry<K,V> {
+    public K getKey();
+    public V getValue();
+    public V setValue(V value);
+  }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Collection.java"><![CDATA[
+package java.util;
+public interface Collection<E> extends java.lang.Iterable<E> {
+  public Iterator<E> iterator();
+  public int size();
+  public boolean isEmpty();
+  public boolean contains(Object value);
+  public boolean add(E value);
+  public boolean addAll(Collection<? extends E> values);
+  public boolean remove(Object value);
+  public boolean containsAll(Collection<?> values);
+  public boolean removeAll(Collection<?> values);
+  public boolean retainAll(Collection<?> values);
+  public void clear();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Set.java"><![CDATA[
+package java.util;
+public interface Set<E> extends Collection<E> {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/List.java"><![CDATA[
+package java.util;
+public interface List<E> extends Collection<E> {
+  public E get(int index);
+  public E set(int index, E element);
+  public void add(int index, E element);
+  public boolean addAll(int index, Collection<? extends E> values);
+  public E remove(int index);
+  public List<E> subList(int fromIndex, int toIndex);
+  public ListIterator<E> listIterator();
+  public ListIterator<E> listIterator(int index);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/ListIterator.java"><![CDATA[
+package java.util;
+public interface ListIterator<E> extends Iterator<E> {
+  public boolean hasPrevious();
+  public E previous();
+  public int nextIndex();
+  public int previousIndex();
+  public void set(E value);
+  public void add(E value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Queue.java"><![CDATA[
+package java.util;
+public interface Queue<E> extends Collection<E> {
+  public boolean offer(E value);
+  public E poll();
+  public E peek();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Iterator.java"><![CDATA[
+package java.util;
+public interface Iterator<E> {
+  public boolean hasNext();
+  public E next();
+  public void remove();
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Arrays.java"><![CDATA[
+package java.util;
+public final class Arrays {
+  private Arrays() {}
+  public static <T> java.util.List<T> asList(T... a) { return null; }
+  public static void fill(int[] a, int val) {}
+  public static <T> void sort(T[] a, Comparator<? super T> c) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/Comparator.java"><![CDATA[
+package java.util;
+public interface Comparator<T> {
+  public int compare(T a, T b);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/Pattern.java"><![CDATA[
+package java.util.regex;
+public final class Pattern implements java.io.Serializable {
+  public static final int MULTILINE = 8;
+  public static Pattern compile(String regex) { return null; }
+  public static Pattern compile(String regex, int flags) { return null; }
+  public static String quote(String s) { return null; }
+  public Matcher matcher(CharSequence input) { return null; }
+  public String pattern() { return null; }
+  public String[] split(CharSequence input) { return null; }
+  public String[] split(CharSequence input, int limit) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/Matcher.java"><![CDATA[
+package java.util.regex;
+public final class Matcher {
+  public static String quoteReplacement(String s) { return null; }
+  public boolean matches() { return false; }
+  public boolean find() { return false; }
+  public String group() { return null; }
+  public String group(int group) { return null; }
+  public int groupCount() { return 0; }
+  public int start() { return 0; }
+  public int start(int group) { return 0; }
+  public int end() { return 0; }
+  public int end(int group) { return 0; }
+  public boolean lookingAt() { return false; }
+  public Matcher reset() { return this; }
+  public Matcher reset(CharSequence input) { return this; }
+  public String replaceAll(String replacement) { return null; }
+  public String replaceFirst(String replacement) { return null; }
+  public Matcher appendReplacement(StringBuffer sb, String replacement) { return this; }
+  public StringBuffer appendTail(StringBuffer sb) { return sb; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/regex/PatternSyntaxException.java"><![CDATA[
+package java.util.regex;
+public class PatternSyntaxException extends IllegalArgumentException {
+  public PatternSyntaxException(String desc, String regex, int index) { super(desc); }
+  public String getDescription() { return null; }
+  public int getIndex() { return 0; }
+  public String getPattern() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/Callable.java"><![CDATA[
+package java.util.concurrent;
+public interface Callable<V> {
+  public V call() throws Exception;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/Executor.java"><![CDATA[
+package java.util.concurrent;
+public interface Executor {
+  public void execute(Runnable command);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/Future.java"><![CDATA[
+package java.util.concurrent;
+public interface Future<V> {
+  public boolean cancel(boolean mayInterruptIfRunning);
+  public boolean isCancelled();
+  public boolean isDone();
+  public V get() throws InterruptedException, java.util.concurrent.ExecutionException;
+  public V get(long timeout, TimeUnit unit) throws InterruptedException, java.util.concurrent.ExecutionException, java.util.concurrent.TimeoutException;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ExecutionException.java"><![CDATA[
+package java.util.concurrent;
+public class ExecutionException extends Exception {
+  public ExecutionException() {}
+  public ExecutionException(String message) { super(message); }
+  public ExecutionException(Throwable cause) { super(cause); }
+  public ExecutionException(String message, Throwable cause) { super(message, cause); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/TimeoutException.java"><![CDATA[
+package java.util.concurrent;
+public class TimeoutException extends Exception {
+  public TimeoutException() {}
+  public TimeoutException(String message) { super(message); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ExecutorService.java"><![CDATA[
+package java.util.concurrent;
+public interface ExecutorService extends Executor {
+  public void shutdown();
+  public java.util.List<Runnable> shutdownNow();
+  public boolean isShutdown();
+  public boolean isTerminated();
+  public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
+  public <T> Future<T> submit(Callable<T> task);
+  public <T> Future<T> submit(Runnable task, T result);
+  public Future<?> submit(Runnable task);
+  public <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks) throws InterruptedException;
+  public <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException;
+  public <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException;
+  public <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ThreadFactory.java"><![CDATA[
+package java.util.concurrent;
+public interface ThreadFactory {
+  public Thread newThread(Runnable runnable);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/BlockingQueue.java"><![CDATA[
+package java.util.concurrent;
+public interface BlockingQueue<E> extends java.util.Queue<E> {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/LinkedBlockingQueue.java"><![CDATA[
+package java.util.concurrent;
+public class LinkedBlockingQueue<E> implements BlockingQueue<E> {
+  public LinkedBlockingQueue() {}
+  public LinkedBlockingQueue(int capacity) {}
+  public java.util.Iterator<E> iterator() { return null; }
+  public int size() { return 0; }
+  public boolean isEmpty() { return false; }
+  public boolean contains(Object value) { return false; }
+  public boolean add(E value) { return false; }
+  public boolean addAll(java.util.Collection<? extends E> values) { return false; }
+  public boolean remove(Object value) { return false; }
+  public boolean containsAll(java.util.Collection<?> values) { return false; }
+  public boolean removeAll(java.util.Collection<?> values) { return false; }
+  public boolean retainAll(java.util.Collection<?> values) { return false; }
+  public void clear() {}
+  public boolean offer(E value) { return false; }
+  public E poll() { return null; }
+  public E peek() { return null; }
+  public void put(E value) throws InterruptedException {}
+  public E take() throws InterruptedException { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ConcurrentLinkedQueue.java"><![CDATA[
+package java.util.concurrent;
+public class ConcurrentLinkedQueue<E> extends java.util.AbstractQueue<E> implements java.util.Queue<E> {
+  public ConcurrentLinkedQueue() {}
+  public java.util.Iterator<E> iterator() { return null; }
+  public int size() { return 0; }
+  public boolean offer(E value) { return false; }
+  public E poll() { return null; }
+  public E peek() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/RejectedExecutionHandler.java"><![CDATA[
+package java.util.concurrent;
+public interface RejectedExecutionHandler {
+  public void rejectedExecution(Runnable runnable, ThreadPoolExecutor executor);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/TimeUnit.java"><![CDATA[
+package java.util.concurrent;
+public enum TimeUnit {
+  NANOSECONDS, MICROSECONDS, MILLISECONDS, SECONDS, MINUTES, HOURS, DAYS;
+  public long convert(long sourceDuration, TimeUnit sourceUnit) { return 0L; }
+  public long toNanos(long duration) { return 0L; }
+  public long toMicros(long duration) { return 0L; }
+  public long toMillis(long duration) { return 0L; }
+  public long toSeconds(long duration) { return 0L; }
+  public long toMinutes(long duration) { return 0L; }
+  public long toHours(long duration) { return 0L; }
+  public long toDays(long duration) { return 0L; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ThreadPoolExecutor.java"><![CDATA[
+package java.util.concurrent;
+public class ThreadPoolExecutor implements ExecutorService {
+  public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue) {}
+  public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory) {}
+  public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, RejectedExecutionHandler handler) {}
+  public ThreadPoolExecutor(int corePoolSize, int maximumPoolSize, long keepAliveTime, TimeUnit unit, BlockingQueue<Runnable> workQueue, ThreadFactory threadFactory, RejectedExecutionHandler handler) {}
+  public int getCorePoolSize() { return 0; }
+  public void setCorePoolSize(int corePoolSize) {}
+  public void allowCoreThreadTimeOut(boolean value) {}
+  public BlockingQueue<Runnable> getQueue() { return null; }
+  public void execute(Runnable command) {}
+  public void shutdown() {}
+  public java.util.List<Runnable> shutdownNow() { return null; }
+  public boolean isShutdown() { return false; }
+  public boolean isTerminated() { return false; }
+  public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException { return false; }
+  public <T> Future<T> submit(Callable<T> task) { return null; }
+  public <T> Future<T> submit(Runnable task, T result) { return null; }
+  public Future<?> submit(Runnable task) { return null; }
+  public <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks) throws InterruptedException { return null; }
+  public <T> java.util.List<Future<T>> invokeAll(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException { return null; }
+  public <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks) throws InterruptedException, ExecutionException { return null; }
+  public <T> T invokeAny(java.util.Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException { return null; }
+  public static class CallerRunsPolicy implements RejectedExecutionHandler {
+    public CallerRunsPolicy() {}
+    public void rejectedExecution(Runnable runnable, ThreadPoolExecutor executor) {}
+  }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/Executors.java"><![CDATA[
+package java.util.concurrent;
+public final class Executors {
+  private Executors() {}
+  public static ExecutorService newCachedThreadPool() { return null; }
+  public static ExecutorService newCachedThreadPool(ThreadFactory threadFactory) { return null; }
+  public static ExecutorService newFixedThreadPool(int nThreads) { return null; }
+  public static ExecutorService newFixedThreadPool(int nThreads, ThreadFactory threadFactory) { return null; }
+  public static ThreadFactory defaultThreadFactory() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/concurrent/ConcurrentMap.java"><![CDATA[
+package java.util.concurrent;
+public interface ConcurrentMap<K,V> extends java.util.Map<K,V> {
+  public V putIfAbsent(K key, V value);
+  public boolean remove(Object key, Object value);
+  public boolean replace(K key, V oldValue, V newValue);
+  public V replace(K key, V value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/Predicate.java"><![CDATA[
+package java.util.function;
+public interface Predicate<T> {
+  public boolean test(T value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/Function.java"><![CDATA[
+package java.util.function;
+public interface Function<T,R> {
+  public R apply(T value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/UnaryOperator.java"><![CDATA[
+package java.util.function;
+public interface UnaryOperator<T> extends Function<T,T> {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/BiConsumer.java"><![CDATA[
+package java.util.function;
+public interface BiConsumer<T,U> {
+  public void accept(T first, U second);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/util/function/BiFunction.java"><![CDATA[
+package java.util.function;
+public interface BiFunction<T,U,R> {
+  public R apply(T first, U second);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Component.java"><![CDATA[
+package java.awt;
+public class Component {
+  public Component() {}
+  public int getWidth() { return 0; }
+  public Toolkit getToolkit() { return null; }
+  public void addComponentListener(java.awt.event.ComponentListener listener) {}
+  public void removeComponentListener(java.awt.event.ComponentListener listener) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Toolkit.java"><![CDATA[
+package java.awt;
+public abstract class Toolkit {
+  public static Toolkit getDefaultToolkit() { return null; }
+  public int getMenuShortcutKeyMask() { return 0; }
+  public EventQueue getSystemEventQueue() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/EventQueue.java"><![CDATA[
+package java.awt;
+public class EventQueue {
+  public void postEvent(AWTEvent event) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/BorderLayout.java"><![CDATA[
+package java.awt;
+public class BorderLayout {
+  public static final String CENTER = "Center";
+  public BorderLayout() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Font.java"><![CDATA[
+package java.awt;
+public class Font {
+  public static final int PLAIN = 0;
+  public Font(String name, int style, int size) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/AWTEvent.java"><![CDATA[
+package java.awt;
+public class AWTEvent extends java.util.EventObject {
+  public AWTEvent(Object source, int id) { super(source); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Container.java"><![CDATA[
+package java.awt;
+public class Container extends Component {
+  public Component add(Component comp) { return comp; }
+  public void add(Component comp, Object constraints) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ComponentEvent.java"><![CDATA[
+package java.awt.event;
+public class ComponentEvent extends java.awt.AWTEvent {
+  public ComponentEvent(java.awt.Component source, int id) { super(source, id); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowEvent.java"><![CDATA[
+package java.awt.event;
+public class WindowEvent extends java.awt.AWTEvent {
+  public static final int WINDOW_CLOSING = 201;
+  public WindowEvent(Object source, int id) { super(source, id); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowListener.java"><![CDATA[
+package java.awt.event;
+public interface WindowListener extends java.util.EventListener {
+  public void windowOpened(WindowEvent e);
+  public void windowClosing(WindowEvent e);
+  public void windowClosed(WindowEvent e);
+  public void windowIconified(WindowEvent e);
+  public void windowDeiconified(WindowEvent e);
+  public void windowActivated(WindowEvent e);
+  public void windowDeactivated(WindowEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/WindowAdapter.java"><![CDATA[
+package java.awt.event;
+public abstract class WindowAdapter implements WindowListener {
+  public void windowOpened(WindowEvent e) {}
+  public void windowClosing(WindowEvent e) {}
+  public void windowClosed(WindowEvent e) {}
+  public void windowIconified(WindowEvent e) {}
+  public void windowDeiconified(WindowEvent e) {}
+  public void windowActivated(WindowEvent e) {}
+  public void windowDeactivated(WindowEvent e) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/InputEvent.java"><![CDATA[
+package java.awt.event;
+public class InputEvent extends java.awt.AWTEvent {
+  public static final int SHIFT_MASK = 1;
+  public InputEvent(Object source, int id) { super(source, id); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/KeyEvent.java"><![CDATA[
+package java.awt.event;
+public class KeyEvent extends InputEvent {
+  public static final int VK_Q = 81;
+  public static final int VK_E = 69;
+  public static final int VK_L = 76;
+  public static final int VK_S = 83;
+  public KeyEvent(Object source, int id) { super(source, id); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionEvent.java"><![CDATA[
+package java.awt.event;
+public class ActionEvent extends java.awt.AWTEvent {
+  public ActionEvent(Object source, int id, String command) { super(source, id); }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ActionListener.java"><![CDATA[
+package java.awt.event;
+public interface ActionListener extends java.util.EventListener {
+  public void actionPerformed(ActionEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/Window.java"><![CDATA[
+package java.awt;
+public class Window extends Container {
+  public Window() {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ComponentListener.java"><![CDATA[
+package java.awt.event;
+public interface ComponentListener extends java.util.EventListener {
+  public void componentResized(ComponentEvent e);
+  public void componentMoved(ComponentEvent e);
+  public void componentShown(ComponentEvent e);
+  public void componentHidden(ComponentEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/java/awt/event/ComponentAdapter.java"><![CDATA[
+package java.awt.event;
+public abstract class ComponentAdapter implements ComponentListener {
+  public void componentResized(ComponentEvent e) {}
+  public void componentMoved(ComponentEvent e) {}
+  public void componentShown(ComponentEvent e) {}
+  public void componentHidden(ComponentEvent e) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JComponent.java"><![CDATA[
+package javax.swing;
+public class JComponent extends java.awt.Container {
+  public void setBorder(javax.swing.border.Border border) {}
+}
+]]></echo>
+    <mkdir dir="${java8.stubs.dir}/src/javax/swing/border"/>
+    <echo file="${java8.stubs.dir}/src/javax/swing/border/Border.java"><![CDATA[
+package javax.swing.border;
+public interface Border {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JApplet.java"><![CDATA[
+package javax.swing;
+public class JApplet extends JComponent {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/UIManager.java"><![CDATA[
+package javax.swing;
+public class UIManager {
+  public static void setLookAndFeel(String className) {}
+  public static String getCrossPlatformLookAndFeelClassName() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/WindowConstants.java"><![CDATA[
+package javax.swing;
+public interface WindowConstants {
+  public static final int DISPOSE_ON_CLOSE = 2;
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/BorderFactory.java"><![CDATA[
+package javax.swing;
+public class BorderFactory {
+  public static javax.swing.border.Border createEmptyBorder(int top, int left, int bottom, int right) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JFrame.java"><![CDATA[
+package javax.swing;
+public class JFrame extends java.awt.Window {
+  public JFrame() {}
+  public JFrame(String title) {}
+  public void setJMenuBar(JMenuBar menuBar) {}
+  public void setDefaultCloseOperation(int operation) {}
+  public void addWindowListener(java.awt.event.WindowListener listener) {}
+  public java.awt.Container getContentPane() { return null; }
+  public void pack() {}
+  public void setVisible(boolean value) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JPanel.java"><![CDATA[
+package javax.swing;
+public class JPanel extends JComponent {
+  public JPanel() {}
+  public JPanel(java.awt.BorderLayout layout) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JSplitPane.java"><![CDATA[
+package javax.swing;
+public class JSplitPane extends JComponent {
+  public static final int HORIZONTAL_SPLIT = 1;
+  public static final int VERTICAL_SPLIT = 0;
+  public JSplitPane() {}
+  public JSplitPane(int orientation, java.awt.Component left, java.awt.Component right) {}
+  public void setResizeWeight(double value) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JTextArea.java"><![CDATA[
+package javax.swing;
+public class JTextArea extends JComponent {
+  public JTextArea() {}
+  public JTextArea(int rows, int columns) {}
+  public void setText(String text) {}
+  public void setFont(java.awt.Font font) {}
+  public void setEditable(boolean value) {}
+  public int getColumnWidth() { return 1; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JTree.java"><![CDATA[
+package javax.swing;
+public class JTree extends JComponent {
+  public JTree() {}
+  public JTree(javax.swing.tree.TreeModel model) {}
+  public javax.swing.tree.TreeModel getModel() { return null; }
+  public void addTreeSelectionListener(javax.swing.event.TreeSelectionListener listener) {}
+  public void expandPath(javax.swing.tree.TreePath path) {}
+  public void collapsePath(javax.swing.tree.TreePath path) {}
+  public String convertValueToText(Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JMenuBar.java"><![CDATA[
+package javax.swing;
+public class JMenuBar extends JComponent {
+  public JMenu add(JMenu menu) { return menu; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JMenuItem.java"><![CDATA[
+package javax.swing;
+public class JMenuItem extends JComponent {
+  public JMenuItem() {}
+  public JMenuItem(String text) {}
+  public JMenuItem(Action action) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JMenu.java"><![CDATA[
+package javax.swing;
+public class JMenu extends JMenuItem {
+  public JMenu() {}
+  public JMenu(String text) {}
+  public JMenuItem add(JMenuItem item) { return item; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/Action.java"><![CDATA[
+package javax.swing;
+public interface Action extends java.awt.event.ActionListener {
+  public static final String ACCELERATOR_KEY = "AcceleratorKey";
+  public void putValue(String key, Object value);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/AbstractAction.java"><![CDATA[
+package javax.swing;
+public abstract class AbstractAction implements Action {
+  public AbstractAction() {}
+  public AbstractAction(String name) {}
+  public void putValue(String key, Object value) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/KeyStroke.java"><![CDATA[
+package javax.swing;
+public class KeyStroke {
+  public static KeyStroke getKeyStroke(int keyCode, int modifiers, boolean onKeyRelease) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/JScrollPane.java"><![CDATA[
+package javax.swing;
+public class JScrollPane extends JComponent {
+  public JScrollPane() {}
+  public JScrollPane(java.awt.Component view) {}
+  public JScrollPane(int vsbPolicy, int hsbPolicy) {}
+  public JScrollPane(java.awt.Component view, int vsbPolicy, int hsbPolicy) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreeModel.java"><![CDATA[
+package javax.swing.tree;
+public interface TreeModel {
+  public Object getRoot();
+  public Object getChild(Object parent, int index);
+  public int getChildCount(Object parent);
+  public boolean isLeaf(Object node);
+  public void valueForPathChanged(TreePath path, Object newValue);
+  public int getIndexOfChild(Object parent, Object child);
+  public void addTreeModelListener(javax.swing.event.TreeModelListener listener);
+  public void removeTreeModelListener(javax.swing.event.TreeModelListener listener);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/tree/TreePath.java"><![CDATA[
+package javax.swing.tree;
+public class TreePath {
+  public TreePath(Object path) {}
+  public Object getLastPathComponent() { return null; }
+  public TreePath pathByAddingChild(Object child) { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeSelectionListener.java"><![CDATA[
+package javax.swing.event;
+public interface TreeSelectionListener extends java.util.EventListener {
+  public void valueChanged(TreeSelectionEvent e);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeSelectionEvent.java"><![CDATA[
+package javax.swing.event;
+public class TreeSelectionEvent extends java.util.EventObject {
+  public TreeSelectionEvent(Object source) { super(source); }
+  public javax.swing.tree.TreePath getPath() { return null; }
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/TreeModelListener.java"><![CDATA[
+package javax.swing.event;
+public interface TreeModelListener extends java.util.EventListener {
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/ListModel.java"><![CDATA[
+package javax.swing;
+public interface ListModel {
+  public int getSize();
+  public Object getElementAt(int index);
+  public void addListDataListener(javax.swing.event.ListDataListener listener);
+  public void removeListDataListener(javax.swing.event.ListDataListener listener);
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/AbstractListModel.java"><![CDATA[
+package javax.swing;
+public abstract class AbstractListModel implements ListModel, java.io.Serializable {
+  public AbstractListModel() {}
+  public void addListDataListener(javax.swing.event.ListDataListener listener) {}
+  public void removeListDataListener(javax.swing.event.ListDataListener listener) {}
+  protected void fireIntervalAdded(Object source, int index0, int index1) {}
+}
+]]></echo>
+    <echo file="${java8.stubs.dir}/src/javax/swing/event/ListDataListener.java"><![CDATA[
+package javax.swing.event;
+public interface ListDataListener extends java.util.EventListener {
+}
+]]></echo>
+    <javac srcdir="${java8.stubs.dir}/src" destdir="${java8.stubs.dir}/classes"
+           source="1.8" target="1.8" fork="true" executable="${javac.exe}"
+           includeantruntime="false" includes="**/*.java"/>
+    <jar destfile="${java8.stubs.jar}" basedir="${java8.stubs.dir}/classes"/>
+  </target>
+
+  <target name="build.java8.test.java" depends="build.java8.stubs">
+    <delete file="${java8.runtime.stubs.jar}" quiet="yes"/>
+    <delete file="${java8.ant.stubs.jar}" quiet="yes"/>
+    <jar destfile="${java8.runtime.stubs.jar}">
+      <fileset dir="${java8.stubs.dir}/classes">
+        <include name="java/awt/**"/>
+        <include name="java/lang/CharSequence.class"/>
+        <include name="java/lang/Iterable.class"/>
+        <include name="java/lang/reflect/AnnotatedElement.class"/>
+        <include name="java/util/Comparator.class"/>
+        <include name="java/util/concurrent/ConcurrentMap.class"/>
+        <include name="java/util/function/**"/>
+        <include name="javax/swing/**"/>
+      </fileset>
+    </jar>
+    <jar destfile="${java8.ant.stubs.jar}">
+      <fileset dir="${java8.stubs.dir}/classes">
+        <include name="java/awt/**"/>
+        <include name="java/io/ObjectInputStream.class"/>
+        <include name="java/io/ObjectStreamClass.class"/>
+        <include name="java/lang/CharSequence.class"/>
+        <include name="java/lang/Iterable.class"/>
+        <include name="java/lang/reflect/AnnotatedElement.class"/>
+        <include name="java/util/Comparator.class"/>
+        <include name="java/util/concurrent/ConcurrentMap.class"/>
+        <include name="java/util/function/**"/>
+        <include name="javax/swing/**"/>
+      </fileset>
+    </jar>
+    <echo file="${java8.test.java.cmd}"><![CDATA[#!/bin/sh
+JAVA8_REPL_ARGS="-javabootclasspath ${java8.ant.stubs.jar}:${java.rt.jar}"
+exec "${JAVA_HOME:-${java.home}}/bin/java" -Xbootclasspath/p:"${java8.runtime.stubs.jar}" -Dscala.partest.debug.repl-args="$JAVA8_REPL_ARGS" "$@"
+]]></echo>
+    <chmod file="${java8.test.java.cmd}" perm="755"/>
+  </target>
+
+  <target name="prepare.java8.test.libs">
+    <delete dir="${build.dir}/java8-test-libs" quiet="yes"/>
+    <mkdir dir="${build.dir}/java8-test-libs/lib"/>
+    <mkdir dir="${build.dir}/java8-test-libs/annotations"/>
+    <mkdir dir="${build.dir}/java8-test-libs/enums"/>
+    <mkdir dir="${build.dir}/java8-test-libs/genericNest-src/nestpkg"/>
+    <mkdir dir="${build.dir}/java8-test-libs/genericNest"/>
+    <mkdir dir="${build.dir}/java8-test-libs/nest"/>
+    <mkdir dir="${build.dir}/java8-test-libs/methvsfield"/>
+    <javac srcdir="${partest.dir}/support/annotations" destdir="${build.dir}/java8-test-libs/annotations"
+           includes="SourceAnnotation.java,NestedAnnotations.java"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${build.dir}/java8-test-libs/lib/annotations.jar"
+         basedir="${build.dir}/java8-test-libs/annotations"/>
+    <javac srcdir="${partest.dir}/support/annotations" destdir="${build.dir}/java8-test-libs/enums"
+           includes="OuterEnum.java"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${build.dir}/java8-test-libs/lib/enums.jar"
+         basedir="${build.dir}/java8-test-libs/enums"/>
+    <echo file="${build.dir}/java8-test-libs/genericNest-src/nestpkg/OuterTParams.java"><![CDATA[
+package nestpkg;
+public class OuterTParams<A> {
+  public class InnerClass {
+    public A method() { return null; }
+  }
+}
+]]></echo>
+    <javac srcdir="${build.dir}/java8-test-libs/genericNest-src" destdir="${build.dir}/java8-test-libs/genericNest"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${build.dir}/java8-test-libs/lib/genericNest.jar"
+         basedir="${build.dir}/java8-test-libs/genericNest"/>
+    <javac srcdir="${partest.dir}/files/jvm" destdir="${build.dir}/java8-test-libs/nest"
+           includes="nest.java"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${build.dir}/java8-test-libs/lib/nest.jar"
+         basedir="${build.dir}/java8-test-libs/nest"/>
+    <javac srcdir="${partest.dir}/files/jvm" destdir="${build.dir}/java8-test-libs/methvsfield"
+           includes="methvsfield.java"
+           source="1.5" target="1.5" fork="true" executable="${javac.exe}" includeantruntime="false"/>
+    <jar destfile="${build.dir}/java8-test-libs/lib/methvsfield.jar"
+         basedir="${build.dir}/java8-test-libs/methvsfield"/>
+  </target>
+
+  <target name="build.instrumented.jar" depends="pack.done">
+    <exec executable="/bin/sh" dir="${partest.dir}/instrumented" failonerror="true">
+      <arg value="-c"/>
+      <arg value="rm -rf classes instrumented.jar &amp;&amp; mkdir classes &amp;&amp; JSOURCES=$(find library -name '*.java' -print) &amp;&amp; SOURCES=$(find library \( -name '*.scala' -o -name '*.java' \) -print) &amp;&amp; ../../build/pack/bin/scalac -bootclasspath ../../build/pack/lib/scala-library.jar -javabootclasspath '${java.boot.classpath}' -d classes $SOURCES &amp;&amp; '${javac.exe}' -cp ../../build/pack/lib/scala-library.jar -d classes $JSOURCES &amp;&amp; (cd classes &amp;&amp; jar cf ../instrumented.jar .)"/>
+    </exec>
+    <mkdir dir="${partest.dir}/files/speclib"/>
+    <copy file="${partest.dir}/instrumented/instrumented.jar"
+          tofile="${partest.dir}/files/speclib/instrumented.jar"/>
+  </target>
+
+  <target name="build.test.natives" depends="pack.done">
+    <mkdir dir="${partest.dir}/files/jvm/natives-jvm.obj"/>
+    <exec executable="${build-pack.dir}/bin/scalac" failonerror="true">
+      <arg value="-bootclasspath"/>
+      <arg value="${build-pack.dir}/lib/scala-library.jar"/>
+      <arg value="-javabootclasspath"/>
+      <arg value="${java.boot.classpath}"/>
+      <arg value="-d"/>
+      <arg value="${partest.dir}/files/jvm/natives-jvm.obj"/>
+      <arg value="${partest.dir}/files/jvm/natives.scala"/>
+    </exec>
+    <exec executable="${bootstrap.java.home}/bin/javah" dir="${partest.dir}/files/jvm" failonerror="true">
+      <arg value="-jni"/>
+      <arg value="-force"/>
+      <arg value="-classpath"/>
+      <arg value="natives-jvm.obj"/>
+      <arg value="-o"/>
+      <arg value="natives.h"/>
+      <arg value="Test$"/>
+    </exec>
+    <exec executable="/bin/sh" dir="${partest.dir}/files/jvm" failonerror="true" osfamily="unix">
+      <arg value="-c"/>
+      <arg value="gcc -c -I&quot;${bootstrap.java.home}/include&quot; -I&quot;${bootstrap.java.home}/include/$(uname | tr '[:upper:]' '[:lower:]')&quot; -o natives.o natives.c &amp;&amp; if [ &quot;$(uname)&quot; = Darwin ]; then gcc -dynamiclib -o libnatives.jnilib natives.o; else gcc -shared -Wl,-soname,libnatives-64 -o libnatives-64.so natives.o; fi"/>
+    </exec>
+  </target>
+
+  <target name="build.test.assets" depends="build.java8.test.java,prepare.java8.test.libs,build.instrumented.jar,build.test.natives"/>
+
+  <target name="test.fork" depends="build.test.assets" unless="java8.test.forked">
+    <exec executable="${ant.home}/bin/ant" failonerror="true">
+      <env key="ANT_OPTS" value="${env.ANT_OPTS} ${jvm.opts} -Xbootclasspath/p:${java8.ant.stubs.jar}"/>
+      <arg value="-Djava8.test.forked=true"/>
+      <arg value="-Dlib.starr.jar=${lib.starr.jar}"/>
+      <arg value="-Dcomp.starr.jar=${comp.starr.jar}"/>
+      <arg value="-Dfjbg.jar=${fjbg.jar}"/>
+      <arg value="test.done"/>
+    </exec>
+  </target>
 
   <!-- Determines OSGi string + maven extension. -->
   <target name="init.hasbuildnum">
@@ -274,7 +1201,7 @@ INITIALISATION
     <property name="scalac.args.optimise" value=""/>
   <!-- scalac.args.quickonly are added to quick.* targets but not others (particularly, locker.)
        This is to facilitate testing new command line options which do not yet exist in starr. -->
-    <property name="scalac.args.quickonly" value="-Ydependent-method-types"/>
+    <property name="scalac.args.quickonly" value=""/>
     <property name="scalac.args.all" value="${scalac.args} ${scalac.args.optimise}"/>
     <property name="scalac.args.quick" value="${scalac.args.all} ${scalac.args.quickonly}"/>
     <!-- This is the start time for the distribution -->
@@ -344,7 +1271,7 @@ INITIALISATION
 LOCAL REFERENCE BUILD (LOCKER)
 ============================================================================ -->
 
-  <target name="locker.start" depends="init,libs.forkjoinpack,libs.jlinepack,libs.fjbgpack">
+  <target name="locker.start" depends="init,build.java8.stubs,libs.forkjoinpack,libs.jlinepack,libs.fjbgpack">
     <condition property="locker.available">
       <available file="${build-locker.dir}/all.complete"/>
     </condition>
@@ -1794,15 +2721,16 @@ BOOTRAPING TEST AND TEST SUITE
     </antcall>
   </target>
 
-  <target name="test.run" depends="pack.done">
+  <target name="test.run" depends="build.java8.test.java,prepare.java8.test.libs,pack.done">
     <property name="partest.srcdir" value="files" />
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+    <partest showlog="yes" erroronfailed="yes" javacmd="${java8.test.java.cmd}"
              timeout="1200000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.optimise}">
+             scalacopts="${partest.scalac.args} ${scalac.args.optimise}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
+        <fileset dir="${build.dir}/java8-test-libs/lib" includes="*.jar" />
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
       <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala"/>
@@ -1810,15 +2738,16 @@ BOOTRAPING TEST AND TEST SUITE
     </partest>
   </target>
 
-  <target name="test.suite" depends="pack.done">
+  <target name="test.suite" depends="build.test.assets,pack.done">
     <property name="partest.srcdir" value="files" />
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+    <partest showlog="yes" erroronfailed="yes" javacmd="${java8.test.java.cmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.optimise}">
+             scalacopts="${partest.scalac.args} ${scalac.args.optimise}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
+        <fileset dir="${build.dir}/java8-test-libs/lib" includes="*.jar" />
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
       <postests  dir="${partest.dir}/${partest.srcdir}/pos" includes="*.scala"/>
@@ -1841,14 +2770,15 @@ BOOTRAPING TEST AND TEST SUITE
     </partest>
   </target>
 
-  <target name="test.continuations.suite" depends="pack.done">
+  <target name="test.continuations.suite" depends="build.java8.test.java,prepare.java8.test.libs,pack.done">
     <property name="partest.srcdir" value="files" />
-    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+    <partest showlog="yes" erroronfailed="yes" javacmd="${java8.test.java.cmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.optimise} -Xpluginsdir ${build-quick.dir}/misc/scala-devel/plugins -Xplugin-require:continuations -P:continuations:enable">
+             scalacopts="${partest.scalac.args} ${scalac.args.optimise} -Xpluginsdir ${build-quick.dir}/misc/scala-devel/plugins -Xplugin-require:continuations -P:continuations:enable">
       <compilationpath>
         <path refid="pack.classpath"/>
+        <fileset dir="${build.dir}/java8-test-libs/lib" includes="*.jar" />
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
       <negtests  dir="${partest.dir}/${partest.srcdir}/continuations-neg" includes="*.scala"/>
@@ -1856,8 +2786,20 @@ BOOTRAPING TEST AND TEST SUITE
     </partest>
   </target>
 
-  <target name="test.scaladoc" depends="pack.done">
-    <partest erroronfailed="yes" scalacopts="${scalac.args.optimise}">
+  <target name="test.scaladoc" depends="test.scaladoc.fork,test.scaladoc.done"/>
+
+  <target name="test.scaladoc.fork" depends="build.java8.test.java" unless="java8.test.forked">
+    <exec executable="${ant.home}/bin/ant" failonerror="true">
+      <env key="ANT_OPTS" value="${env.ANT_OPTS} ${jvm.opts} -Xbootclasspath/p:${java8.ant.stubs.jar}"/>
+      <arg value="-Djava8.test.forked=true"/>
+      <arg value="-Dlib.starr.jar=${lib.starr.jar}"/>
+      <arg value="-Dcomp.starr.jar=${comp.starr.jar}"/>
+      <arg value="test.scaladoc.done"/>
+    </exec>
+  </target>
+
+  <target name="test.scaladoc.done" depends="build.java8.test.java,pack.done" if="java8.test.forked">
+    <partest erroronfailed="yes" javacmd="${java8.test.java.cmd}" scalacopts="${partest.scalac.args} ${scalac.args.optimise}">
       <compilationpath>
         <path refid="pack.classpath"/>
       </compilationpath>
@@ -2177,10 +3119,21 @@ POSITIONS
 Binary compatibility testing
 ============================================================================ -->
 
-  <target name="bc.init" depends="init">
+  <target name="bc.pre" depends="init">
+    <available property="bc.maven.tasks.available" file="${maven.ant.tasks.jar}"/>
+  </target>
+
+  <target name="bc.skip" depends="bc.pre" unless="bc.maven.tasks.available">
+    <echo message="Skipping bc.run: ${maven.ant.tasks.jar} is missing."/>
+  </target>
+
+  <target name="bc.init" depends="bc.pre" if="bc.maven.tasks.available">
     <property name="bc-build.dir" value="${build.dir}/bc"/>
     <!-- Obtain mima -->
     <mkdir dir="${bc-build.dir}"/>
+    <taskdef uri="urn:maven-artifact-ant"
+             resource="org/apache/maven/artifact/ant/antlib.xml"
+             classpath="${maven.ant.tasks.jar}"/>
     <!-- Pull down MIMA -->
     <artifact:dependencies pathId="mima.classpath">
       <dependency groupId="com.typesafe" artifactId="mima-reporter_2.9.2" version="0.1.4"/>
@@ -2190,7 +3143,9 @@ Binary compatibility testing
     </artifact:dependencies>
   </target>
 
-  <target name="bc.run" depends="bc.init, pack.lib">
+  <target name="bc.run" depends="bc.skip,bc.run.available"/>
+
+  <target name="bc.run.available" depends="bc.init, pack.lib" if="bc.maven.tasks.available">
     <java 
        fork="true"
        failonerror="true"
