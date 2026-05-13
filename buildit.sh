@@ -499,8 +499,9 @@ create_worktree() {
     || fail "Remote branch does not exist: $REMOTE/$branch"
 
   if [[ -d "../$branch" ]]; then
-    echo ">>> Worktree directory already exists; syncing to $REMOTE/$branch: ../$branch"
-    run git -C "../$branch" reset --hard "$REMOTE/$branch"
+    echo ">>> Worktree directory already exists; reusing without syncing: ../$branch"
+    git -C "../$branch" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+      || fail "Existing directory is not a valid git worktree: ../$branch"
     return
   fi
 
