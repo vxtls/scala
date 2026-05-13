@@ -13,7 +13,8 @@ mode="$3"
 version_number="${4:-$(basename "$stage_dir" | sed 's/-bootstrap$//')}"
 ant_bin="${ANT_BIN:-ant}"
 ant_opts="${ANT_OPTS:--Xmx1536M}"
-base_java8_stubs="${BASE_JAVA8_STUBS:-$script_dir/v2.9.3-bootstrap/build/java8-stubs-r9.jar}"
+default_base_java8_stubs="$script_dir/v2.9.3-bootstrap/build/java8-stubs-r9.jar"
+base_java8_stubs="${BASE_JAVA8_STUBS:-$default_base_java8_stubs}"
 rt_jar="${JAVA_HOME:+$JAVA_HOME/jre/lib/rt.jar}"
 
 [[ "$mode" == "build" || "$mode" == "test" || "$mode" == "all" ]] || {
@@ -72,6 +73,7 @@ run_ant() {
 }
 
 build_deps() {
+  ensure_base_java8_stubs
   "$script_dir/deps/build-jansi-1.4.sh" "$stage_dir"
   "$script_dir/deps/build-typesafe-config-0.3.0.sh" "$stage_dir"
   "$script_dir/deps/build-legacy-reflect-beans.sh" "$stage_dir" "$starr_lib"
@@ -86,6 +88,31 @@ cat > "$partest_java_cmd" <<EOF
 exec "$JAVA_HOME/bin/java" "-noverify" "-Xbootclasspath/p:$java8_partest_boot_stubs_jar" "-Dpartest.debug.settings=-javabootclasspath $java_bootclasspath" "\$@"
 EOF
   chmod +x "$partest_java_cmd"
+}
+
+ensure_base_java8_stubs() {
+  local base_stage_dir
+
+  [[ -f "$base_java8_stubs" ]] && return 0
+
+  if [[ -n "${BASE_JAVA8_STUBS:-}" ]]; then
+    echo "base Java 8 stubs jar does not exist: $base_java8_stubs" >&2
+    exit 1
+  fi
+
+  base_stage_dir="$script_dir/v2.9.3-bootstrap"
+  [[ -f "$base_stage_dir/build.xml" ]] || {
+    echo "base Java 8 stubs stage is missing: $base_stage_dir" >&2
+    exit 1
+  }
+
+  echo "base Java 8 stubs jar is missing; building it from $base_stage_dir"
+  (cd "$base_stage_dir" && env ANT_OPTS="$ant_opts" "$ant_bin" build.java8.stubs)
+
+  [[ -f "$base_java8_stubs" ]] || {
+    echo "base Java 8 stubs jar was not produced: $base_java8_stubs" >&2
+    exit 1
+  }
 }
 
 build_test_deps() {
