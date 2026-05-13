@@ -81,6 +81,9 @@ build_deps() {
   "$script_dir/deps/build-filtered-java8-stubs.sh" "$stage_dir" "$base_java8_stubs"
   "$script_dir/deps/build-java8-charbuffer-overrides.sh" "$stage_dir" "$base_java8_stubs"
   "$script_dir/deps/build-java8-partest-boot-stubs.sh" "$stage_dir" "$java8_legacy_stubs_jar"
+  if [[ -d "$stage_dir/src/msil" ]]; then
+    "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number"
+  fi
   mkdir -p "$stage_dir/build"
 cat > "$partest_java_cmd" <<EOF
 #!/usr/bin/env bash

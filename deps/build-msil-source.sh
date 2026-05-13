@@ -17,6 +17,7 @@ classes_dir="$work_dir/classes"
 out_dir="$stage_dir/lib/extra"
 out_jar="$out_dir/msil-source.jar"
 javac_bin="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
+java_bin="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 
 [[ -d "$src_dir" ]] || {
   echo "vendored MSIL sources not found: $src_dir" >&2
@@ -43,7 +44,7 @@ find "$src_dir" -name '*.scala' \
   | sort > "$work_dir/scala-sources.list"
 
 if [[ -s "$work_dir/scala-sources.list" ]]; then
-  java -cp "$starr_comp_jar:$starr_lib_jar" scala.tools.nsc.Main \
+  "$java_bin" -cp "$starr_comp_jar:$starr_lib_jar" scala.tools.nsc.Main \
     -javabootclasspath "$java_bootclasspath" \
     -classpath "$classes_dir:$starr_lib_jar" \
     -d "$classes_dir" \
