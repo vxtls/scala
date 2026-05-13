@@ -41,6 +41,11 @@ legacy_reflect_beans_jar="$stage_dir/build/legacy-reflect-beans.jar"
 legacy_beans_meta_jar="$stage_dir/build/legacy-beans-meta.jar"
 java_bootclasspath="$java8_override_jar:$java8_legacy_stubs_jar:$java8_filtered_stubs_jar:$rt_jar"
 partest_java_cmd="$stage_dir/build/partest-java"
+scalac_args="-javabootclasspath $java_bootclasspath"
+
+if grep -q 'name="scalac.args" value="-Xmacros"' "$stage_dir/build.xml"; then
+  scalac_args="-Xmacros $scalac_args"
+fi
 
 run_ant() {
   local ant_runtime_opts="$ant_opts"
@@ -57,10 +62,11 @@ run_ant() {
 
   (cd "$stage_dir" && env ANT_OPTS="$ant_runtime_opts" "$ant_bin" \
     -Dversion.number="$version_number" \
+    -Djava6.home="$JAVA_HOME" \
     -Dlib.starr.jar="$starr_lib" \
     -Dcomp.starr.jar="$starr_comp" \
     -Dlegacy.beans.meta.jar="$legacy_beans_meta_jar" \
-    -Dscalac.args="-javabootclasspath $java_bootclasspath" \
+    -Dscalac.args="$scalac_args" \
     -Dpartest.javacmd="$partest_java_cmd" \
     "$@")
 }
