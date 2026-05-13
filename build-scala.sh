@@ -27,6 +27,7 @@ rt_jar="${JAVA_HOME:+$JAVA_HOME/jre/lib/rt.jar}"
 
 starr_lib="$prev_dir/build/pack/lib/scala-library.jar"
 starr_comp="$prev_dir/build/pack/lib/scala-compiler.jar"
+active_starr_comp="$starr_comp"
 [[ -f "$starr_lib" && -f "$starr_comp" ]] || {
   echo "previous stage pack jars are missing under $prev_dir/build/pack/lib" >&2
   exit 1
@@ -64,7 +65,8 @@ run_ant() {
     -Dversion.number="$version_number" \
     -Djava6.home="$JAVA_HOME" \
     -Dlib.starr.jar="$starr_lib" \
-    -Dcomp.starr.jar="$starr_comp" \
+    -Dcomp.starr.jar="$active_starr_comp" \
+    -Dlegacy.reflect.beans.jar="$legacy_reflect_beans_jar" \
     -Dlegacy.beans.meta.jar="$legacy_beans_meta_jar" \
     -Dscalac.args="$scalac_args" \
     -Dpartest.javacmd="$partest_java_cmd" \
@@ -84,12 +86,45 @@ build_deps() {
   if [[ -d "$stage_dir/src/msil" ]]; then
     "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number"
   fi
+  if needs_transition_bootstrap_compiler; then
+    run_ant no jline.done forkjoin.done libs.fjbgpack
+    build_transition_bootstrap_compiler
+  fi
   mkdir -p "$stage_dir/build"
 cat > "$partest_java_cmd" <<EOF
 #!/usr/bin/env bash
 exec "$JAVA_HOME/bin/java" "-noverify" "-Xbootclasspath/p:$java8_partest_boot_stubs_jar" "-Dpartest.debug.settings=-javabootclasspath $java_bootclasspath" "\$@"
 EOF
   chmod +x "$partest_java_cmd"
+}
+
+needs_transition_bootstrap_compiler() {
+  [[ "$version_number" == "v2.9.3+55109d-bootstrap" ]]
+}
+
+build_transition_bootstrap_compiler() {
+  local ant_home
+  local ant_jar
+
+  ant_home="${ANT_HOME:-}"
+  if [[ -z "$ant_home" && -n "$(command -v "$ant_bin" 2>/dev/null)" ]]; then
+    ant_home="$(cd "$(dirname "$(command -v "$ant_bin")")/.." && pwd -P)"
+  fi
+  ant_jar="$ant_home/lib/ant.jar"
+  [[ -f "$ant_jar" ]] || {
+    echo "ant.jar is required to build the transition bootstrap compiler: $ant_jar" >&2
+    exit 1
+  }
+
+  "$script_dir/deps/build-transition-bootstrap-compiler.sh" \
+    "$stage_dir" \
+    "$starr_lib" \
+    "$starr_comp" \
+    "$java_bootclasspath" \
+    "$legacy_reflect_beans_jar" \
+    "$legacy_beans_meta_jar" \
+    "$ant_jar"
+  active_starr_comp="$stage_dir/build/transition-bootstrap-compiler/classes"
 }
 
 resolve_base_java8_stubs() {
