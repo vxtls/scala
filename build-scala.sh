@@ -13,7 +13,7 @@ mode="$3"
 version_number="${4:-$(basename "$stage_dir" | sed 's/-bootstrap$//')}"
 ant_bin="${ANT_BIN:-ant}"
 ant_opts="${ANT_OPTS:--Xmx1536M}"
-base_java8_stubs="${BASE_JAVA8_STUBS:-$script_dir/../v2.9.3-bootstrap/build/java8-stubs-r9.jar}"
+base_java8_stubs="${BASE_JAVA8_STUBS:-$script_dir/v2.9.3-bootstrap/build/java8-stubs-r9.jar}"
 rt_jar="${JAVA_HOME:+$JAVA_HOME/jre/lib/rt.jar}"
 
 [[ "$mode" == "build" || "$mode" == "test" || "$mode" == "all" ]] || {
