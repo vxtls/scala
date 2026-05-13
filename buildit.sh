@@ -7,6 +7,7 @@ MARKER=".bootstrap-build-ok"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_DIR="${REPO_DIR:-$SCRIPT_DIR/scala}"
 WORKTREE_ROOT="${WORKTREE_ROOT:-$SCRIPT_DIR}"
+FORCE_VERIFY=0
 
 GROUP1=(
   v1.0.0-b6-bootstrap
@@ -302,6 +303,20 @@ run() {
   "$@"
 }
 
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --force-verify)
+        FORCE_VERIFY=1
+        ;;
+      *)
+        fail "Unknown option: $1"
+        ;;
+    esac
+    shift
+  done
+}
+
 expects_error2() {
   local branch="$1"
   local expected
@@ -465,6 +480,12 @@ already_built() {
   local current_commit
 
   if [[ -f "$MARKER" ]]; then
+    if [[ "$FORCE_VERIFY" -ne 1 ]]; then
+      echo ">>> Success marker already exists; skipping build: $branch"
+      echo ">>> marker: $(pwd)/$MARKER"
+      return 0
+    fi
+
     marker_commit="$(sed -n 's/^commit=//p' "$MARKER" | head -n 1)"
     current_commit="$(git rev-parse HEAD)"
 
@@ -759,6 +780,7 @@ build_group5() {
 }
 
 main() {
+  parse_args "$@"
   ensure_tools
   mkdir -p "$WORKTREE_ROOT"
   ensure_repo
