@@ -18,18 +18,25 @@ out_dir="$stage_dir/lib/extra"
 out_jar="$out_dir/msil-source.jar"
 javac_bin="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 java_bin="${JAVA_HOME:+$JAVA_HOME/bin/}java"
+compiler_cp="$starr_comp_jar:$starr_lib_jar"
 
 [[ -d "$src_dir" ]] || {
   echo "vendored MSIL sources not found: $src_dir" >&2
   exit 1
 }
-[[ -f "$starr_lib_jar" && -f "$starr_comp_jar" ]] || {
+[[ -f "$starr_lib_jar" && -e "$starr_comp_jar" ]] || {
   echo "starr jars are required to build vendored MSIL Scala sources" >&2
   exit 1
 }
 
 rm -rf "$classes_dir"
 mkdir -p "$classes_dir" "$out_dir"
+
+for runtime_jar in "$stage_dir/build/libs/fjbg.jar" "$stage_dir/build/libs/forkjoin.jar" "$stage_dir/build/libs/jline.jar"; do
+  if [[ -f "$runtime_jar" ]]; then
+    compiler_cp="$compiler_cp:$runtime_jar"
+  fi
+done
 
 find "$src_dir" -name '*.java' \
   ! -path '*/tests/*' \
@@ -44,7 +51,7 @@ find "$src_dir" -name '*.scala' \
   | sort > "$work_dir/scala-sources.list"
 
 if [[ -s "$work_dir/scala-sources.list" ]]; then
-  "$java_bin" -cp "$starr_comp_jar:$starr_lib_jar" scala.tools.nsc.Main \
+  "$java_bin" -cp "$compiler_cp" scala.tools.nsc.Main \
     -javabootclasspath "$java_bootclasspath" \
     -classpath "$classes_dir:$starr_lib_jar" \
     -d "$classes_dir" \
