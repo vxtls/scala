@@ -118,10 +118,10 @@ class DeprecatedClassManifestApis[T](ctag: ClassTag[T]) {
   def <:<(that: ClassManifest[_]): Boolean = ctag.tpe <:< that.tpe
 
   @deprecated("Use `tpe` to analyze the underlying type", "2.10.0")
-  def >:>(that: ClassManifest[_]): Boolean = that <:< ctag
+  def >:>(that: ClassManifest[_]): Boolean = that <:< ctag.asInstanceOf[ClassManifest[_]]
 
   @deprecated("Use `wrap` instead", "2.10.0")
-  def arrayManifest: ClassManifest[Array[T]] = ctag.wrap
+  def arrayManifest: ClassManifest[Array[T]] = ctag.wrap.asInstanceOf[ClassManifest[Array[T]]]
 
   @deprecated("Use a combination of `wrap` and `newArray` instead", "2.10.0")
   def newArray2(len: Int): Array[Array[T]] = ctag.wrap.newArray(len)
@@ -151,7 +151,7 @@ class DeprecatedClassManifestApis[T](ctag: ClassTag[T]) {
     }
 
   @deprecated("Use `@scala.collection.mutable.ArrayBuilder` object instead", "2.10.0")
-  def newArrayBuilder(): ArrayBuilder[T] = ArrayBuilder.make[T]()(ctag)
+  def newArrayBuilder(): ArrayBuilder[T] = ArrayBuilder.make[T]()(ctag.asInstanceOf[ClassManifest[T]])
 
   @deprecated("`typeArguments` is no longer supported, and will always return an empty list. Use `@scala.reflect.TypeTag` or `@scala.reflect.GroundTypeTag` to capture and analyze type arguments", "2.10.0")
   def typeArguments: List[OptManifest[_]] = List()

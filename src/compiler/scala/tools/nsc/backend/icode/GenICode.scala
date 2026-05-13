@@ -464,16 +464,8 @@ abstract class GenICode extends SubComponent  {
     /**
      * forMSIL
      */
-    private def msil_IsValuetypeInstMethod(msym: Symbol) = (
-      loaders.clrTypes.methods get msym exists (mMSIL =>
-        mMSIL.IsInstance && mMSIL.DeclaringType.IsValueType
-      )
-    )
-    private def msil_IsValuetypeInstField(fsym: Symbol) = (
-      loaders.clrTypes.fields get fsym exists (fMSIL =>
-        !fMSIL.IsStatic && fMSIL.DeclaringType.IsValueType
-      )
-    )
+    private def msil_IsValuetypeInstMethod(msym: Symbol) = false
+    private def msil_IsValuetypeInstField(fsym: Symbol) = false
 
     /**
      * forMSIL: Adds a local var, the emitted code requires one more slot on the stack as on entry

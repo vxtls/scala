@@ -13,6 +13,7 @@ trait Aliases {
   type Modifiers = mirror.Modifiers
   type Expr[+T] = mirror.Expr[T]
   type TypeTag[T] = mirror.TypeTag[T]
+  type GroundTypeTag[T] = mirror.GroundTypeTag[T]
 
   /** Creator/extractor objects for Expr and TypeTag values */
   val TypeTag = mirror.TypeTag

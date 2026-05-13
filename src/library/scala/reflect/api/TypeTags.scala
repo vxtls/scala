@@ -177,10 +177,11 @@ trait TypeTags { self: Universe =>
       def <:<(that: Manifest[_]): Boolean = ttag.tpe <:< that.tpe
 
       @deprecated("Use `tpe` to analyze the underlying type", "2.10.0")
-      def >:>(that: Manifest[_]): Boolean = that <:< ttag
+      def >:>(that: Manifest[_]): Boolean = that <:< ttag.asInstanceOf[Manifest[_]]
 
       @deprecated("Use `tpe` to analyze the type arguments", "2.10.0")
-      override def typeArguments: List[Manifest[_]] = ttag.tpe.typeArguments map (targ => rm.GroundTypeTag(targ))
+      override def typeArguments: List[Manifest[_]] =
+        ttag.tpe.typeArguments map (targ => rm.GroundTypeTag(targ).asInstanceOf[Manifest[_]])
     }
   }
 

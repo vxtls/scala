@@ -18,7 +18,7 @@ class Mirror(var classLoader: ClassLoader) extends Universe with api.Mirror {
   }
 
   def companionInstance(clazz: Symbol): AnyRef = {
-    val singleton = singletonInstance(classLoader, clazz.fullName)
+    val singleton = singletonInstance(clazz.fullName, classLoader)
     singleton
   }
 

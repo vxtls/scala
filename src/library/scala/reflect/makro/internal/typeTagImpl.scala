@@ -1,25 +1,29 @@
 package scala.reflect.makro
 
 import scala.reflect.api.Universe
+import scala.reflect.ClassTag
 
 /** This package is required by the compiler and <b>should not be used in client code</b>. */
 package object internal {
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeClassTag[T](u: Universe): ClassTag[T] = macro materializeClassTag_impl[T]
+  def materializeClassTag[T](u: Universe): ClassTag[T] =
+    throw new UnsupportedOperationException("bootstrap-only class tag materialization stub")
 
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeClassTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[ClassTag[T]] =
     c.Expr[Nothing](c.materializeClassTag(u.tree, implicitly[c.TypeTag[T]].tpe))(c.TypeTag.Nothing)
 
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeTypeTag[T](u: Universe): u.TypeTag[T] = macro materializeTypeTag_impl[T]
+  def materializeTypeTag[T](u: Universe): u.TypeTag[T] =
+    throw new UnsupportedOperationException("bootstrap-only type tag materialization stub")
 
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeTypeTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[u.value.TypeTag[T]] =
     c.Expr[Nothing](c.materializeTypeTag(u.tree, implicitly[c.TypeTag[T]].tpe, requireGroundTypeTag = false))(c.TypeTag.Nothing)
 
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
-  def materializeGroundTypeTag[T](u: Universe): u.GroundTypeTag[T] = macro materializeGroundTypeTag_impl[T]
+  def materializeGroundTypeTag[T](u: Universe): u.GroundTypeTag[T] =
+    throw new UnsupportedOperationException("bootstrap-only ground type tag materialization stub")
 
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   def materializeGroundTypeTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[u.value.GroundTypeTag[T]] =
