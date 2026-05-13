@@ -9,6 +9,7 @@ classes_dir="$work_dir/classes"
 sources_jar="$work_dir/typesafe-config-0.3.0-sources.jar"
 out_dir="$stage_dir/lib/extra"
 out_jar="$out_dir/typesafe-config-0.3.0.jar"
+javac_bin="${JAVA_HOME:?JAVA_HOME must point at a JDK 8 installation}/bin/javac"
 
 if [[ -f "$out_jar" ]]; then
   exit 0
@@ -31,6 +32,6 @@ if [[ ! -s "$source_list" ]]; then
   exit 1
 fi
 
-javac -source 1.5 -target 1.5 -d "$classes_dir" @"$source_list"
+"$javac_bin" -source 1.5 -target 1.5 -d "$classes_dir" @"$source_list"
 jar cf "$out_jar" -C "$classes_dir" .
 echo "built $out_jar"
