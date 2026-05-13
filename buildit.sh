@@ -2,10 +2,11 @@
 set -Eeuo pipefail
 
 REPO_URL="https://github.com/vxtls/scala.git"
-REPO_DIR="scala"
 REMOTE="origin"
 MARKER=".bootstrap-build-ok"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_DIR="${REPO_DIR:-$SCRIPT_DIR/scala}"
+WORKTREE_ROOT="${WORKTREE_ROOT:-$SCRIPT_DIR}"
 
 GROUP1=(
   v1.0.0-b6-bootstrap
@@ -331,6 +332,10 @@ absolute_path() {
   fi
 }
 
+stage_path() {
+  printf '%s/%s\n' "$WORKTREE_ROOT" "$1"
+}
+
 clean_make_tree() {
   run make distclean
 }
@@ -356,19 +361,19 @@ group4_starr_lib() {
 
   case "$prev" in
     way2scala-2.0-stage10-bootstrap)
-      absolute_path "../$prev/build/lib/scala2-library.jar"
+      absolute_path "$(stage_path "$prev")/build/lib/scala2-library.jar"
       ;;
     v2.0.0-bootstrap|v2.1.0-bootstrap|v2.1.0+bridge-bootstrap)
-      absolute_path "../$prev/build/quick/library"
+      absolute_path "$(stage_path "$prev")/build/quick/library"
       ;;
     v2.7.7+*-bootstrap|v2.8.*-bootstrap|v2.8-diverged*-bootstrap|v2.9*-bootstrap)
-      absolute_path "../$prev/build/pack/lib/scala-library.jar"
+      absolute_path "$(stage_path "$prev")/build/pack/lib/scala-library.jar"
       ;;
     v2.7.2+v2.7.3-starr-bootstrap|v2.7.[3-9]*-bootstrap|v2.7.*+v2.7.*-bootstrap)
-      absolute_path "../$prev/build/quick/classes/library"
+      absolute_path "$(stage_path "$prev")/build/quick/classes/library"
       ;;
     *)
-      absolute_path "../$prev/build/quick/lib/library"
+      absolute_path "$(stage_path "$prev")/build/quick/lib/library"
       ;;
   esac
 }
@@ -378,25 +383,25 @@ group4_starr_comp() {
 
   case "$prev" in
     way2scala-2.0-stage10-bootstrap)
-      absolute_path "../$prev/build/lib/scala2-compiler.jar"
+      absolute_path "$(stage_path "$prev")/build/lib/scala2-compiler.jar"
       ;;
     v2.0.0-bootstrap|v2.1.0-bootstrap|v2.1.0+bridge-bootstrap)
-      absolute_path "../$prev/build/quick/compiler"
+      absolute_path "$(stage_path "$prev")/build/quick/compiler"
       ;;
     v2.7.7+*-bootstrap|v2.8.*-bootstrap|v2.8-diverged*-bootstrap|v2.9*-bootstrap)
-      absolute_path "../$prev/build/pack/lib/scala-compiler.jar"
+      absolute_path "$(stage_path "$prev")/build/pack/lib/scala-compiler.jar"
       ;;
     v2.7.2+v2.7.3-starr-bootstrap|v2.7.[3-9]*-bootstrap|v2.7.*+v2.7.*-bootstrap)
-      absolute_path "../$prev/build/quick/classes/compiler"
+      absolute_path "$(stage_path "$prev")/build/quick/classes/compiler"
       ;;
     *)
-      absolute_path "../$prev/build/quick/lib/compiler"
+      absolute_path "$(stage_path "$prev")/build/quick/lib/compiler"
       ;;
   esac
 }
 
 group4_fjbg_jar() {
-  absolute_path "../way2scala-2.0-stage10-bootstrap/distribs/unix/scala-2.0-stage10-bootstrap/share/scala/lib/fjbg.jar"
+  absolute_path "$(stage_path "way2scala-2.0-stage10-bootstrap")/distribs/unix/scala-2.0-stage10-bootstrap/share/scala/lib/fjbg.jar"
 }
 
 group4_uses_source_fjbg() {
@@ -494,21 +499,24 @@ mark_built() {
 create_worktree() {
   local branch="$1"
   local remote_ref="refs/remotes/$REMOTE/$branch"
+  local worktree_dir
+
+  worktree_dir="$(stage_path "$branch")"
 
   git rev-parse --verify --quiet "$remote_ref" >/dev/null \
     || fail "Remote branch does not exist: $REMOTE/$branch"
 
-  if [[ -d "../$branch" ]]; then
-    echo ">>> Worktree directory already exists; reusing without syncing: ../$branch"
-    git -C "../$branch" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
-      || fail "Existing directory is not a valid git worktree: ../$branch"
+  if [[ -d "$worktree_dir" ]]; then
+    echo ">>> Worktree directory already exists; reusing without syncing: $worktree_dir"
+    git -C "$worktree_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+      || fail "Existing directory is not a valid git worktree: $worktree_dir"
     return
   fi
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
-    run git worktree add "../$branch" "$branch"
+    run git worktree add "$worktree_dir" "$branch"
   else
-    run git worktree add -b "$branch" "../$branch" "$REMOTE/$branch"
+    run git worktree add -b "$branch" "$worktree_dir" "$REMOTE/$branch"
   fi
 }
 
@@ -528,7 +536,7 @@ build_group1() {
     echo
     echo "========== BUILD GROUP1: $branch =========="
 
-    pushd "../$branch" >/dev/null
+    pushd "$(stage_path "$branch")" >/dev/null
 
     if already_built "$branch"; then
       popd >/dev/null
@@ -542,10 +550,11 @@ build_group1() {
       run_build "$branch" make
     elif uses_bootstrap_home; then
       local bootstrap_home
-      bootstrap_home="$(absolute_path "../$prev")"
+      bootstrap_home="$(absolute_path "$(stage_path "$prev")")"
       run_build "$branch" make BOOTSTRAP_HOME="$bootstrap_home"
     else
-      local scalac="../$prev/bin/scalac"
+      local scalac
+      scalac="$(stage_path "$prev")/bin/scalac"
       [[ -x "$scalac" ]] || fail "Previous scalac not found: $scalac"
       run_build "$branch" env BOOTSTRAP_SCALAC="$scalac" make
     fi
@@ -564,7 +573,7 @@ build_group2() {
     echo
     echo "========== BUILD GROUP2: $branch =========="
 
-    pushd "../$branch" >/dev/null
+    pushd "$(stage_path "$branch")" >/dev/null
 
     if already_built "$branch"; then
       popd >/dev/null
@@ -590,7 +599,7 @@ build_group3_make() {
     echo
     echo "========== BUILD GROUP3_MAKE: $branch =========="
 
-    pushd "../$branch" >/dev/null
+    pushd "$(stage_path "$branch")" >/dev/null
 
     if already_built "$branch"; then
       popd >/dev/null
@@ -598,8 +607,8 @@ build_group3_make() {
       continue
     fi
 
-    [[ -d "../$prev" ]] || fail "BOOTSTRAP_HOME not found: ../$prev"
-    bootstrap_home="$(absolute_path "../$prev")"
+    [[ -d "$(stage_path "$prev")" ]] || fail "BOOTSTRAP_HOME not found: $(stage_path "$prev")"
+    bootstrap_home="$(absolute_path "$(stage_path "$prev")")"
 
     clean_make_tree
     run make BOOTSTRAP_HOME="$bootstrap_home" all
@@ -618,7 +627,7 @@ build_group3_ant() {
     echo
     echo "========== BUILD GROUP3_ANT: $branch =========="
 
-    pushd "../$branch" >/dev/null
+    pushd "$(stage_path "$branch")" >/dev/null
 
     if already_built "$branch"; then
       popd >/dev/null
@@ -654,7 +663,7 @@ build_group4() {
     echo
     echo "========== BUILD GROUP4: $branch =========="
 
-    pushd "../$branch" >/dev/null
+    pushd "$(stage_path "$branch")" >/dev/null
 
     if already_built "$branch"; then
       popd >/dev/null
@@ -696,7 +705,7 @@ build_group4() {
     java_stub_prev="${GROUP4_JAVABOOTCLASSPATH_PREV[$branch]:-}"
     if [[ -n "$java_stub_prev" ]]; then
       [[ -n "${JAVA_HOME:-}" ]] || fail "$branch requires JAVA_HOME to set the Java bootclasspath"
-      java_stub_jar="$(absolute_path "../$java_stub_prev/build/java8-stubs.jar")"
+      java_stub_jar="$(absolute_path "$(stage_path "$java_stub_prev")/build/java8-stubs.jar")"
       rt_jar="$(absolute_path "$JAVA_HOME/jre/lib/rt.jar")"
       ant_props+=("-Dscalac.args=-javabootclasspath $java_stub_jar:$rt_jar")
     fi
@@ -722,7 +731,7 @@ build_group5() {
     echo
     echo "========== BUILD GROUP5: $branch =========="
 
-    pushd "../$branch" >/dev/null
+    pushd "$(stage_path "$branch")" >/dev/null
 
     if already_built "$branch"; then
       popd >/dev/null
@@ -736,7 +745,7 @@ build_group5() {
     fi
 
     mode="${GROUP5_MODE[$branch]:-all}"
-    run "$SCRIPT_DIR/build-scala.sh" "$(pwd)" "$(absolute_path "../$effective_prev")" "$mode" "$branch"
+    run "$SCRIPT_DIR/build-scala.sh" "$(pwd)" "$(absolute_path "$(stage_path "$effective_prev")")" "$mode" "$branch"
 
     mark_built "$branch"
 
@@ -747,6 +756,7 @@ build_group5() {
 
 main() {
   ensure_tools
+  mkdir -p "$WORKTREE_ROOT"
   ensure_repo
   create_all_worktrees
 
