@@ -508,8 +508,12 @@ create_worktree() {
 
   if [[ -d "$worktree_dir" ]]; then
     echo ">>> Worktree directory already exists; reusing without syncing: $worktree_dir"
-    git -C "$worktree_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
-      || fail "Existing directory is not a valid git worktree: $worktree_dir"
+    if ! git -C "$worktree_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      echo ">>> Existing worktree metadata is invalid; attempting repair: $worktree_dir"
+      run git worktree repair "$worktree_dir"
+      git -C "$worktree_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+        || fail "Existing directory is not a valid git worktree after repair: $worktree_dir"
+    fi
     return
   fi
 
