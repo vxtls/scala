@@ -454,8 +454,8 @@ trait Definitions extends api.StandardDefinitions {
          def ReflectRuntimeUniverse      = if (ReflectRuntimePackage != NoSymbol) getMemberValue(ReflectRuntimePackage, nme.universe) else NoSymbol
          def ReflectRuntimeCurrentMirror = if (ReflectRuntimePackage != NoSymbol) getMemberMethod(ReflectRuntimePackage, nme.currentMirror) else NoSymbol
 
-    lazy val PartialManifestClass  = requiredClass[scala.reflect.ClassManifest[_]]
-    lazy val PartialManifestModule = requiredModule[scala.reflect.ClassManifest.type]
+    lazy val PartialManifestClass  = rootMirror.getRequiredClassNoDealias("scala.reflect.ClassManifest")
+    lazy val PartialManifestModule = rootMirror.getRequiredModule("scala.reflect.ClassManifest")
     lazy val FullManifestClass     = requiredClass[scala.reflect.Manifest[_]]
     lazy val FullManifestModule    = requiredModule[scala.reflect.Manifest.type]
     lazy val OptManifestClass      = requiredClass[scala.reflect.OptManifest[_]]

@@ -69,6 +69,12 @@ trait Mirrors extends api.Mirrors {
       }
     }
 
+    def getClassByNameNoDealias(fullname: Name): TypeSymbol =
+      getModuleOrClass(fullname.toTypeName) match {
+        case x: TypeSymbol => x
+        case _             => MissingRequirementError.notFound("class " + fullname)
+      }
+
     override def staticModule(fullName: String): ModuleSymbol = getRequiredModule(fullName)
 
     def getModule(fullname: Name): ModuleSymbol =
@@ -92,6 +98,12 @@ trait Mirrors extends api.Mirrors {
         case _              => MissingRequirementError.notFound("class " + fullname)
       }
 
+    def getRequiredClassNoDealias(fullname: String): TypeSymbol =
+      getClassByNameNoDealias(newTypeNameCached(fullname)) match {
+        case x: TypeSymbol => x
+        case _             => MissingRequirementError.notFound("class " + fullname)
+      }
+
     def getRequiredModule(fullname: String): ModuleSymbol =
       getModule(newTermNameCached(fullname))
 
@@ -108,6 +120,9 @@ trait Mirrors extends api.Mirrors {
 
     def requiredClass[T: ClassTag] : ClassSymbol =
       getRequiredClass(erasureName[T])
+
+    def requiredClassNoDealias[T: ClassTag] : TypeSymbol =
+      getRequiredClassNoDealias(erasureName[T])
 
     // TODO: What syntax do we think should work here? Say you have an object
     // like scala.Predef.  You can't say requiredModule[scala.Predef] since there's
