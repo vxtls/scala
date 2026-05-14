@@ -593,7 +593,7 @@ trait Implicits {
             typed1(itree, EXPRmode, wildPt)
 
         if (context.hasErrors)
-          return fail("typed implicit %s has errors".format(info.sym.fullLocationString))
+          return fail("typed implicit " + info.sym.fullLocationString + " has errors")
 
         Statistics.incCounter(typedImplicits)
 
