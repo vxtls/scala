@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 if [[ $# -lt 3 || $# -gt 4 ]]; then
-  echo "usage: $0 <stage-dir> <previous-stage-dir> <build|test|all> [version-number]" >&2
+  echo "usage: $0 <stage-dir> <previous-stage-dir> <build|test|all|locker-pack> [version-number]" >&2
   exit 2
 fi
 
@@ -16,8 +16,8 @@ ant_opts="${ANT_OPTS:--Xmx1536M}"
 base_java8_stubs="${BASE_JAVA8_STUBS:-}"
 rt_jar="${JAVA_HOME:+$JAVA_HOME/jre/lib/rt.jar}"
 
-[[ "$mode" == "build" || "$mode" == "test" || "$mode" == "all" ]] || {
-  echo "mode must be build, test, or all" >&2
+[[ "$mode" == "build" || "$mode" == "test" || "$mode" == "all" || "$mode" == "locker-pack" ]] || {
+  echo "mode must be build, test, all, or locker-pack" >&2
   exit 2
 }
 [[ -n "${JAVA_HOME:-}" && -f "$rt_jar" ]] || {
@@ -251,6 +251,20 @@ build_classtag_string_transition() {
   run_ant no build
 }
 
+build_locker_pack_transition() {
+  local pack_lib="$stage_dir/build/pack/lib"
+
+  build_bootstrap_lib_jars
+
+  rm -rf "$stage_dir/build/locker" "$stage_dir/build/quick" "$stage_dir/build/pack" "$stage_dir/build/strap" "$stage_dir/build/palo"
+  run_ant no locker.done
+
+  mkdir -p "$pack_lib"
+  "$JAVA_HOME/bin/jar" cf "$pack_lib/scala-library.jar" -C "$stage_dir/build/locker/classes/library" .
+  "$JAVA_HOME/bin/jar" cf "$pack_lib/scala-reflect.jar" -C "$stage_dir/build/locker/classes/reflect" .
+  "$JAVA_HOME/bin/jar" cf "$pack_lib/scala-compiler.jar" -C "$stage_dir/build/locker/classes/compiler" .
+}
+
 build_transition_bootstrap_compiler() {
   local ant_home
   local ant_jar
@@ -294,6 +308,12 @@ build_test_deps() {
     "$script_dir/deps/build-instrumented-speclib.sh" "$stage_dir" "$java_bootclasspath"
   fi
 }
+
+if [[ "$mode" == "locker-pack" ]]; then
+  run_ant no locker.clean
+  build_deps
+  build_locker_pack_transition
+fi
 
 if [[ "$mode" == "build" || "$mode" == "all" ]]; then
   run_ant no locker.clean clean
