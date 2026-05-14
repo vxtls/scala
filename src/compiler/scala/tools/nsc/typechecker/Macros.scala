@@ -45,6 +45,14 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
   import MacrosStats._
   def globalSettings = global.settings
 
+  private def macroRuntimeAttachment(tree: Tree): Option[MacroRuntimeAttachment] = {
+    var result: MacroRuntimeAttachment = null
+    for (att <- tree.attachments.all)
+      if (att.isInstanceOf[MacroRuntimeAttachment])
+        result = att.asInstanceOf[MacroRuntimeAttachment]
+    Option(result)
+  }
+
   val globalMacroCache = collection.mutable.Map[Any, Any]()
   val perRunMacroCache = perRunCaches.newMap[Symbol, collection.mutable.Map[Any, Any]]
 
@@ -758,7 +766,7 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
     val macroDef   = expandee.symbol
     val runtime    = macroRuntime(macroDef) orElse { return None }
     val prefixTree = expandee.collect{ case Select(qual, name) => qual }.headOption.getOrElse(EmptyTree)
-    val context    = expandee.attachments.get[MacroRuntimeAttachment].flatMap(_.macroContext).getOrElse(macroContext(typer, prefixTree, expandee))
+    val context    = macroRuntimeAttachment(expandee).flatMap(_.macroContext).getOrElse(macroContext(typer, prefixTree, expandee))
     var typeArgs   = List[Tree]()
     val exprArgs   = ListBuffer[List[Expr[_]]]()
     def collectMacroArgs(tree: Tree): Unit = tree match {
@@ -1249,7 +1257,7 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
       override def transform(tree: Tree) = super.transform(tree match {
         // todo. expansion should work from the inside out
         case wannabe if (delayed contains wannabe) && calculateUndetparams(wannabe).isEmpty =>
-          val context = wannabe.attachments.get[MacroRuntimeAttachment].get.typerContext
+          val context = macroRuntimeAttachment(wannabe).get.typerContext
           delayed -= wannabe
           context.implicitsEnabled = typer.context.implicitsEnabled
           context.enrichmentEnabled = typer.context.enrichmentEnabled

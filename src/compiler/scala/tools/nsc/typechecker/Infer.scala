@@ -686,7 +686,12 @@ trait Infer {
      *  - namesOK is false when there's an invalid use of named arguments
      */
     private def checkNames(argtpes: List[Type], params: List[Symbol]) = {
-      val argPos = Array.fill(argtpes.length)(-1)
+      val argPos = new Array[Int](argtpes.length)
+      var argPosIndex = 0
+      while (argPosIndex < argPos.length) {
+        argPos(argPosIndex) = -1
+        argPosIndex += 1
+      }
       var positionalAllowed, namesOK = true
       var index = 0
       val argtpes1 = argtpes map {
@@ -1785,4 +1790,3 @@ trait Infer {
     }
   }
 }
-
