@@ -13,7 +13,7 @@ import classfile.ClassfileParser
 import reflect.internal.Flags._
 import reflect.internal.MissingRequirementError
 import util.Statistics._
-import scala.tools.nsc.io.{ AbstractFile, MsilFile }
+import scala.tools.nsc.io.AbstractFile
 
 /** This class ...
  *
@@ -253,16 +253,6 @@ abstract class SymbolLoaders {
     override def sourcefile: Option[AbstractFile] = classfileParser.srcfile
   }
 
-  class MsilFileLoader(msilFile: MsilFile) extends SymbolLoader {
-    private def typ = msilFile.msilType
-    private object typeParser extends clr.TypeParser {
-      val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-    }
-
-    protected def description = "MsilFile "+ typ.FullName + ", assembly "+ typ.Assembly.FullName
-    protected def doComplete(root: Symbol) { typeParser.parse(typ, root) }
-  }
-
   class SourcefileLoader(val srcfile: AbstractFile) extends SymbolLoader {
     protected def description = "source file "+ srcfile.toString
     override def fromSource = true
@@ -275,9 +265,10 @@ abstract class SymbolLoaders {
     protected def doComplete(root: Symbol) { root.sourceModule.initialize }
   }
 
-  object clrTypes extends clr.CLRTypes {
-    val global: SymbolLoaders.this.global.type = SymbolLoaders.this.global
-    if (global.forMSIL) init()
+  object clrTypes {
+    def isNonEnumValuetype(sym: Symbol) = false
+    def isAddressOf(sym: Symbol) = false
+    def mdgptrcls4clssym(sym: Symbol) = sym
   }
 
   /** used from classfile parser to avoid cyclies */
