@@ -112,7 +112,15 @@ needs_anyval_class_transition() {
   [[ "$version_number" == "v2.10.0-M2+be11c92-bootstrap" ]]
 }
 
+needs_compiler_first_transition() {
+  [[ "$version_number" == "v2.10.0-M3+1708a7f-bootstrap" ]]
+}
+
 build_anyval_class_transition() {
+  build_compiler_first_transition
+}
+
+build_compiler_first_transition() {
   local transition_comp="$stage_dir/build/locker/classes/compiler"
   local seeded_lib="$stage_dir/build/locker/classes/library"
 
@@ -179,8 +187,8 @@ build_test_deps() {
 if [[ "$mode" == "build" || "$mode" == "all" ]]; then
   run_ant no locker.clean clean
   build_deps
-  if needs_anyval_class_transition; then
-    build_anyval_class_transition
+  if needs_anyval_class_transition || needs_compiler_first_transition; then
+    build_compiler_first_transition
   else
     run_ant no build
   fi
