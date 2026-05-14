@@ -133,7 +133,8 @@ needs_compiler_first_transition() {
 
 needs_previous_forkjoin_jar() {
   [[ "$version_number" == "v2.10.0-M3+6bb5975-bootstrap" ]] \
-    || [[ "$version_number" == "v2.10.0-M3+252a448-bootstrap" ]]
+    || [[ "$version_number" == "v2.10.0-M3+252a448-bootstrap" ]] \
+    || [[ "$version_number" == "v2.10.0-M3+bdff66e-bootstrap" ]]
 }
 
 build_anyval_class_transition() {
