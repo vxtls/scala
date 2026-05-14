@@ -175,8 +175,13 @@ trait TypeTags { self: Universe =>
    *
    * @see [[scala.reflect.base.TypeTags]]
    */
+  @annotation.implicitNotFound(msg = "No ConcreteTypeTag available for ${T}")
+  trait ConcreteTypeTag[T] extends AbsTypeTag[T] with Equals with Serializable {
+    override def in[U <: Universe with Singleton](otherMirror: MirrorOf[U]): U # ConcreteTypeTag[T]
+  }
+
   @annotation.implicitNotFound(msg = "No TypeTag available for ${T}")
-  trait TypeTag[T] extends AbsTypeTag[T] with Equals with Serializable {
+  trait TypeTag[T] extends ConcreteTypeTag[T] with Equals with Serializable {
     override def in[U <: Universe with Singleton](otherMirror: MirrorOf[U]): U # TypeTag[T]
 
     /** case class accessories */
@@ -224,6 +229,28 @@ trait TypeTags { self: Universe =>
     def unapply[T](ttag: TypeTag[T]): Option[Type] = Some(ttag.tpe)
   }
 
+  object ConcreteTypeTag {
+    val Byte:    ConcreteTypeTag[scala.Byte]       = TypeTag.Byte
+    val Short:   ConcreteTypeTag[scala.Short]      = TypeTag.Short
+    val Char:    ConcreteTypeTag[scala.Char]       = TypeTag.Char
+    val Int:     ConcreteTypeTag[scala.Int]        = TypeTag.Int
+    val Long:    ConcreteTypeTag[scala.Long]       = TypeTag.Long
+    val Float:   ConcreteTypeTag[scala.Float]      = TypeTag.Float
+    val Double:  ConcreteTypeTag[scala.Double]     = TypeTag.Double
+    val Boolean: ConcreteTypeTag[scala.Boolean]    = TypeTag.Boolean
+    val Unit:    ConcreteTypeTag[scala.Unit]       = TypeTag.Unit
+    val Any:     ConcreteTypeTag[scala.Any]        = TypeTag.Any
+    val Object:  ConcreteTypeTag[java.lang.Object] = TypeTag.Object
+    val Nothing: ConcreteTypeTag[scala.Nothing]    = TypeTag.Nothing
+    val Null:    ConcreteTypeTag[scala.Null]       = TypeTag.Null
+    val String:  ConcreteTypeTag[java.lang.String] = TypeTag.String
+
+    def apply[T](mirror1: MirrorOf[self.type], tpec1: TypeCreator): ConcreteTypeTag[T] =
+      TypeTag(mirror1, tpec1)
+
+    def unapply[T](ttag: ConcreteTypeTag[T]): Option[Type] = Some(ttag.tpe)
+  }
+
   private class TypeTagImpl[T](mirror: Mirror, tpec: TypeCreator) extends AbsTypeTagImpl[T](mirror, tpec) with TypeTag[T] {
     override def in[U <: Universe with Singleton](otherMirror: MirrorOf[U]): U # TypeTag[T] = {
       val otherMirror1 = otherMirror.asInstanceOf[MirrorOf[otherMirror.universe.type]]
@@ -240,6 +267,7 @@ trait TypeTags { self: Universe =>
 
   // incantations
   def typeTag[T](implicit ttag: TypeTag[T]) = ttag
+  def concreteTypeTag[T](implicit ttag: ConcreteTypeTag[T]) = ttag
 
   // big thanks to Viktor Klang for this brilliant idea!
   def typeOf[T](implicit ttag: TypeTag[T]): Type = ttag.tpe

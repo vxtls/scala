@@ -9,9 +9,11 @@ package object reflect extends reflect_compat {
 
   // ClassTag class is defined in ClassTag.scala
   type TypeTag[T]          = scala.reflect.basis.TypeTag[T]
+  type ConcreteTypeTag[T]  = scala.reflect.basis.ConcreteTypeTag[T]
 
   // ClassTag object is defined in ClassTag.scala
   lazy val TypeTag         = scala.reflect.basis.TypeTag
+  lazy val ConcreteTypeTag = scala.reflect.basis.ConcreteTypeTag
 
   @deprecated("Use `@scala.beans.BeanDescription` instead", "2.10.0")
   type BeanDescription = scala.beans.BeanDescription
