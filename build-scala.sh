@@ -138,7 +138,8 @@ needs_previous_forkjoin_jar() {
     || [[ "$version_number" == "v2.10.0-M3+ce67870-bootstrap" ]] \
     || [[ "$version_number" == "v2.10.0-M3+6355d1-bootstrap" ]] \
     || [[ "$version_number" == "v2.10.0-M3+3896a4-bootstrap" ]] \
-    || [[ "$version_number" == "v2.10.0-M3+d9103e-bootstrap" ]]
+    || [[ "$version_number" == "v2.10.0-M3+d9103e-bootstrap" ]] \
+    || [[ "$version_number" == "v2.10.0-M3+0b2f1bc-bootstrap" ]]
 }
 
 build_anyval_class_transition() {
