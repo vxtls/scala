@@ -416,7 +416,7 @@ trait Trees extends api.Trees { self: SymbolTable =>
 
   case class Ident(name: Name) extends RefTree with IdentContextApi {
     def qualifier: Tree = EmptyTree
-    def isBackquoted = this.attachments.get[BackquotedIdentifierAttachment.type].isDefined
+    def isBackquoted = this.attachments.all.exists(_ == BackquotedIdentifierAttachment)
   }
   object Ident extends IdentExtractor
 
