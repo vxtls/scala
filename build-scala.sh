@@ -138,6 +138,10 @@ needs_arraytag_transition() {
   [[ "$version_number" == "v2.10.0-M3+bc5f42f-bootstrap" ]]
 }
 
+needs_classtag_string_transition() {
+  [[ "$version_number" == "v2.10.0-M4+3becbd5-bootstrap" ]]
+}
+
 needs_previous_forkjoin_jar() {
   [[ "$version_number" == "v2.10.0-M3+6bb5975-bootstrap" ]] \
     || [[ "$version_number" == "v2.10.0-M3+252a448-bootstrap" ]] \
@@ -157,11 +161,19 @@ build_anyval_class_transition() {
   build_compiler_first_transition
 }
 
+build_bootstrap_lib_jars() {
+  if grep -q 'target name="libs.fjbgpack"' "$stage_dir/build.xml"; then
+    run_ant no jline.done forkjoin.done libs.fjbgpack
+  else
+    run_ant no jline.done forkjoin.done fjbg.done
+  fi
+}
+
 build_compiler_first_transition() {
   local transition_comp="$stage_dir/build/locker/classes/compiler"
   local seeded_lib="$stage_dir/build/locker/classes/library"
 
-  run_ant no jline.done forkjoin.done libs.fjbgpack
+  build_bootstrap_lib_jars
 
   rm -rf "$seeded_lib" "$stage_dir/build/locker/library.complete"
   mkdir -p "$seeded_lib"
@@ -181,13 +193,50 @@ build_arraytag_transition() {
   local transition_dir="$stage_dir/build/transition-starr"
   local seeded_lib="$stage_dir/build/locker/classes/library"
 
-  run_ant no jline.done libs.fjbgpack
+  build_bootstrap_lib_jars
 
   rm -rf "$stage_dir/build/locker" "$transition_dir"
   mkdir -p "$seeded_lib"
   (cd "$seeded_lib" && "$JAVA_HOME/bin/jar" xf "$starr_lib")
   touch "$stage_dir/build/locker/library.complete"
 
+  run_ant no locker.reflect locker.comp
+
+  mkdir -p "$transition_dir/classes"
+  cp -R "$stage_dir/build/locker/classes/library" "$transition_dir/classes/library"
+  cp -R "$stage_dir/build/locker/classes/reflect" "$transition_dir/classes/reflect"
+  cp -R "$stage_dir/build/locker/classes/compiler" "$transition_dir/classes/compiler"
+
+  rm -rf "$stage_dir/build/locker" "$stage_dir/build/quick" "$stage_dir/build/pack" "$stage_dir/build/strap" "$stage_dir/build/palo"
+  starr_lib="$transition_dir/classes/library"
+  starr_reflect="$transition_dir/classes/reflect"
+  active_starr_comp="$transition_dir/classes/compiler"
+  run_ant no build
+}
+
+copy_starr_classtag_classes() {
+  local target_lib="$1"
+  local class_tag_dir="$stage_dir/build/starr-classtag"
+
+  rm -rf "$class_tag_dir"
+  mkdir -p "$class_tag_dir"
+  (
+    cd "$class_tag_dir"
+    "$JAVA_HOME/bin/jar" xf "$starr_lib" $("$JAVA_HOME/bin/jar" tf "$starr_lib" | grep '^scala/reflect/ClassTag')
+  )
+  mkdir -p "$target_lib/scala/reflect"
+  cp "$class_tag_dir"/scala/reflect/ClassTag*.class "$target_lib/scala/reflect/"
+}
+
+build_classtag_string_transition() {
+  local transition_dir="$stage_dir/build/transition-starr"
+  local seeded_lib="$stage_dir/build/locker/classes/library"
+
+  build_bootstrap_lib_jars
+
+  rm -rf "$stage_dir/build/locker" "$transition_dir"
+  run_ant no locker.lib
+  copy_starr_classtag_classes "$seeded_lib"
   run_ant no locker.reflect locker.comp
 
   mkdir -p "$transition_dir/classes"
@@ -249,7 +298,9 @@ build_test_deps() {
 if [[ "$mode" == "build" || "$mode" == "all" ]]; then
   run_ant no locker.clean clean
   build_deps
-  if needs_arraytag_transition; then
+  if needs_classtag_string_transition; then
+    build_classtag_string_transition
+  elif needs_arraytag_transition; then
     build_arraytag_transition
   elif needs_anyval_class_transition || needs_compiler_first_transition; then
     build_compiler_first_transition
