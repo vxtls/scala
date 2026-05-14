@@ -527,7 +527,12 @@ trait NamesDefaults { self: Analyzer =>
   def removeNames(typer: Typer)(args: List[Tree], params: List[Symbol]): (List[Tree], Array[Int]) = {
     implicit val context0 = typer.context
     // maps indices from (order written by user) to (order of definition)
-    val argPos            = Array.fill(args.length)(-1)
+    val argPos            = new Array[Int](args.length)
+    var argPosIndex = 0
+    while (argPosIndex < argPos.length) {
+      argPos(argPosIndex) = -1
+      argPosIndex += 1
+    }
     var positionalAllowed = true
     val namelessArgs = mapWithIndex(args) { (arg, argIndex) =>
       arg match {
