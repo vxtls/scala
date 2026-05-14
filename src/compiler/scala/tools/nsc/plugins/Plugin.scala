@@ -7,7 +7,7 @@ package scala.tools.nsc
 package plugins
 
 import io.{ File, Path, Jar }
-import java.net.URLClassLoader
+import java.net.{ URL, URLClassLoader }
 import java.util.jar.JarFile
 import java.util.zip.ZipException
 
@@ -70,7 +70,13 @@ object Plugin {
     val compilerLoader = classOf[Plugin].getClassLoader
     val jarurls = jarfiles map (_.toURL)
 
-    new URLClassLoader(jarurls.toArray, compilerLoader)
+    val urlarray = new Array[URL](jarurls.length)
+    var i = 0
+    jarurls foreach { url =>
+      urlarray(i) = url
+      i += 1
+    }
+    new URLClassLoader(urlarray, compilerLoader)
   }
 
   /** Try to load a plugin description from the specified
