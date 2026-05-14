@@ -36,7 +36,12 @@ trait ScannersCommon {
     val names = keywords sortBy (_._1.start) map { case (k, v) => (k.start, v) }
     val low   = names.head._1
     val high  = names.last._1
-    val arr   = Array.fill(high - low + 1)(defaultToken)
+    val arr   = new Array[Int](high - low + 1)
+    var i     = 0
+    while (i < arr.length) {
+      arr(i) = defaultToken
+      i += 1
+    }
 
     names foreach { case (k, v) => arr(k + low) = v }
     (low, arr)
