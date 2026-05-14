@@ -28,7 +28,7 @@ object Position {
       case NoPosition    => msg
       case _             =>
         List(
-          "%s:%s: %s".format(prefix, pos.line, msg),
+          prefix + ":" + pos.line + ": " + msg,
           pos.lineContent.stripLineEnd,
           " " * (pos.column - 1) + "^"
         ) mkString "\n"
