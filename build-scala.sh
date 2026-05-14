@@ -27,8 +27,6 @@ rt_jar="${JAVA_HOME:+$JAVA_HOME/jre/lib/rt.jar}"
 
 starr_lib="$prev_dir/build/pack/lib/scala-library.jar"
 starr_comp="$prev_dir/build/pack/lib/scala-compiler.jar"
-active_starr_lib="$starr_lib"
-active_starr_comp="$starr_comp"
 [[ -f "$starr_lib" && -f "$starr_comp" ]] || {
   echo "previous stage pack jars are missing under $prev_dir/build/pack/lib" >&2
   exit 1
@@ -65,8 +63,8 @@ run_ant() {
   (cd "$stage_dir" && env ANT_OPTS="$ant_runtime_opts" "$ant_bin" \
     -Dversion.number="$version_number" \
     -Djava6.home="$JAVA_HOME" \
-    -Dlib.starr.jar="$active_starr_lib" \
-    -Dcomp.starr.jar="$active_starr_comp" \
+    -Dlib.starr.jar="$starr_lib" \
+    -Dcomp.starr.jar="$starr_comp" \
     -Dlegacy.reflect.beans.jar="$legacy_reflect_beans_jar" \
     -Dlegacy.beans.meta.jar="$legacy_beans_meta_jar" \
     -Dscalac.args="$scalac_args" \
@@ -76,7 +74,11 @@ run_ant() {
 
 build_deps() {
   "$script_dir/deps/build-jansi-1.4.sh" "$stage_dir"
-  "$script_dir/deps/build-typesafe-config-0.3.0.sh" "$stage_dir"
+  if grep -q 'typesafe-config-0.4.0.jar' "$stage_dir/build.xml"; then
+    "$script_dir/deps/build-typesafe-config-0.4.0.sh" "$stage_dir"
+  else
+    "$script_dir/deps/build-typesafe-config-0.3.0.sh" "$stage_dir"
+  fi
   "$script_dir/deps/build-legacy-reflect-beans.sh" "$stage_dir" "$starr_lib"
   "$script_dir/deps/build-legacy-beans-meta.sh" "$stage_dir" "$starr_lib"
   "$script_dir/deps/build-java8-legacy-stubs.sh" "$stage_dir"
@@ -84,11 +86,7 @@ build_deps() {
   "$script_dir/deps/build-filtered-java8-stubs.sh" "$stage_dir" "$base_java8_stubs"
   "$script_dir/deps/build-java8-charbuffer-overrides.sh" "$stage_dir" "$base_java8_stubs"
   "$script_dir/deps/build-java8-partest-boot-stubs.sh" "$stage_dir" "$java8_legacy_stubs_jar"
-  if needs_ground_concrete_transition_compiler; then
-    run_ant no jline.done forkjoin.done libs.fjbgpack
-    "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number"
-    build_ground_concrete_transition_compiler
-  elif [[ -d "$stage_dir/src/msil" ]] \
+  if [[ -d "$stage_dir/src/msil" ]] \
     && grep -q 'msil-source.jar' "$stage_dir/build.xml" \
     && ! grep -q 'scala/tools/nsc/backend/MSILPlatform.scala' "$stage_dir/build.xml"; then
     "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number"
@@ -107,21 +105,6 @@ EOF
 
 needs_transition_bootstrap_compiler() {
   [[ "$version_number" == "v2.9.3+55109d-bootstrap" ]]
-}
-
-needs_ground_concrete_transition_compiler() {
-  [[ "$version_number" == "v2.10.0-M2+46d0d73-bootstrap" ]]
-}
-
-build_ground_concrete_transition_compiler() {
-  "$script_dir/deps/build-ground-concrete-transition-compiler.sh" \
-    "$stage_dir" \
-    "$starr_lib" \
-    "$starr_comp" \
-    "$java_bootclasspath" \
-    "$version_number"
-  active_starr_lib="$stage_dir/build/transition-ground-concrete/classes/library"
-  active_starr_comp="$stage_dir/build/transition-ground-concrete/classes/compiler"
 }
 
 build_transition_bootstrap_compiler() {
