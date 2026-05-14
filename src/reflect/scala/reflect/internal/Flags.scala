@@ -340,8 +340,14 @@ class Flags extends ModifierFlags {
     (ABSTRACT, ABSTRACT_PKL)
   )
   
-  private val mappedRawFlags = rawPickledCorrespondence map (_._1)
-  private val mappedPickledFlags = rawPickledCorrespondence map (_._2)
+  private val mappedRawFlags = new Array[Long](rawPickledCorrespondence.length)
+  private val mappedPickledFlags = new Array[Long](rawPickledCorrespondence.length)
+  private var mappedFlagIndex = 0
+  while (mappedFlagIndex < rawPickledCorrespondence.length) {
+    mappedRawFlags(mappedFlagIndex) = rawPickledCorrespondence(mappedFlagIndex)._1
+    mappedPickledFlags(mappedFlagIndex) = rawPickledCorrespondence(mappedFlagIndex)._2
+    mappedFlagIndex += 1
+  }
   
   private class MapFlags(from: Array[Long], to: Array[Long]) extends (Long => Long) {
     val fromSet = (0L /: from) (_ | _)
