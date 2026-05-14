@@ -121,10 +121,12 @@ object Predef extends LowPriorityImplicits {
   type ClassTag[T]         = scala.reflect.ClassTag[T]
   type TypeTag[T]          = scala.reflect.TypeTag[T]
   type ConcreteTypeTag[T]  = scala.reflect.ConcreteTypeTag[T]
+  type GroundTypeTag[T]    = scala.reflect.GroundTypeTag[T]
   val ClassTag             = scala.reflect.ClassTag // doesn't need to be lazy, because it's not a path-dependent type
   // [Paul to Eugene] No lazy vals in Predef.  Too expensive.  Have to work harder on breaking initialization dependencies.
   lazy val TypeTag         = scala.reflect.TypeTag // needs to be lazy, because requires scala.reflect.mirror instance
   lazy val ConcreteTypeTag = scala.reflect.ConcreteTypeTag
+  lazy val GroundTypeTag   = scala.reflect.GroundTypeTag
 
   // [Eugene to Martin] it's really tedious to type "implicitly[...]" all the time, so I'm reintroducing these shortcuts
   def classTag[T](implicit ctag: ClassTag[T])                = ctag
@@ -132,6 +134,8 @@ object Predef extends LowPriorityImplicits {
   def typeTag[T](implicit ttag: TypeTag[T])                  = ttag
   def concreteTag[T](implicit cttag: ConcreteTypeTag[T])     = cttag
   def concreteTypeTag[T](implicit cttag: ConcreteTypeTag[T]) = cttag
+  def groundTag[T](implicit gttag: GroundTypeTag[T])         = gttag
+  def groundTypeTag[T](implicit gttag: GroundTypeTag[T])     = gttag
 
   // Minor variations on identity functions
   def identity[A](x: A): A         = x    // @see `conforms` for the implicit version

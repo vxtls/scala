@@ -509,6 +509,11 @@ LOCAL REFERENCE BUILD (LOCKER)
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/MSILPlatform.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**/*.scala"/>
+      <exclude name="scala/tools/nsc/io/MsilFile.scala"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**/*.scala"/>
+      <exclude name="scala/tools/nsc/util/MsilClassPath.scala"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
         <pathelement location="${build-locker.dir}/classes/compiler"/>
@@ -803,6 +808,11 @@ QUICK BUILD (QUICK)
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/MSILPlatform.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**/*.scala"/>
+      <exclude name="scala/tools/nsc/io/MsilFile.scala"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**/*.scala"/>
+      <exclude name="scala/tools/nsc/util/MsilClassPath.scala"/>
       <compilationpath>
         <pathelement location="${build-quick.dir}/classes/library"/>
         <pathelement location="${build-quick.dir}/classes/compiler"/>
@@ -1339,6 +1349,11 @@ BOOTSTRAPPING BUILD (STRAP)
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
+      <exclude name="scala/tools/nsc/backend/MSILPlatform.scala"/>
+      <exclude name="scala/tools/nsc/backend/msil/**/*.scala"/>
+      <exclude name="scala/tools/nsc/io/MsilFile.scala"/>
+      <exclude name="scala/tools/nsc/symtab/clr/**/*.scala"/>
+      <exclude name="scala/tools/nsc/util/MsilClassPath.scala"/>
       <compilationpath>
         <pathelement location="${build-strap.dir}/classes/library"/>
         <pathelement location="${build-strap.dir}/classes/compiler"/>

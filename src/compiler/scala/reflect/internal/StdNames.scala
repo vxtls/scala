@@ -127,6 +127,7 @@ trait StdNames extends NameManglers { self: SymbolTable =>
     final val ClassTag: NameType = "ClassTag"
     final val TypeTag : NameType = "TypeTag"
     final val ConcreteTypeTag: NameType = "ConcreteTypeTag"
+    final val GroundTypeTag: NameType = "GroundTypeTag"
 
     // fictions we use as both types and terms
     final val ERROR: NameType    = "<error>"
@@ -397,6 +398,7 @@ trait StdNames extends NameManglers { self: SymbolTable =>
     val materializeClassTag: NameType  = "materializeClassTag"
     val materializeTypeTag: NameType   = "materializeTypeTag"
     val materializeConcreteTypeTag: NameType = "materializeConcreteTypeTag"
+    val materializeGroundTypeTag: NameType = "materializeGroundTypeTag"
     val mirror : NameType              = "mirror"
     val moduleClass : NameType         = "moduleClass"
     val name: NameType                 = "name"

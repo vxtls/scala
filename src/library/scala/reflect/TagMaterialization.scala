@@ -27,6 +27,12 @@ object TagMaterialization {
     c.materializeTypeTag(tpe, requireConcreteTypeTag = true)
   }
 
+  def materializeGroundTypeTag[T: c.TypeTag](c: Context { type PrefixType = Universe }): c.Expr[c.prefix.value.GroundTypeTag[T]] = {
+    import c.mirror._
+    val tpe = implicitly[c.TypeTag[T]].tpe
+    c.materializeGroundTypeTag(tpe)
+  }
+
   private implicit def context2utils(c0: Context) : Utils { val c: c0.type } = new { val c: c0.type = c0 } with Utils
 
   private abstract class Utils {
@@ -63,6 +69,16 @@ object TagMaterialization {
     val TypeTagModule         = selectTerm(TypeTagsClass, "TypeTag")
     val ConcreteTypeTagClass  = selectType(TypeTagsClass, "ConcreteTypeTag")
     val ConcreteTypeTagModule = selectTerm(TypeTagsClass, "ConcreteTypeTag")
+    def optionalGroundTypeTagModule = TypeTagsClass.typeSignature.member(newTermName("GroundTypeTag"))
+    def isGroundTypeTagModule(sym: Symbol) = {
+      val ground = optionalGroundTypeTagModule
+      ground != NoSymbol && sym == ground
+    }
+    def groundTypeTagModule = {
+      val ground = optionalGroundTypeTagModule
+      if (ground == NoSymbol) fail("GroundTypeTag not found")
+      ground
+    }
 
     def materializeClassTag(tpe: Type): Tree = {
       val prefix = gen.mkAttributedRef(Reflect_mirror) setType singleType(Reflect_mirror.owner.thisPrefix, Reflect_mirror)
@@ -71,7 +87,7 @@ object TagMaterialization {
 
     def materializeClassTag(prefix: Tree, tpe: Type): Tree = {
       val typetagInScope = c.inferImplicitValue(appliedType(typeRef(prefix.tpe, ConcreteTypeTagClass, Nil), List(tpe)))
-      def typetagIsSynthetic(tree: Tree) = tree.isInstanceOf[Block] || (tree exists (sub => sub.symbol == TypeTagModule || sub.symbol == ConcreteTypeTagModule))
+      def typetagIsSynthetic(tree: Tree) = tree.isInstanceOf[Block] || (tree exists (sub => sub.symbol == TypeTagModule || sub.symbol == ConcreteTypeTagModule || isGroundTypeTagModule(sub.symbol)))
       typetagInScope match {
         case success if !success.isEmpty && !typetagIsSynthetic(success) =>
           val factory = TypeApply(Select(Ident(ClassTagModule), newTermName("apply")), List(TypeTree(tpe)))
@@ -109,14 +125,35 @@ object TagMaterialization {
       materializeTypeTag(prefix, tpe, requireConcreteTypeTag)
     }
 
-    def materializeTypeTag(prefix: Tree, tpe: Type, requireConcreteTypeTag: Boolean): Tree = {
-      val tagModule = if (requireConcreteTypeTag) ConcreteTypeTagModule else TypeTagModule
+    def materializeGroundTypeTag(tpe: Type): Tree = {
+      def prefix: Tree = ??? // todo. needs to be synthesized from c.prefix
+      materializeGroundTypeTag(prefix, tpe)
+    }
+
+    def materializeTypeTag(prefix: Tree, tpe: Type, requireConcreteTypeTag: Boolean): Tree =
+      materializeTypeTag(prefix, tpe, if (requireConcreteTypeTag) ConcreteTypeTagModule else TypeTagModule, requireConcreteTypeTag)
+
+    def materializeGroundTypeTag(prefix: Tree, tpe: Type): Tree =
+      materializeTypeTag(prefix, tpe, groundTypeTagModule, requireConcreteTypeTag = true)
+
+    def materializeTypeTag(prefix: Tree, tpe: Type, tagModule: Symbol, requireConcreteTypeTag: Boolean): Tree = {
       val result =
         tpe match {
           case coreTpe if coreTags contains coreTpe =>
             Select(Select(prefix, tagModule.name), coreTags(coreTpe))
           case _ =>
-            try c.reifyType(prefix, tpe, dontSpliceAtTopLevel = true, requireConcreteTypeTag = requireConcreteTypeTag)
+            try {
+              val reified = c.reifyType(prefix, tpe, dontSpliceAtTopLevel = true, requireConcreteTypeTag = requireConcreteTypeTag)
+              if (!isGroundTypeTagModule(tagModule)) reified
+              else new Transformer {
+                override def transform(tree: Tree): Tree = tree match {
+                  case Select(qual, name) if name == ConcreteTypeTagModule.name =>
+                    treeCopy.Select(tree, transform(qual), tagModule.name)
+                  case _ =>
+                    super.transform(tree)
+                }
+              }.transform(reified)
+            }
             catch {
               case ex: Throwable =>
                 // [Eugene] cannot pattern match on an abstract type, so had to do this

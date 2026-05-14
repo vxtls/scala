@@ -1098,15 +1098,19 @@ trait Implicits {
         implicitInfoss1
     }
 
-    // these should be lazy, otherwise we wouldn't be able to compile scala-library with starr
-    private val TagSymbols = Set(ClassTagClass, TypeTagClass, ConcreteTypeTagClass)
-    private val TagMaterializers = Map(
-      ClassTagClass -> MacroInternal_materializeClassTag,
-      TypeTagClass -> MacroInternal_materializeTypeTag,
-      ConcreteTypeTagClass -> MacroInternal_materializeConcreteTypeTag
-    )
+    private def optionalGroundTypeTagMaterializer(sym: Symbol) =
+      try if (sym == GroundTypeTagClass || sym.name == tpnme.GroundTypeTag) Some(MacroInternal_materializeGroundTypeTag) else None
+      catch {
+        case ex: scala.reflect.internal.FatalError if ex.getMessage.contains("GroundTypeTag") => None
+      }
 
-    def tagOfType(pre: Type, tp: Type, tagClass: Symbol): SearchResult = {
+    private def tagMaterializer(sym: Symbol) =
+      if (sym == ClassTagClass || sym.fullName == "scala.reflect.ClassTag") Some(MacroInternal_materializeClassTag)
+      else if (sym == TypeTagClass || sym.name == tpnme.TypeTag) Some(MacroInternal_materializeTypeTag)
+      else if (sym == ConcreteTypeTagClass || sym.name == tpnme.ConcreteTypeTag) Some(MacroInternal_materializeConcreteTypeTag)
+      else optionalGroundTypeTagMaterializer(sym)
+
+    def tagOfType(pre: Type, tp: Type, tagClass: Symbol, materializerSym: Symbol): SearchResult = {
       def success(arg: Tree) =
         try {
           val tree1 = typed(atPos(pos.focus)(arg))
@@ -1120,7 +1124,7 @@ trait Implicits {
 
       val prefix = (tagClass, pre) match {
         // ClassTags only exist for scala.reflect.mirror, so their materializer doesn't care about prefixes
-        case (ClassTagClass, _) =>
+        case (tag, _) if tag == ClassTagClass || tag.fullName == "scala.reflect.ClassTag" =>
           gen.mkAttributedRef(Reflect_mirror) setType singleType(Reflect_mirror.owner.thisPrefix, Reflect_mirror)
         // [Eugene to Martin] this is the crux of the interaction between implicits and reifiers
         // here we need to turn a (supposedly path-dependent) type into a tree that will be used as a prefix
@@ -1138,7 +1142,7 @@ trait Implicits {
       }
 
       // todo. migrate hardcoded materialization in Implicits to corresponding implicit macros
-      var materializer = atPos(pos.focus)(Apply(TypeApply(Ident(TagMaterializers(tagClass)), List(TypeTree(tp))), List(prefix)))
+      var materializer = atPos(pos.focus)(Apply(TypeApply(Ident(materializerSym), List(TypeTree(tp))), List(prefix)))
       if (settings.XlogImplicits.value) println("materializing requested %s.%s[%s] using %s".format(pre, tagClass.name, tp, materializer))
       success(materializer)
     }
@@ -1146,8 +1150,8 @@ trait Implicits {
     /** The manifest corresponding to type `pt`, provided `pt` is an instance of Manifest.
      */
     private def implicitTagOrOfExpectedType(pt: Type): SearchResult = pt.dealias match {
-      case TypeRef(pre, sym, args) if TagSymbols(sym) =>
-        tagOfType(pre, args.head, sym)
+      case TypeRef(pre, sym, args) if tagMaterializer(sym).isDefined =>
+        tagOfType(pre, args.head, sym, tagMaterializer(sym).get)
       case tp@TypeRef(_, sym, _) if sym.isAbstractType =>
         implicitTagOrOfExpectedType(tp.bounds.lo) // #3977: use tp (==pt.dealias), not pt (if pt is a type alias, pt.bounds.lo == pt)
       case _ =>

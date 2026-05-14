@@ -64,6 +64,9 @@ trait TypeTags { self: Universe =>
     def isConcrete = !isNotConcrete
     def isNotConcrete = tpe exists (_.typeSymbol.isAbstractType)
     def toConcrete: ConcreteTypeTag[T] = ConcreteTypeTag[T](tpe)
+    def isGround = isConcrete
+    def isNotGround = isNotConcrete
+    def toGround: GroundTypeTag[T] = GroundTypeTag[T](tpe)
 
     override def toString = {
       var prefix = if (isConcrete) "ConcreteTypeTag" else "TypeTag"
@@ -181,7 +184,69 @@ trait TypeTags { self: Universe =>
       def >:>(that: Manifest[_]): Boolean = that <:< ttag
 
       @deprecated("Use `tpe` to analyze the type arguments", "2.10.0")
-      override def typeArguments: List[Manifest[_]] = ttag.tpe.typeArguments map (targ => rm.ConcreteTypeTag(targ))
+      override def typeArguments: List[Manifest[_]] = ttag.tpe.typeArguments map (targ => rm.GroundTypeTag(targ))
+    }
+  }
+
+  @annotation.implicitNotFound(msg = "No GroundTypeTag available for ${T}")
+  class GroundTypeTag[T](tpe: Type) extends ConcreteTypeTag[T](tpe) {
+    override def productPrefix = "GroundTypeTag"
+  }
+
+  object GroundTypeTag {
+    val Byte    : GroundTypeTag[scala.Byte]       = new GroundTypeTag[scala.Byte](ByteTpe) { private def readResolve() = GroundTypeTag.Byte }
+    val Short   : GroundTypeTag[scala.Short]      = new GroundTypeTag[scala.Short](ShortTpe) { private def readResolve() = GroundTypeTag.Short }
+    val Char    : GroundTypeTag[scala.Char]       = new GroundTypeTag[scala.Char](CharTpe) { private def readResolve() = GroundTypeTag.Char }
+    val Int     : GroundTypeTag[scala.Int]        = new GroundTypeTag[scala.Int](IntTpe) { private def readResolve() = GroundTypeTag.Int }
+    val Long    : GroundTypeTag[scala.Long]       = new GroundTypeTag[scala.Long](LongTpe) { private def readResolve() = GroundTypeTag.Long }
+    val Float   : GroundTypeTag[scala.Float]      = new GroundTypeTag[scala.Float](FloatTpe) { private def readResolve() = GroundTypeTag.Float }
+    val Double  : GroundTypeTag[scala.Double]     = new GroundTypeTag[scala.Double](DoubleTpe) { private def readResolve() = GroundTypeTag.Double }
+    val Boolean : GroundTypeTag[scala.Boolean]    = new GroundTypeTag[scala.Boolean](BooleanTpe) { private def readResolve() = GroundTypeTag.Boolean }
+    val Unit    : GroundTypeTag[scala.Unit]       = new GroundTypeTag[scala.Unit](UnitTpe) { private def readResolve() = GroundTypeTag.Unit }
+    val Any     : GroundTypeTag[scala.Any]        = new GroundTypeTag[scala.Any](AnyTpe) { private def readResolve() = GroundTypeTag.Any }
+    val Object  : GroundTypeTag[java.lang.Object] = new GroundTypeTag[java.lang.Object](ObjectTpe) { private def readResolve() = GroundTypeTag.Object }
+    val AnyVal  : GroundTypeTag[scala.AnyVal]     = new GroundTypeTag[scala.AnyVal](AnyValTpe) { private def readResolve() = GroundTypeTag.AnyVal }
+    val AnyRef  : GroundTypeTag[scala.AnyRef]     = new GroundTypeTag[scala.AnyRef](AnyRefTpe) { private def readResolve() = GroundTypeTag.AnyRef }
+    val Nothing : GroundTypeTag[scala.Nothing]    = new GroundTypeTag[scala.Nothing](NothingTpe) { private def readResolve() = GroundTypeTag.Nothing }
+    val Null    : GroundTypeTag[scala.Null]       = new GroundTypeTag[scala.Null](NullTpe) { private def readResolve() = GroundTypeTag.Null }
+    val String  : GroundTypeTag[java.lang.String] = new GroundTypeTag[java.lang.String](StringTpe) { private def readResolve() = GroundTypeTag.String }
+
+    def apply[T](tpe: Type): GroundTypeTag[T] =
+      tpe match {
+        case ByteTpe    => GroundTypeTag.Byte.asInstanceOf[GroundTypeTag[T]]
+        case ShortTpe   => GroundTypeTag.Short.asInstanceOf[GroundTypeTag[T]]
+        case CharTpe    => GroundTypeTag.Char.asInstanceOf[GroundTypeTag[T]]
+        case IntTpe     => GroundTypeTag.Int.asInstanceOf[GroundTypeTag[T]]
+        case LongTpe    => GroundTypeTag.Long.asInstanceOf[GroundTypeTag[T]]
+        case FloatTpe   => GroundTypeTag.Float.asInstanceOf[GroundTypeTag[T]]
+        case DoubleTpe  => GroundTypeTag.Double.asInstanceOf[GroundTypeTag[T]]
+        case BooleanTpe => GroundTypeTag.Boolean.asInstanceOf[GroundTypeTag[T]]
+        case UnitTpe    => GroundTypeTag.Unit.asInstanceOf[GroundTypeTag[T]]
+        case AnyTpe     => GroundTypeTag.Any.asInstanceOf[GroundTypeTag[T]]
+        case ObjectTpe  => GroundTypeTag.Object.asInstanceOf[GroundTypeTag[T]]
+        case AnyValTpe  => GroundTypeTag.AnyVal.asInstanceOf[GroundTypeTag[T]]
+        case AnyRefTpe  => GroundTypeTag.AnyRef.asInstanceOf[GroundTypeTag[T]]
+        case NothingTpe => GroundTypeTag.Nothing.asInstanceOf[GroundTypeTag[T]]
+        case NullTpe    => GroundTypeTag.Null.asInstanceOf[GroundTypeTag[T]]
+        case StringTpe  => GroundTypeTag.String.asInstanceOf[GroundTypeTag[T]]
+        case _          => new GroundTypeTag[T](tpe) {}
+      }
+
+    def unapply[T](ttag: TypeTag[T]): Option[Type] = if (ttag.isGround) Some(ttag.tpe) else None
+
+    implicit def toClassTag[T](ttag: rm.GroundTypeTag[T]): ClassTag[T] = ClassTag[T](rm.typeToClass(ttag.tpe.erasure))
+
+    implicit def toDeprecatedManifestApis[T](ttag: rm.GroundTypeTag[T]): DeprecatedManifestApis[T] = new DeprecatedManifestApis[T](ttag)
+
+    class DeprecatedManifestApis[T](ttag: rm.GroundTypeTag[T]) extends DeprecatedClassManifestApis[T](toClassTag(ttag)) {
+      @deprecated("Use `tpe` to analyze the underlying type", "2.10.0")
+      def <:<(that: Manifest[_]): Boolean = ttag.tpe <:< that.tpe
+
+      @deprecated("Use `tpe` to analyze the underlying type", "2.10.0")
+      def >:>(that: Manifest[_]): Boolean = that <:< ttag
+
+      @deprecated("Use `tpe` to analyze the type arguments", "2.10.0")
+      override def typeArguments: List[Manifest[_]] = ttag.tpe.typeArguments map (targ => rm.GroundTypeTag(targ))
     }
   }
 

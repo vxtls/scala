@@ -25,6 +25,13 @@ package object internal {
   def materializeConcreteTypeTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[u.value.ConcreteTypeTag[T]] =
     c.Expr[Nothing](c.materializeTypeTag(u.tree, implicitly[c.TypeTag[T]].tpe, requireConcreteTypeTag = true))(c.TypeTag.Nothing)
 
+  /** This method is required by the transition compiler and <b>should not be used in client code</b>. */
+  def materializeGroundTypeTag[T](u: Universe): u.GroundTypeTag[T] = macro materializeGroundTypeTag_impl[T]
+
+  /** This method is required by the transition compiler and <b>should not be used in client code</b>. */
+  def materializeGroundTypeTag_impl[T: c.TypeTag](c: Context)(u: c.Expr[Universe]): c.Expr[u.value.GroundTypeTag[T]] =
+    c.Expr[Nothing](c.materializeGroundTypeTag(u.tree, implicitly[c.TypeTag[T]].tpe))(c.TypeTag.Nothing)
+
   /** This method is required by the compiler and <b>should not be used in client code</b>. */
   private[scala] implicit def context2utils(c0: Context) : Utils { val c: c0.type } = new { val c: c0.type = c0 } with Utils
 }
@@ -53,9 +60,20 @@ package internal {
       NothingClass.asType -> newTermName("Nothing"),
       NullClass.asType -> newTermName("Null"))
 
+    def optionalGroundTypeTagModule = ConcreteTypeTagModule.owner.typeSignature.member(newTermName("GroundTypeTag"))
+    def isGroundTypeTagModule(sym: Symbol) = {
+      val ground = optionalGroundTypeTagModule
+      ground != NoSymbol && sym == ground
+    }
+    def groundTypeTagModule = {
+      val ground = optionalGroundTypeTagModule
+      if (ground == NoSymbol) fail("GroundTypeTag not found")
+      ground
+    }
+
     def materializeClassTag(prefix: Tree, tpe: Type): Tree = {
       val typetagInScope = c.inferImplicitValue(appliedType(typeRef(prefix.tpe, ConcreteTypeTagClass, Nil), List(tpe)))
-      def typetagIsSynthetic(tree: Tree) = tree.isInstanceOf[Block] || (tree exists (sub => sub.symbol == TypeTagModule || sub.symbol == ConcreteTypeTagModule))
+      def typetagIsSynthetic(tree: Tree) = tree.isInstanceOf[Block] || (tree exists (sub => sub.symbol == TypeTagModule || sub.symbol == ConcreteTypeTagModule || isGroundTypeTagModule(sub.symbol)))
       typetagInScope match {
         case success if !success.isEmpty && !typetagIsSynthetic(success) =>
           val factory = TypeApply(Select(Ident(ClassTagModule), newTermName("apply")), List(TypeTree(tpe)))
@@ -88,16 +106,32 @@ package internal {
       }
     }
 
-    def materializeTypeTag(prefix: Tree, tpe: Type, requireConcreteTypeTag: Boolean): Tree = {
-      val tagModule = if (requireConcreteTypeTag) ConcreteTypeTagModule else TypeTagModule
-      val result =
-        tpe match {
-          case coreTpe if coreTags contains coreTpe =>
-            Select(Select(prefix, tagModule.name), coreTags(coreTpe))
-          case _ =>
-            try c.reifyType(prefix, tpe, dontSpliceAtTopLevel = true, requireConcreteTypeTag = requireConcreteTypeTag)
-            catch {
-              case ex: Throwable =>
+      def materializeTypeTag(prefix: Tree, tpe: Type, requireConcreteTypeTag: Boolean): Tree =
+        materializeTypeTag(prefix, tpe, if (requireConcreteTypeTag) ConcreteTypeTagModule else TypeTagModule, requireConcreteTypeTag)
+
+      def materializeGroundTypeTag(prefix: Tree, tpe: Type): Tree =
+        materializeTypeTag(prefix, tpe, groundTypeTagModule, requireConcreteTypeTag = true)
+
+      def materializeTypeTag(prefix: Tree, tpe: Type, tagModule: Symbol, requireConcreteTypeTag: Boolean): Tree = {
+        val result =
+          tpe match {
+            case coreTpe if coreTags contains coreTpe =>
+              Select(Select(prefix, tagModule.name), coreTags(coreTpe))
+            case _ =>
+              try {
+                val reified = c.reifyType(prefix, tpe, dontSpliceAtTopLevel = true, requireConcreteTypeTag = requireConcreteTypeTag)
+                if (!isGroundTypeTagModule(tagModule)) reified
+                else new Transformer {
+                  override def transform(tree: Tree): Tree = tree match {
+                    case Select(qual, name) if name == ConcreteTypeTagModule.name =>
+                      treeCopy.Select(tree, transform(qual), tagModule.name)
+                    case _ =>
+                      super.transform(tree)
+                  }
+                }.transform(reified)
+              }
+              catch {
+                case ex: Throwable =>
                 // [Eugene] cannot pattern match on an abstract type, so had to do this
                 val ex1 = ex
                 if (ex.getClass.toString.endsWith("$ReificationError")) {
