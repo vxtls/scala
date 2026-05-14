@@ -2599,8 +2599,8 @@ trait Typers extends Modes with Adaptations with Tags {
         // this code kicks in only after typer, so `stats` will never be filled in time
         // as a result, most of compound type trees with non-empty stats will fail to reify
         // [Eugene++] todo. investigate whether something can be done about this
-        val att = templ.attachments.get[CompoundTypeTreeOriginalAttachment].getOrElse(CompoundTypeTreeOriginalAttachment(Nil, Nil))
-        templ.removeAttachment[CompoundTypeTreeOriginalAttachment]
+        val att = templ.attachments.get[CompoundTypeTreeOriginalAttachment](scala.reflect.ClassTag(classOf[CompoundTypeTreeOriginalAttachment])).getOrElse(CompoundTypeTreeOriginalAttachment(Nil, Nil))
+        templ.removeAttachment[CompoundTypeTreeOriginalAttachment](scala.reflect.ClassTag(classOf[CompoundTypeTreeOriginalAttachment]))
         templ addAttachment att.copy(stats = stats1)
         for (stat <- stats1 if stat.isDef) {
           val member = stat.symbol
