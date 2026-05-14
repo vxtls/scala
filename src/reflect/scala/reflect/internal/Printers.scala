@@ -33,7 +33,7 @@ trait Printers extends api.Printers { self: SymbolTable =>
     if (sym.name.toString == nme.ERROR.toString) {
       "<" + quotedName(name, decoded) + ": error>"
     } else if (sym != null && sym != NoSymbol) {
-      val prefix = if (sym.isMixinConstructor) "/*%s*/".format(quotedName(sym.owner.name, decoded)) else ""
+      val prefix = if (sym.isMixinConstructor) "/*" + quotedName(sym.owner.name, decoded) + "*/" else ""
       var suffix = ""
       if (settings.uniqid.value) suffix += ("#" + sym.id)
       if (settings.Yshowsymkinds.value) suffix += ("#" + sym.abbreviatedKindString)
@@ -51,8 +51,8 @@ trait Printers extends api.Printers { self: SymbolTable =>
    */
   def backquotedPath(t: Tree): String = {
     t match {
-      case Select(qual, name) if name.isTermName  => "%s.%s".format(backquotedPath(qual), symName(t, name))
-      case Select(qual, name) if name.isTypeName  => "%s#%s".format(backquotedPath(qual), symName(t, name))
+      case Select(qual, name) if name.isTermName  => backquotedPath(qual) + "." + symName(t, name)
+      case Select(qual, name) if name.isTypeName  => backquotedPath(qual) + "#" + symName(t, name)
       case Ident(name)                            => symName(t, name)
       case _                                      => t.toString
     }
