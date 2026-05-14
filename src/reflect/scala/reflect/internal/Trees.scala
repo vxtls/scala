@@ -195,8 +195,8 @@ trait Trees extends api.Trees { self: SymbolTable =>
      */
     def summaryString: String = this match {
       case Literal(const)     => "Literal(" + const + ")"
-      case Ident(name)        => "Ident(%s)".format(name.decode)
-      case Select(qual, name) => "Select(%s, %s)".format(qual.summaryString, name.decode)
+      case Ident(name)        => "Ident(" + name.decode + ")"
+      case Select(qual, name) => "Select(" + qual.summaryString + ", " + name.decode + ")"
       case t: NameTree        => t.name.longString
       case t                  =>
         t.shortClass + (
