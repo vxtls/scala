@@ -1143,9 +1143,14 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
       case _              => sym.ownerChain mkString " -> " // unlikely
     }
   )
-  private def formatExplain(pairs: (String, Any)*): String = (
-    pairs.toList collect { case (k, v) if v != null => "%20s: %s".format(k, v) } mkString "\n"
-  )
+  private def formatExplain(pairs: (String, Any)*): String = {
+    var result = List[String]()
+    pairs.toList foreach {
+      case (k, v) if v != null => result :+= ((" " * (20 - (k.length min 20))) + k + ": " + v)
+      case _                   =>
+    }
+    result mkString "\n"
+  }
 
   def explainTree(t: Tree): String = formatExplain(
   )
@@ -1161,7 +1166,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     val info1 = formatExplain(
       "while compiling"    -> currentSource.path,
-      "during phase"       -> ( if (globalPhase eq phase) phase else "global=%s, atPhase=%s".format(globalPhase, phase) ),
+      "during phase"       -> ( if (globalPhase eq phase) phase else "global=" + globalPhase + ", atPhase=" + phase ),
       "library version"    -> scala.util.Properties.versionString,
       "compiler version"   -> Properties.versionString,
       "reconstructed args" -> settings.recreateArgs.mkString(" ")
