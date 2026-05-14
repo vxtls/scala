@@ -165,6 +165,12 @@ trait Definitions extends api.StandardDefinitions {
     private var isInitialized = false
     def isDefinitionsInitialized = isInitialized
 
+    private def requiredClass[T](implicit manifest: ClassManifest[T]): ClassSymbol =
+      getRequiredClass(manifest.erasure.getName)
+
+    private def requiredModule[T](implicit manifest: ClassManifest[T]): ModuleSymbol =
+      getRequiredModule(manifest.erasure.getName stripSuffix "$")
+
     // symbols related to packages
     var emptypackagescope: Scope = null //debug
 
