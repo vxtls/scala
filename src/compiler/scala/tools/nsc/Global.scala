@@ -24,7 +24,7 @@ import ast.parser._
 import typechecker._
 import transform._
 import backend.icode.{ ICodes, GenICode, ICodeCheckers }
-import backend.{ ScalaPrimitives, Platform, MSILPlatform, JavaPlatform }
+import backend.{ ScalaPrimitives, Platform, JavaPlatform }
 import backend.jvm.GenJVM
 import backend.opt.{ Inliners, InlineExceptionHandlers, ClosureElimination, DeadCodeElimination }
 import backend.icode.analysis._
@@ -69,8 +69,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
   type ThisPlatform = Platform { val global: Global.this.type }
 
   lazy val platform: ThisPlatform =
-    if (forMSIL) new { val global: Global.this.type = Global.this } with MSILPlatform
-    else new { val global: Global.this.type = Global.this } with JavaPlatform
+    new { val global: Global.this.type = Global.this } with JavaPlatform
 
   def classPath: ClassPath[platform.BinaryRepr] = platform.classPath
   def rootLoader: LazyType = platform.rootLoader
@@ -1600,7 +1599,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter) extends Symb
   // to false except in old code.  The downside is that this leaves us calling a
   // deprecated method: but I see no simple way out, so I leave it for now.
   def forJVM           = opt.jvm
-  override def forMSIL = opt.msil
+  override def forMSIL = false
   def forInteractive   = onlyPresentation
   def forScaladoc      = onlyPresentation
   def createJavadoc    = false
