@@ -90,7 +90,7 @@ class ScalacFork extends ScalaMatchingTask with ScalacShared with TaskArgs {
   override def execute() {
     def plural(x: Int) = if (x > 1) "s" else ""
 
-    log("Executing ant task scalacfork, origin: %s".format(originOfThis), Project.MSG_VERBOSE)
+    log("Executing ant task scalacfork, origin: " + originOfThis, Project.MSG_VERBOSE)
 
     val compilerPath = this.compilerPath getOrElse sys.error("Mandatory attribute 'compilerpath' is not set.")
     val sourceDir = this.sourceDir getOrElse sys.error("Mandatory attribute 'srcdir' is not set.")
@@ -109,20 +109,26 @@ class ScalacFork extends ScalaMatchingTask with ScalacShared with TaskArgs {
 
     val mapper = createMapper()
 
-    val includedFiles: Array[File] =
+    val includedFileNames =
       new SourceFileScanner(this).restrict(
         getDirectoryScanner(sourceDir).getIncludedFiles,
         sourceDir,
         destinationDir,
         mapper
-      ) map (x => new File(sourceDir, x))
+      )
+    val includedFiles = new Array[File](includedFileNames.length)
+    var includedFileIndex = 0
+    while (includedFileIndex < includedFileNames.length) {
+      includedFiles(includedFileIndex) = new File(sourceDir, includedFileNames(includedFileIndex))
+      includedFileIndex += 1
+    }
 
     /** Nothing to do. */
     if (includedFiles.isEmpty && argfile.isEmpty)
       return
 
     if (includedFiles.nonEmpty)
-      log("Compiling %d file%s to %s".format(includedFiles.size, plural(includedFiles.size), destinationDir))
+      log("Compiling " + includedFiles.size + " file" + plural(includedFiles.size) + " to " + destinationDir)
 
     argfile foreach (x => log("Using argfile file: @" + x))
 
@@ -144,10 +150,16 @@ class ScalacFork extends ScalaMatchingTask with ScalacShared with TaskArgs {
 
     // dump the arguments to a file and do "java @file"
     val tempArgFile = io.File.makeTemp("scalacfork")
-    val tokens = settings.toArgs ++ (includedFiles map (_.getPath))
+    var tokens = settings.toArgs
+    var tokenFileIndex = 0
+    while (tokenFileIndex < includedFiles.length) {
+      tokens :+= includedFiles(tokenFileIndex).getPath
+      tokenFileIndex += 1
+    }
     tempArgFile writeAll encodeScalacArgsFile(tokens)
 
-    val paths = List(Some(tempArgFile.toAbsolute.path), argfile).flatten map (_.toString)
+    var paths = List[String](tempArgFile.toAbsolute.path.toString)
+    argfile foreach (x => paths :+= x.toString)
     val res = execWithArgFiles(java, paths)
 
     if (failOnError && res != 0)
