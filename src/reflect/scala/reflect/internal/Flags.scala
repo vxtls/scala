@@ -488,11 +488,26 @@ class Flags extends ModifierFlags {
 
   final val pickledListOrder: List[Long] = {
     val all   = 0 to MaxBitPosition map (1L << _)
-    val front = mappedRawFlags map (_.toLong)
+    var front = List[Long]()
+    var i = mappedRawFlags.length - 1
+    while (i >= 0) {
+      front = mappedRawFlags(i) :: front
+      i -= 1
+    }
 
     front.toList ++ (all filterNot (front contains _))
   }
-  final val rawFlagPickledOrder: Array[Long] = pickledListOrder.toArray
+  final val rawFlagPickledOrder: Array[Long] = {
+    val result = new Array[Long](pickledListOrder.length)
+    var rest = pickledListOrder
+    var i = 0
+    while (!rest.isEmpty) {
+      result(i) = rest.head
+      rest = rest.tail
+      i += 1
+    }
+    result
+  }
 }
 
 object Flags extends Flags { }
