@@ -32,6 +32,7 @@ starr_comp="$prev_dir/build/pack/lib/scala-compiler.jar"
   exit 1
 }
 active_starr_comp="$starr_comp"
+prev_forkjoin_jar="$prev_dir/build/libs/forkjoin.jar"
 
 java8_override_jar="$stage_dir/build/java8-charbuffer-overrides.jar"
 java8_legacy_stubs_jar="$stage_dir/build/java8-legacy-stubs.jar"
@@ -51,6 +52,7 @@ fi
 run_ant() {
   local ant_runtime_opts="$ant_opts"
   local runtime_mode="${1:-no}"
+  local extra_ant_args=()
   shift || true
 
   if [[ "$runtime_mode" == "active" ]]; then
@@ -61,6 +63,14 @@ run_ant() {
   fi
   ant_runtime_opts="$ant_runtime_opts -Dpartest.javacmd=$partest_java_cmd"
 
+  if needs_previous_forkjoin_jar; then
+    [[ -f "$prev_forkjoin_jar" ]] || {
+      echo "previous stage forkjoin jar is missing: $prev_forkjoin_jar" >&2
+      exit 1
+    }
+    extra_ant_args+=("-Dforkjoin.jar=$prev_forkjoin_jar")
+  fi
+
   (cd "$stage_dir" && env ANT_OPTS="$ant_runtime_opts" "$ant_bin" \
     -Dversion.number="$version_number" \
     -Djava6.home="$JAVA_HOME" \
@@ -68,6 +78,7 @@ run_ant() {
     -Dcomp.starr.jar="$active_starr_comp" \
     -Dlegacy.reflect.beans.jar="$legacy_reflect_beans_jar" \
     -Dlegacy.beans.meta.jar="$legacy_beans_meta_jar" \
+    "${extra_ant_args[@]}" \
     -Dscalac.args="$scalac_args" \
     -Dpartest.javacmd="$partest_java_cmd" \
     "$@")
@@ -114,6 +125,10 @@ needs_anyval_class_transition() {
 
 needs_compiler_first_transition() {
   [[ "$version_number" == "v2.10.0-M3+1708a7f-bootstrap" ]]
+}
+
+needs_previous_forkjoin_jar() {
+  [[ "$version_number" == "v2.10.0-M3+6bb5975-bootstrap" ]]
 }
 
 build_anyval_class_transition() {
