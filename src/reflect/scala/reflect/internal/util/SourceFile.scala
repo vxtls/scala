@@ -81,12 +81,19 @@ object ScriptSourceFile {
     }
     else 0
   }
-  def stripHeader(cs: Array[Char]): Array[Char] = cs drop headerLength(cs)
+  def stripHeader(cs: Array[Char]): Array[Char] = {
+    val offset = headerLength(cs)
+    val result = new Array[Char](cs.length - offset)
+    Array.copy(cs, offset, result, 0, result.length)
+    result
+  }
 
   def apply(file: AbstractFile, content: Array[Char]) = {
     val underlying = new BatchSourceFile(file, content)
     val headerLen = headerLength(content)
-    val stripped = new ScriptSourceFile(underlying, content drop headerLen, headerLen)
+    val strippedContent = new Array[Char](content.length - headerLen)
+    Array.copy(content, headerLen, strippedContent, 0, strippedContent.length)
+    val stripped = new ScriptSourceFile(underlying, strippedContent, headerLen)
 
     stripped
   }
@@ -101,21 +108,38 @@ class ScriptSourceFile(underlying: BatchSourceFile, content: Array[Char], overri
     else pos.withSource(underlying, start)
 }
 
+private object BatchSourceFile {
+  def charsFromSeq(cs: Seq[Char]) = {
+    val result = new Array[Char](cs.length)
+    var i = 0
+    for (c <- cs) {
+      result(i) = c
+      i += 1
+    }
+    result
+  }
+}
+import BatchSourceFile._
+
 /** a file whose contents do not change over time */
 class BatchSourceFile(val file : AbstractFile, val content0: Array[Char]) extends SourceFile {
   def this(_file: AbstractFile)                 = this(_file, _file.toCharArray)
-  def this(sourceName: String, cs: Seq[Char])   = this(new VirtualFile(sourceName), cs.toArray)
-  def this(file: AbstractFile, cs: Seq[Char])   = this(file, cs.toArray)
+  def this(sourceName: String, cs: Seq[Char])   = this(new VirtualFile(sourceName), charsFromSeq(cs))
+  def this(file: AbstractFile, cs: Seq[Char])   = this(file, charsFromSeq(cs))
 
   // If non-whitespace tokens run all the way up to EOF,  
   // positions go wrong because the correct end of the last  
   // token cannot be used as an index into the char array.  
   // The least painful way to address this was to add a  
   // newline to the array.  
-  val content = (  
-    if (content0.length == 0 || !content0.last.isWhitespace)  
-      content0 :+ '\n'  
-    else content0  
+  val content = (
+    if (content0.length == 0 || !content0.last.isWhitespace) {
+      val result = new Array[Char](content0.length + 1)
+      Array.copy(content0, 0, result, 0, content0.length)
+      result(content0.length) = '\n'
+      result
+    }
+    else content0
   )
   val length = content.length
   def start = 0
@@ -142,7 +166,13 @@ class BatchSourceFile(val file : AbstractFile, val content0: Array[Char]) extend
     buf += 0
     for (i <- 0 until cs.length) if (isLineBreak(i)) buf += i + 1
     buf += cs.length // sentinel, so that findLine below works smoother
-    buf.toArray
+    val result = new Array[Int](buf.length)
+    var i = 0
+    while (i < buf.length) {
+      result(i) = buf(i)
+      i += 1
+    }
+    result
   }
   private lazy val lineIndices: Array[Int] = calculateLineIndices(content)
 
