@@ -215,6 +215,7 @@ GROUP5=(
   v2.10.0-M3+1708a7f-bootstrap
   v2.10.0-M3+8ce4787-bootstrap
   v2.10.0-M3+6bb5975-bootstrap
+  v2.10.0-M3+252a448-bootstrap
 )
 
 declare -A GROUP4_PREV=(
@@ -302,6 +303,7 @@ declare -A GROUP5_PREV=(
   [v2.10.0-M3+1708a7f-bootstrap]=v2.10.0-M3+fb67a1d-bootstrap
   [v2.10.0-M3+8ce4787-bootstrap]=v2.10.0-M3+1708a7f-bootstrap
   [v2.10.0-M3+6bb5975-bootstrap]=v2.10.0-M3+8ce4787-bootstrap
+  [v2.10.0-M3+252a448-bootstrap]=v2.10.0-M3+6bb5975-bootstrap
 )
 
 declare -A GROUP5_MODE=(
@@ -345,6 +347,7 @@ declare -A GROUP5_MODE=(
   [v2.10.0-M3+1708a7f-bootstrap]=build
   [v2.10.0-M3+8ce4787-bootstrap]=build
   [v2.10.0-M3+6bb5975-bootstrap]=build
+  [v2.10.0-M3+252a448-bootstrap]=build
 )
 
 EXPECTED_ERROR2=(
