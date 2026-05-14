@@ -249,6 +249,7 @@ GROUP5=(
   v2.10.0-M4+96dd731-bootstrap
   v2.10.0-M4+bc2e6fe-bootstrap
   v2.10.0-M6+c39c727-bootstrap
+  v2.10.0-M6+623b739-bootstrap
   v2.10.0-M5-bootstrap
   v2.10.0-M6+7050335-bootstrap
 )
@@ -372,6 +373,7 @@ declare -A GROUP5_PREV=(
   [v2.10.0-M4+96dd731-bootstrap]=v2.10.0-M4+c18414d-bootstrap
   [v2.10.0-M4+bc2e6fe-bootstrap]=v2.10.0-M4+96dd731-bootstrap
   [v2.10.0-M6+c39c727-bootstrap]=v2.10.0-M4+bc2e6fe-bootstrap
+  [v2.10.0-M6+623b739-bootstrap]=v2.10.0-M6+c39c727-bootstrap
   [v2.10.0-M5-bootstrap]=v2.10.0-M4+bc2e6fe-bootstrap
   [v2.10.0-M6+7050335-bootstrap]=v2.10.0-M4+3393624-bootstrap
 )
@@ -451,6 +453,7 @@ declare -A GROUP5_MODE=(
   [v2.10.0-M4+96dd731-bootstrap]=build
   [v2.10.0-M4+bc2e6fe-bootstrap]=build
   [v2.10.0-M6+c39c727-bootstrap]=build
+  [v2.10.0-M6+623b739-bootstrap]=build
   [v2.10.0-M5-bootstrap]=build
   [v2.10.0-M6+7050335-bootstrap]=build
 )
