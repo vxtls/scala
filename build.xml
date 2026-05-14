@@ -437,6 +437,7 @@ INITIALISATION
     <path id="starr.dep.libs">
       <pathelement location="${fjbg.jar}"/>
       <pathelement location="${forkjoin.jar}"/>
+      <pathelement location="${build-asm.dir}/classes"/>
       <pathelement location="${legacy.beans.meta.jar}"/>
     </path>
     <!-- Auxiliary libs placed on every classpath. -->
