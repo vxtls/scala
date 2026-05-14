@@ -40,7 +40,10 @@ object Exception {
     def apply(x: Throwable): T = f(downcast(x).get)
   }
 
-  def mkThrowableCatcher[T](isDef: Throwable => Boolean, f: Throwable => T) = mkCatcher(isDef, f)
+  def mkThrowableCatcher[T](isDef: Throwable => Boolean, f: Throwable => T) = new Catcher[T] {
+    def isDefinedAt(x: Throwable) = isDef(x)
+    def apply(x: Throwable): T = f(x)
+  }
 
   implicit def throwableSubtypeToCatcher[Ex <: Throwable: ClassTag, T](pf: PartialFunction[Ex, T]) =
     mkCatcher(pf.isDefinedAt _, pf.apply _)

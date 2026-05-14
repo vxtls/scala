@@ -1104,7 +1104,7 @@ trait Macros extends scala.tools.reflect.FastTrack with Traces {
                   case x          => x
                 }
                 finally {
-                  expandee.removeAttachment[MacroRuntimeAttachment]
+                  expandee.removeAttachment[MacroRuntimeAttachment](scala.reflect.ClassTag(classOf[MacroRuntimeAttachment]))
                   if (!isSuccess) openMacros = openMacros.tail
                 }
               }
