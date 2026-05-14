@@ -75,7 +75,14 @@ object NameTransformer {
           buf = new StringBuilder()
           buf.append(name.substring(0, i))
         }
-        buf.append("$u%04X".format(c.toInt))
+        val hex = java.lang.Integer.toHexString(c.toInt).toUpperCase
+        buf.append("$u")
+        var pad = hex.length
+        while (pad < 4) {
+          buf.append('0')
+          pad += 1
+        }
+        buf.append(hex)
       }
       else if (buf ne null) {
         buf.append(c)
