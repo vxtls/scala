@@ -415,7 +415,14 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   val MaxPhases = 64
 
-  val phaseWithId: Array[Phase] = Array.fill(MaxPhases)(NoPhase)
+  val phaseWithId: Array[Phase] = java.lang.reflect.Array.newInstance(classOf[Phase], MaxPhases).asInstanceOf[Array[Phase]];
+  {
+    var idx = 0
+    while (idx < phaseWithId.length) {
+      phaseWithId(idx) = NoPhase
+      idx += 1
+    }
+  }
 
   abstract class GlobalPhase(prev: Phase) extends Phase(prev) {
     phaseWithId(id) = this
