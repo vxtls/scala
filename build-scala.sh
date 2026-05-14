@@ -31,6 +31,7 @@ starr_comp="$prev_dir/build/pack/lib/scala-compiler.jar"
   echo "previous stage pack jars are missing under $prev_dir/build/pack/lib" >&2
   exit 1
 }
+active_starr_comp="$starr_comp"
 
 java8_override_jar="$stage_dir/build/java8-charbuffer-overrides.jar"
 java8_legacy_stubs_jar="$stage_dir/build/java8-legacy-stubs.jar"
@@ -64,7 +65,7 @@ run_ant() {
     -Dversion.number="$version_number" \
     -Djava6.home="$JAVA_HOME" \
     -Dlib.starr.jar="$starr_lib" \
-    -Dcomp.starr.jar="$starr_comp" \
+    -Dcomp.starr.jar="$active_starr_comp" \
     -Dlegacy.reflect.beans.jar="$legacy_reflect_beans_jar" \
     -Dlegacy.beans.meta.jar="$legacy_beans_meta_jar" \
     -Dscalac.args="$scalac_args" \
@@ -105,6 +106,30 @@ EOF
 
 needs_transition_bootstrap_compiler() {
   [[ "$version_number" == "v2.9.3+55109d-bootstrap" ]]
+}
+
+needs_anyval_class_transition() {
+  [[ "$version_number" == "v2.10.0-M2+be11c92-bootstrap" ]]
+}
+
+build_anyval_class_transition() {
+  local transition_comp="$stage_dir/build/locker/classes/compiler"
+  local seeded_lib="$stage_dir/build/locker/classes/library"
+
+  run_ant no jline.done forkjoin.done libs.fjbgpack
+
+  rm -rf "$seeded_lib" "$stage_dir/build/locker/library.complete"
+  mkdir -p "$seeded_lib"
+  (cd "$seeded_lib" && "$JAVA_HOME/bin/jar" xf "$starr_lib")
+  touch "$stage_dir/build/locker/library.complete"
+
+  active_starr_comp="$starr_comp"
+  run_ant no locker.comp
+
+  rm -rf "$seeded_lib" "$stage_dir/build/locker/library.complete"
+  active_starr_comp="$transition_comp"
+  run_ant no locker.lib
+  run_ant no build
 }
 
 build_transition_bootstrap_compiler() {
@@ -154,7 +179,11 @@ build_test_deps() {
 if [[ "$mode" == "build" || "$mode" == "all" ]]; then
   run_ant no locker.clean clean
   build_deps
-  run_ant no build
+  if needs_anyval_class_transition; then
+    build_anyval_class_transition
+  else
+    run_ant no build
+  fi
 fi
 
 if [[ "$mode" == "test" || "$mode" == "all" ]]; then
