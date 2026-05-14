@@ -35,7 +35,12 @@ trait Chars {
     if (0 <= num && num < base) num else -1
   }
   /** Buffer for creating '\ u XXXX' strings. */
-  private[this] val char2uescapeArray = Array[Char]('\\', 'u', 0, 0, 0, 0)
+  private[this] val char2uescapeArray = {
+    val chars = new Array[Char](6)
+    chars(0) = '\\'
+    chars(1) = 'u'
+    chars
+  }
 
   /** Convert a character to a backslash-u escape */
   def char2uescape(c: Char): String = {
