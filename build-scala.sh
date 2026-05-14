@@ -27,6 +27,8 @@ rt_jar="${JAVA_HOME:+$JAVA_HOME/jre/lib/rt.jar}"
 
 starr_lib="$prev_dir/build/pack/lib/scala-library.jar"
 starr_comp="$prev_dir/build/pack/lib/scala-compiler.jar"
+starr_reflect="$prev_dir/build/pack/lib/scala-reflect.jar"
+[[ -f "$starr_reflect" ]] || starr_reflect=""
 [[ -f "$starr_lib" && -f "$starr_comp" ]] || {
   echo "previous stage pack jars are missing under $prev_dir/build/pack/lib" >&2
   exit 1
@@ -79,6 +81,7 @@ run_ant() {
     -Dversion.number="$version_number" \
     -Djava6.home="$JAVA_HOME" \
     -Dlib.starr.jar="$starr_lib" \
+    ${starr_reflect:+"-Dreflect.starr.jar=$starr_reflect"} \
     -Dcomp.starr.jar="$active_starr_comp" \
     -Dlegacy.reflect.beans.jar="$legacy_reflect_beans_jar" \
     -Dlegacy.beans.meta.jar="$legacy_beans_meta_jar" \
@@ -139,7 +142,8 @@ needs_previous_forkjoin_jar() {
     || [[ "$version_number" == "v2.10.0-M3+6355d1-bootstrap" ]] \
     || [[ "$version_number" == "v2.10.0-M3+3896a4-bootstrap" ]] \
     || [[ "$version_number" == "v2.10.0-M3+d9103e-bootstrap" ]] \
-    || [[ "$version_number" == "v2.10.0-M3+0b2f1bc-bootstrap" ]]
+    || [[ "$version_number" == "v2.10.0-M3+0b2f1bc-bootstrap" ]] \
+    || [[ "$version_number" == "v2.10.0-M3+07f7baa-bootstrap" ]]
 }
 
 build_anyval_class_transition() {
