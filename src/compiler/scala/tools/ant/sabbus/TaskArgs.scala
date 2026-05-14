@@ -42,7 +42,14 @@ trait TaskArgs extends CompilationPathProperty {
   }
 
   def setParams(input: String) {
-    extraArgs ++= input.split(' ').map { s => val a = new Argument; a.setValue(s); a }
+    val parts = input.split(' ')
+    var i = 0
+    while (i < parts.length) {
+      val a = new Argument
+      a.setValue(parts(i))
+      extraArgs :+= a
+      i += 1
+    }
   }
 
   def createCompilerArg(): Argument = {
