@@ -12,10 +12,10 @@ result = (() => {
 evaluated = Element(someName)
 testing: (() => truc.elem = 6)
 result = (() => truc.elem{Int} = 6{Int(6)}{Unit}){() => Unit}
-evaluated = null
+evaluated = ()
 testing: (() => truc.elem = truc.elem.$plus(6))
 result = (() => truc.elem{Int} = truc.elem.+{(x: <?>)Int}(6{Int(6)}){Int}{Unit}){() => Unit}
-evaluated = null
+evaluated = ()
 testing: (() => new baz.BazElement("someName"))
 result = (() => new baz.BazElement{baz.BazElement}{(name: <?>)baz.BazElement}("someName"{String("someName")}){baz.BazElement}){() => baz.BazElement}
 evaluated = BazElement(someName)

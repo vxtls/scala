@@ -4,9 +4,13 @@ Type :help for more information.
 scala> 
 
 scala> println(3)
+missing argument
+bad option: '-javabootclasspath'
 3
 
 scala>   List(1,2)
+missing argument
+bad option: '-javabootclasspath'
 res1: List[Int] = List(1, 2)
 
 scala> 
