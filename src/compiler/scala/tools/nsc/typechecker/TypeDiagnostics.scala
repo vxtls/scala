@@ -204,28 +204,27 @@ trait TypeDiagnostics {
                 def isJava  = reqsym.isJavaDefined
                 def isScala = reqsym hasTransOwner ScalaPackageClass
 
-                val explainFound = "%s %s %s%s, but ".format(
-                  arg, op, reqArg,
-                  // If the message involves a type from the base type sequence rather than the
-                  // actual found type, we need to explain why we're talking about it.  Less brute
-                  // force measures than comparing normalized Strings were producing error messages
-                  // like "and java.util.ArrayList[String] <: java.util.ArrayList[String]" but there
-                  // should be a cleaner way to do this.
+                // If the message involves a type from the base type sequence rather than the
+                // actual found type, we need to explain why we're talking about it.  Less brute
+                // force measures than comparing normalized Strings were producing error messages
+                // like "and java.util.ArrayList[String] <: java.util.ArrayList[String]" but there
+                // should be a cleaner way to do this.
+                val foundNote =
                   if (found.normalize.toString == tp.normalize.toString) ""
-                  else " (and %s <: %s)".format(found, tp)
-                )
+                  else " (and " + found + " <: " + tp + ")"
+                val explainFound = arg + " " + op + " " + reqArg + foundNote + ", but "
                 val explainDef = {
                   val prepend = if (isJava) "Java-defined " else ""
-                  "%s%s is %s in %s.".format(prepend, reqsym, varianceWord(param), param)
+                  prepend + reqsym + " is " + varianceWord(param) + " in " + param + "."
                 }
                 // Don't suggest they change the class declaration if it's somewhere
                 // under scala.* or defined in a java class, because attempting either
                 // would be fruitless.
                 val suggestChange = "\nYou may wish to " + (
                   if (isScala || isJava)
-                    "investigate a wildcard type such as `_ %s %s`. (SLS 3.2.10)".format(op, reqArg)
+                    "investigate a wildcard type such as `_ " + op + " " + reqArg + "`. (SLS 3.2.10)"
                   else
-                    "define %s as %s%s instead. (SLS 4.5)".format(param.name, suggest, param.name)
+                    "define " + param.name + " as " + suggest + param.name + " instead. (SLS 4.5)"
                 )
 
                 Some("Note: " + explainFound + explainDef + suggestChange)
@@ -300,15 +299,11 @@ trait TypeDiagnostics {
       else 1
 
     override def toString = {
-      """
-      |tp = %s
-      |tp.typeSymbol = %s
-      |tp.typeSymbol.owner = %s
-      |tp.typeSymbolDirect = %s
-      |tp.typeSymbolDirect.owner = %s
-      """.stripMargin.format(
-        tp, tp.typeSymbol, tp.typeSymbol.owner, tp.typeSymbolDirect, tp.typeSymbolDirect.owner
-      )
+      "\ntp = " + tp +
+      "\ntp.typeSymbol = " + tp.typeSymbol +
+      "\ntp.typeSymbol.owner = " + tp.typeSymbol.owner +
+      "\ntp.typeSymbolDirect = " + tp.typeSymbolDirect +
+      "\ntp.typeSymbolDirect.owner = " + tp.typeSymbolDirect.owner + "\n"
     }
   }
   /** This is tricky stuff - we need to traverse types deeply to
@@ -397,7 +392,7 @@ trait TypeDiagnostics {
     private def contextWarning(pos: Position, msg: String) = context.unit.warning(pos, msg)
 
     def permanentlyHiddenWarning(pos: Position, hidden: Name, defn: Symbol) =
-      contextWarning(pos, "imported `%s' is permanently hidden by definition of %s".format(hidden, defn.fullLocationString))
+      contextWarning(pos, "imported `" + hidden + "' is permanently hidden by definition of " + defn.fullLocationString)
 
     object checkDead {
       private var expr: Symbol = NoSymbol
