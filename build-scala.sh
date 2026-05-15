@@ -52,6 +52,10 @@ if grep -q 'name="scalac.args" value="-Xmacros"' "$stage_dir/build.xml"; then
   scalac_args="-Xmacros $scalac_args"
 fi
 
+if [[ "$version_number" == "v2.10.0-M7+a0a63c-bootstrap" ]]; then
+  scalac_args="-Xno-patmat-analysis $scalac_args"
+fi
+
 run_ant() {
   local ant_runtime_opts="$ant_opts"
   local runtime_mode="${1:-no}"
