@@ -239,7 +239,7 @@ trait PatternMatching extends Transform with TypingTransformers with ast.TreeDSL
 
       // the alternative to attaching the default case override would be to simply
       // append the default to the list of cases and suppress the unreachable case error that may arise (once we detect that...)
-      val matchFailGenOverride = match_.attachments.get[DefaultOverrideMatchAttachment].map{case DefaultOverrideMatchAttachment(default) => ((scrut: Tree) => default)}
+      val matchFailGenOverride = match_.attachments.get[DefaultOverrideMatchAttachment](scala.reflect.ClassTag(classOf[DefaultOverrideMatchAttachment])).map{case DefaultOverrideMatchAttachment(default) => ((scrut: Tree) => default)}
 
       val selectorSym  = freshSym(selector.pos, pureType(selectorTp)) setFlag SYNTH_CASE
       // pt = Any* occurs when compiling test/files/pos/annotDepMethType.scala  with -Xexperimental
