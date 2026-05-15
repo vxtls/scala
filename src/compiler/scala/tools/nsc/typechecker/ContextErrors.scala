@@ -107,7 +107,7 @@ trait ContextErrors {
           val paramName = param.name
           val paramTp   = param.tpe
           paramTp.typeSymbolDirect match {
-              case ImplicitNotFoundMsg(msg) => msg.format(paramName, paramTp)
+              case ImplicitNotFoundMsg(msg) => java.lang.String.format(msg.toString, paramName.asInstanceOf[AnyRef], paramTp.asInstanceOf[AnyRef])
               case _ =>
                 "could not find implicit value for "+
                    (if (paramName startsWith nme.EVIDENCE_PARAM_PREFIX) "evidence parameter of type "
@@ -467,11 +467,10 @@ trait ContextErrors {
             if (missing.isEmpty) ""
             else {
               val keep = missing take 3 map (_.name)
-              ".\nUnspecified value parameter%s %s".format(
-                if (missing.tail.isEmpty) "" else "s",
-                if ((missing drop 3).nonEmpty) (keep :+ "...").mkString(", ")
-                else keep.mkString("", ", ", ".")
-              )
+              ".\nUnspecified value parameter" +
+                (if (missing.tail.isEmpty) "" else "s") + " " +
+                (if ((missing drop 3).nonEmpty) (keep :+ "...").mkString(", ")
+                else keep.mkString("", ", ", "."))
             }
           }
 
@@ -610,9 +609,9 @@ trait ContextErrors {
         val isBug = sym0.isAbstractType && sym1.isAbstractType && (sym0.name startsWith "_$")
         val addendums = List(
           if (sym0.associatedFile eq sym1.associatedFile)
-            Some("conflicting symbols both originated in file '%s'".format(sym0.associatedFile.canonicalPath))
+            Some("conflicting symbols both originated in file '" + sym0.associatedFile.canonicalPath + "'")
           else if ((sym0.associatedFile ne null) && (sym1.associatedFile ne null))
-            Some("conflicting symbols originated in files '%s' and '%s'".format(sym0.associatedFile.canonicalPath, sym1.associatedFile.canonicalPath))
+            Some("conflicting symbols originated in files '" + sym0.associatedFile.canonicalPath + "' and '" + sym1.associatedFile.canonicalPath + "'")
           else None ,
           if (isBug) Some("Note: this may be due to a bug in the compiler involving wildcards in package objects") else None
         )
@@ -899,7 +898,7 @@ trait ContextErrors {
         val s3 = if (prevSym.isCase) "case class " + prevSym.name else "" + prevSym
         val where = if (currentSym.owner.isPackageClass != prevSym.owner.isPackageClass) {
                       val inOrOut = if (prevSym.owner.isPackageClass) "outside of" else "in"
-                      " %s package object %s".format(inOrOut, ""+prevSym.effectiveOwner.name)
+                      " " + inOrOut + " package object " + prevSym.effectiveOwner.name
                     } else ""
 
         issueSymbolTypeError(currentSym, prevSym.name + " is already defined as " + s2 + s3 + where)
@@ -961,8 +960,7 @@ trait ContextErrors {
         issueSymbolTypeError(sym, "abstract member may not have " + Flags.flagsToString(flag) + " modifier")
 
       def IllegalModifierCombination(sym: Symbol, flag1: Int, flag2: Int) =
-        issueSymbolTypeError(sym, "illegal combination of modifiers: %s and %s for: %s".format(
-            Flags.flagsToString(flag1), Flags.flagsToString(flag2), sym))
+        issueSymbolTypeError(sym, "illegal combination of modifiers: " + Flags.flagsToString(flag1) + " and " + Flags.flagsToString(flag2) + " for: " + sym)
 
       def IllegalDependentMethTpeError(sym: Symbol)(context: Context) = {
         val errorAddendum =
@@ -1046,10 +1044,7 @@ trait ContextErrors {
       setError(arg) // to distinguish it from ambiguous reference error
 
       def errMsg =
-        "%s definition needs %s because '%s' is used as a named argument in its body.".format(
-          "variable",   // "method"
-          "type",       // "result type"
-          sym.name)
+        "variable definition needs type because '" + sym.name + "' is used as a named argument in its body."
       issueSymbolTypeError(sym, errMsg)
     }
 
