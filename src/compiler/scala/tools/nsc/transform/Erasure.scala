@@ -742,7 +742,7 @@ abstract class Erasure extends AddInterfaces
       val tree1 = try {
         tree match {
           case InjectDerivedValue(arg) =>
-            (tree.attachments.get[TypeRefAttachment]: @unchecked) match {
+            (tree.attachments.all.find(_.isInstanceOf[TypeRefAttachment]).asInstanceOf[Option[TypeRefAttachment]]: @unchecked) match {
               case Some(itype) =>
                 val tref = itype.tpe
                 val argPt = atPhase(currentRun.erasurePhase)(erasedValueClassArg(tref))

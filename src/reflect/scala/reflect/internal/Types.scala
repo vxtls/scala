@@ -5042,11 +5042,17 @@ trait Types extends api.Types { self: SymbolTable =>
         @inline def revive(suspension: List[TypeVar]) =
           if (suspension ne null) suspension foreach (_.suspended = false)
 
-        val suspensions = Array(tp1, stp.tp1, tp2, stp.tp2) map suspend
+        val suspension1 = suspend(tp1)
+        val suspension2 = suspend(stp.tp1)
+        val suspension3 = suspend(tp2)
+        val suspension4 = suspend(stp.tp2)
 
         val sameTypes = (tp1 =:= stp.tp1) && (tp2 =:= stp.tp2)
 
-        suspensions foreach revive
+        revive(suspension1)
+        revive(suspension2)
+        revive(suspension3)
+        revive(suspension4)
 
         sameTypes
       case _ =>

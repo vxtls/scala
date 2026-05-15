@@ -698,9 +698,9 @@ LOCAL REFERENCE BUILD (LOCKER)
       destdir="${build-locker.dir}/classes/library"
       compilerpathref="starr.classpath"
       srcpath="${src.dir}/library"
-      params="${scalac.args.all}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
+      <compilerarg line="${scalac.args.all}"/>
       <include name="**/*.scala"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
@@ -738,9 +738,9 @@ LOCAL REFERENCE BUILD (LOCKER)
     <scalacfork
       destdir="${build-locker.dir}/classes/reflect"
       compilerpathref="starr.classpath"
-      params="${scalac.args.all}"
       srcdir="${src.dir}/reflect"
       jvmargs="${scalacfork.jvmargs}">
+      <compilerarg line="${scalac.args.all}"/>
       <include name="**/*.scala"/>
       <compilationpath>
         <pathelement location="${build-locker.dir}/classes/library"/>
@@ -786,9 +786,9 @@ LOCAL REFERENCE BUILD (LOCKER)
     <scalacfork
       destdir="${build-locker.dir}/classes/compiler"
       compilerpathref="starr.classpath"
-      params="${scalac.args.all}"
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
+      <compilerarg line="${scalac.args.all}"/>
       <include name="**/*.scala"/>
       <exclude name="scala/tools/nsc/backend/MSILPlatform.scala"/>
       <exclude name="scala/tools/nsc/backend/msil/**/*.scala"/>

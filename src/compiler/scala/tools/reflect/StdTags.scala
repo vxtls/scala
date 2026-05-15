@@ -2,7 +2,6 @@ package scala.tools
 package reflect
 
 import java.lang.{Class => jClass}
-import scala.reflect.{ClassTag, classTag}
 import scala.reflect.base.{MirrorOf, TypeCreator, Universe => BaseUniverse}
 
 // [Eugene++] Before 2.10 is released, I suggest we don't rely on automated type tag generation
@@ -24,25 +23,25 @@ trait StdTags {
         }
       })
 
-  private def tagOfStaticClass[T: ClassTag]: u.TypeTag[T] =
+  private def tagOfStaticClass[T](cls: jClass[_]): u.TypeTag[T] =
     u.TypeTag[T](
       m,
       new TypeCreator {
         def apply[U <: BaseUniverse with Singleton](m: MirrorOf[U]): U # Type =
-          m.staticClass(classTag[T].runtimeClass.getName).toTypeConstructor.asInstanceOf[U # Type]
+          m.staticClass(cls.getName).toTypeConstructor.asInstanceOf[U # Type]
       })
   lazy val tagOfInt = u.TypeTag.Int
-  lazy val tagOfString = tagOfStaticClass[String]
-  lazy val tagOfFile = tagOfStaticClass[scala.tools.nsc.io.File]
-  lazy val tagOfDirectory = tagOfStaticClass[scala.tools.nsc.io.Directory]
-  lazy val tagOfStdReplVals = tagOfStaticClass[scala.tools.nsc.interpreter.StdReplVals]
-  lazy val tagOfIMain = tagOfStaticClass[scala.tools.nsc.interpreter.IMain]
-  lazy val tagOfThrowable = tagOfStaticClass[java.lang.Throwable]
-  lazy val tagOfClassLoader = tagOfStaticClass[java.lang.ClassLoader]
-  lazy val tagOfBigInt = tagOfStaticClass[BigInt]
-  lazy val tagOfBigDecimal = tagOfStaticClass[BigDecimal]
-  lazy val tagOfCalendar = tagOfStaticClass[java.util.Calendar]
-  lazy val tagOfDate = tagOfStaticClass[java.util.Date]
+  lazy val tagOfString = tagOfStaticClass[String](classOf[String])
+  lazy val tagOfFile = tagOfStaticClass[scala.tools.nsc.io.File](classOf[scala.tools.nsc.io.File])
+  lazy val tagOfDirectory = tagOfStaticClass[scala.tools.nsc.io.Directory](classOf[scala.tools.nsc.io.Directory])
+  lazy val tagOfStdReplVals = tagOfStaticClass[scala.tools.nsc.interpreter.StdReplVals](classOf[scala.tools.nsc.interpreter.StdReplVals])
+  lazy val tagOfIMain = tagOfStaticClass[scala.tools.nsc.interpreter.IMain](classOf[scala.tools.nsc.interpreter.IMain])
+  lazy val tagOfThrowable = tagOfStaticClass[java.lang.Throwable](classOf[java.lang.Throwable])
+  lazy val tagOfClassLoader = tagOfStaticClass[java.lang.ClassLoader](classOf[java.lang.ClassLoader])
+  lazy val tagOfBigInt = tagOfStaticClass[BigInt](classOf[BigInt])
+  lazy val tagOfBigDecimal = tagOfStaticClass[BigDecimal](classOf[BigDecimal])
+  lazy val tagOfCalendar = tagOfStaticClass[java.util.Calendar](classOf[java.util.Calendar])
+  lazy val tagOfDate = tagOfStaticClass[java.util.Date](classOf[java.util.Date])
 }
 
 object StdRuntimeTags extends StdTags {

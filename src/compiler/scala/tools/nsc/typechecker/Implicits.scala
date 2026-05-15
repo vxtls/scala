@@ -1466,9 +1466,20 @@ trait Implicits {
         interpolate(msg, Map((typeParamNames zip typeArgs): _*)) // TODO: give access to the name and type of the implicit argument, etc?
 
       def validate: Option[String] = {
-        import scala.util.matching.Regex; import collection.breakOut
-        // is there a shorter way to avoid the intermediate toList?
-        val refs = """\$\{([^}]+)\}""".r.findAllIn(msg).matchData.map(_ group 1).toSet
+        def refsIn(s: String): Set[String] = {
+          var refs = Set[String]()
+          var start = s.indexOf("${")
+          while (start >= 0) {
+            val end = s.indexOf('}', start + 2)
+            if (end >= 0) {
+              refs += s.substring(start + 2, end)
+              start = s.indexOf("${", end + 1)
+            }
+            else start = -1
+          }
+          refs
+        }
+        val refs = refsIn(msg)
         val decls = typeParamNames.toSet
 
         (refs &~ decls) match {

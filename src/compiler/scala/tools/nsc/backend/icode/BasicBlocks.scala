@@ -305,11 +305,15 @@ trait BasicBlocks {
     def subst(map: Map[Instruction, Instruction]): Unit =
       if (!closed)
         instructionList = instructionList map (x => map.getOrElse(x, x))
-      else
-        instrs.zipWithIndex collect {
-          case (oldInstr, i) if map contains oldInstr =>
+      else {
+        var i = 0
+        while (i < instrs.length) {
+          val oldInstr = instrs(i)
+          if (map contains oldInstr)
             code.touched |= replaceInstruction(i, map(oldInstr))
+          i += 1
         }
+      }
 
     ////////////////////// Emit //////////////////////
 
@@ -395,7 +399,15 @@ trait BasicBlocks {
         closed = true
         setFlag(DIRTYSUCCS)
         instructionList = instructionList.reverse
-        instrs = instructionList.toArray
+        val arr = new Array[Instruction](instructionList.length)
+        var rest = instructionList
+        var i = 0
+        while (rest.nonEmpty) {
+          arr(i) = rest.head
+          rest = rest.tail
+          i += 1
+        }
+        instrs = arr
       }
     }
 

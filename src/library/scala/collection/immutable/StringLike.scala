@@ -262,8 +262,18 @@ self =>
    *  @param args the arguments used to instantiating the pattern.
    *  @throws `java.lang.IllegalArgumentException`
    */
+  private def formatArgs(args: scala.Seq[Any]): Array[Object] = {
+    val res = new Array[Object](args.length)
+    var i = 0
+    for (arg <- args) {
+      res(i) = unwrapArg(arg).asInstanceOf[Object]
+      i += 1
+    }
+    res
+  }
+
   def format(args : Any*): String =
-    java.lang.String.format(toString, args map unwrapArg: _*)
+    java.lang.String.format(toString, formatArgs(args): _*)
 
   /** Like `format(args*)` but takes an initial `Locale` parameter
    *  which influences formatting as in `java.lang.String`'s format.
@@ -280,5 +290,5 @@ self =>
    *  @throws `java.lang.IllegalArgumentException`
    */
   def formatLocal(l: java.util.Locale, args: Any*): String =
-    java.lang.String.format(l, toString, args map unwrapArg: _*)
+    java.lang.String.format(l, toString, formatArgs(args): _*)
 }

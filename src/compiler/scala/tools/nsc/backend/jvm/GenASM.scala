@@ -451,8 +451,8 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
   /** basic functionality for class file building */
   abstract class JBuilder(bytecodeWriter: BytecodeWriter) {
 
-    val EMPTY_JTYPE_ARRAY  = Array.empty[asm.Type]
-    val EMPTY_STRING_ARRAY = Array.empty[String]
+    val EMPTY_JTYPE_ARRAY  = new Array[asm.Type](0)
+    val EMPTY_STRING_ARRAY = new Array[String](0)
 
     val mdesc_arglessvoid = "()V"
 
@@ -641,7 +641,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
     def javaType(s: Symbol): asm.Type = {
       if (s.isMethod) {
         val resT: asm.Type = if (s.isClassConstructor) asm.Type.VOID_TYPE else javaType(s.tpe.resultType);
-        asm.Type.getMethodType( resT, (s.tpe.paramTypes map javaType): _* )
+        asm.Type.getMethodType( resT, mkArray(s.tpe.paramTypes map javaType): _* )
       } else { javaType(s.tpe) }
     }
 
@@ -1114,7 +1114,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       val thrownExceptions: List[String] = getExceptions(throws)
 
       val jReturnType = javaType(methodInfo.resultType)
-      val mdesc = asm.Type.getMethodDescriptor(jReturnType, paramJavaTypes: _*)
+      val mdesc = asm.Type.getMethodDescriptor(jReturnType, mkArray(paramJavaTypes): _*)
       val mirrorMethodName = javaName(m)
       val mirrorMethod: asm.MethodVisitor = jclass.visitMethod(
         flags,
@@ -1241,7 +1241,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
         asm.Opcodes.INVOKEVIRTUAL,
         moduleName,
         androidFieldName,
-        asm.Type.getMethodDescriptor(creatorType, Array.empty[asm.Type]: _*)
+        asm.Type.getMethodDescriptor(creatorType, EMPTY_JTYPE_ARRAY: _*)
       )
 
       // PUTSTATIC `thisName`.CREATOR;
@@ -1319,6 +1319,22 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
     val mdesc_arrayClone  = "()Ljava/lang/Object;"
 
     val tdesc_long        = asm.Type.LONG_TYPE.getDescriptor // ie. "J"
+
+    def intArray4(a0: Int, a1: Int, a2: Int, a3: Int): Array[Int] = {
+      val a = new Array[Int](4)
+      a(0) = a0; a(1) = a1; a(2) = a2; a(3) = a3
+      a
+    }
+    def intArray7(a0: Int, a1: Int, a2: Int, a3: Int, a4: Int, a5: Int, a6: Int): Array[Int] = {
+      val a = new Array[Int](7)
+      a(0) = a0; a(1) = a1; a(2) = a2; a(3) = a3; a(4) = a4; a(5) = a5; a(6) = a6
+      a
+    }
+    def intArray8(a0: Int, a1: Int, a2: Int, a3: Int, a4: Int, a5: Int, a6: Int, a7: Int): Array[Int] = {
+      val a = new Array[Int](8)
+      a(0) = a0; a(1) = a1; a(2) = a2; a(3) = a3; a(4) = a4; a(5) = a5; a(6) = a6; a(7) = a7
+      a
+    }
 
     def isParcelableClass = isAndroidParcelableClass(clasz.symbol)
 
@@ -1569,7 +1585,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       val thrownExceptions: List[String] = getExceptions(excs)
 
       jMethodName = javaName(m.symbol)
-      val mdesc = asm.Type.getMethodDescriptor(resTpe, (m.params map (p => javaType(p.kind))): _*)
+      val mdesc = asm.Type.getMethodDescriptor(resTpe, mkArray(m.params map (p => javaType(p.kind))): _*)
       jmethod = jclass.visitMethod(
         flags,
         jMethodName,
@@ -1960,10 +1976,10 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
       // ---------------- array load and store ----------------
 
-      val aloadOpcodes  = { import Opcodes._; Array(AALOAD,  BALOAD,  SALOAD,  CALOAD,  IALOAD,  LALOAD,  FALOAD,  DALOAD)  }
-      val astoreOpcodes = { import Opcodes._; Array(AASTORE, BASTORE, SASTORE, CASTORE, IASTORE, LASTORE, FASTORE, DASTORE) }
+      val aloadOpcodes  = { import Opcodes._; intArray8(AALOAD,  BALOAD,  SALOAD,  CALOAD,  IALOAD,  LALOAD,  FALOAD,  DALOAD)  }
+      val astoreOpcodes = { import Opcodes._; intArray8(AASTORE, BASTORE, SASTORE, CASTORE, IASTORE, LASTORE, FASTORE, DASTORE) }
 
-      val returnOpcodes = { import Opcodes._; Array(ARETURN, IRETURN, IRETURN, IRETURN, IRETURN, LRETURN, FRETURN, DRETURN) }
+      val returnOpcodes = { import Opcodes._; intArray8(ARETURN, IRETURN, IRETURN, IRETURN, IRETURN, LRETURN, FRETURN, DRETURN) }
 
       def emitTypeBased(opcs: Array[Int], tk: TypeKind) {
         assert(tk != UNIT, tk)
@@ -1989,12 +2005,12 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
       // ---------------- primitive operations ----------------
 
-      val negOpcodes: Array[Int] = { import Opcodes._; Array(INEG, LNEG, FNEG, DNEG) }
-      val addOpcodes: Array[Int] = { import Opcodes._; Array(IADD, LADD, FADD, DADD) }
-      val subOpcodes: Array[Int] = { import Opcodes._; Array(ISUB, LSUB, FSUB, DSUB) }
-      val mulOpcodes: Array[Int] = { import Opcodes._; Array(IMUL, LMUL, FMUL, DMUL) }
-      val divOpcodes: Array[Int] = { import Opcodes._; Array(IDIV, LDIV, FDIV, DDIV) }
-      val remOpcodes: Array[Int] = { import Opcodes._; Array(IREM, LREM, FREM, DREM) }
+      val negOpcodes: Array[Int] = { import Opcodes._; intArray4(INEG, LNEG, FNEG, DNEG) }
+      val addOpcodes: Array[Int] = { import Opcodes._; intArray4(IADD, LADD, FADD, DADD) }
+      val subOpcodes: Array[Int] = { import Opcodes._; intArray4(ISUB, LSUB, FSUB, DSUB) }
+      val mulOpcodes: Array[Int] = { import Opcodes._; intArray4(IMUL, LMUL, FMUL, DMUL) }
+      val divOpcodes: Array[Int] = { import Opcodes._; intArray4(IDIV, LDIV, FDIV, DDIV) }
+      val remOpcodes: Array[Int] = { import Opcodes._; intArray4(IREM, LREM, FREM, DREM) }
 
       def emitPrimitive(opcs: Array[Int], tk: TypeKind) {
         val opc = {
@@ -2693,10 +2709,10 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
 
         if(from.isIntSizedType) { // BYTE, CHAR, SHORT, and INT. (we're done with BOOL already)
 
-          val fromByte  = { import asm.Opcodes._; Array( -1,  -1, I2C,  -1, I2L, I2F, I2D) } // do nothing for (BYTE -> SHORT) and for (BYTE -> INT)
-          val fromChar  = { import asm.Opcodes._; Array(I2B, I2S,  -1,  -1, I2L, I2F, I2D) } // for (CHAR  -> INT) do nothing
-          val fromShort = { import asm.Opcodes._; Array(I2B,  -1, I2C,  -1, I2L, I2F, I2D) } // for (SHORT -> INT) do nothing
-          val fromInt   = { import asm.Opcodes._; Array(I2B, I2S, I2C,  -1, I2L, I2F, I2D) }
+          val fromByte  = { import asm.Opcodes._; intArray7( -1,  -1, I2C,  -1, I2L, I2F, I2D) } // do nothing for (BYTE -> SHORT) and for (BYTE -> INT)
+          val fromChar  = { import asm.Opcodes._; intArray7(I2B, I2S,  -1,  -1, I2L, I2F, I2D) } // for (CHAR  -> INT) do nothing
+          val fromShort = { import asm.Opcodes._; intArray7(I2B,  -1, I2C,  -1, I2L, I2F, I2D) } // for (SHORT -> INT) do nothing
+          val fromInt   = { import asm.Opcodes._; intArray7(I2B, I2S, I2C,  -1, I2L, I2F, I2D) }
 
           (from: @unchecked) match {
             case BYTE  => pickOne(fromByte)
@@ -2839,10 +2855,12 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
               case REFERENCE(_) | ARRAY(_) => JAVA_LANG_OBJECT
               case _ => javaType(el)
             }
+            val appendParamTypes = new Array[asm.Type](1)
+            appendParamTypes(0) = jtype
             jcode.invokevirtual(
               StringBuilderClassName,
               "append",
-              asm.Type.getMethodDescriptor(StringBuilderType, Array(jtype): _*)
+              asm.Type.getMethodDescriptor(StringBuilderType, appendParamTypes: _*)
             )
 
           case EndConcat =>
@@ -3035,10 +3053,14 @@ abstract class GenASM extends SubComponent with BytecodeWriters {
       //   [ visitAnnotationDefault ] ( visitAnnotation | visitParameterAnnotation | visitAttribute )*
 
       val stringArrayJType: asm.Type = javaArrayType(JAVA_LANG_STRING)
+      val conParams = new Array[asm.Type](3)
+      conParams(0) = javaType(ClassClass)
+      conParams(1) = stringArrayJType
+      conParams(2) = stringArrayJType
       val conJType: asm.Type =
         asm.Type.getMethodType(
           asm.Type.VOID_TYPE,
-          Array(javaType(ClassClass), stringArrayJType, stringArrayJType): _*
+          conParams: _*
         )
 
       def push(lst: List[String]) {
