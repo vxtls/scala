@@ -59,10 +59,7 @@ trait Implicits {
    *  @return                        A search result
    */
   def inferImplicit(tree: Tree, pt: Type, reportAmbiguous: Boolean, isView: Boolean, context: Context, saveAmbiguousDivergent: Boolean, pos: Position): SearchResult = {
-    printInference("[infer %s] %s with pt=%s in %s".format(
-      if (isView) "view" else "implicit",
-      tree, pt, context.owner.enclClass)
-    )
+    printInference("[infer " + (if (isView) "view" else "implicit") + "] " + tree + " with pt=" + pt + " in " + context.owner.enclClass)
     printTyping(
       ptBlock("infer implicit" + (if (isView) " view" else ""),
         "tree"        -> tree,
@@ -77,7 +74,7 @@ trait Implicits {
     val subtypeStart    = Statistics.startCounter(subtypeImpl)
     val start           = Statistics.startTimer(implicitNanos)
     if (printInfers && !tree.isEmpty && !context.undetparams.isEmpty)
-      printTyping("typing implicit: %s %s".format(tree, context.undetparamsString))
+      printTyping("typing implicit: " + tree + " " + context.undetparamsString)
     val implicitSearchContext = context.makeImplicit(reportAmbiguous)
     val result = new ImplicitSearch(tree, pt, isView, implicitSearchContext, pos).bestImplicit
     if (saveAmbiguousDivergent && implicitSearchContext.hasErrors) {
@@ -147,8 +144,7 @@ trait Implicits {
    *                  that were instantiated by the winning implicit.
    */
   class SearchResult(val tree: Tree, val subst: TreeTypeSubstituter) {
-    override def toString = "SearchResult(%s, %s)".format(tree,
-      if (subst.isEmpty) "" else subst)
+    override def toString = "SearchResult(" + tree + ", " + (if (subst.isEmpty) "" else subst) + ")"
   }
 
   lazy val SearchFailure = new SearchResult(EmptyTree, EmptyTreeTypeSubstituter)
@@ -574,9 +570,7 @@ trait Implicits {
           Select(gen.mkAttributedQualifier(info.pre), implicitMemberName)
         }
       }
-      printTyping("typedImplicit1 %s, pt=%s, from implicit %s:%s".format(
-        typeDebug.ptTree(itree), wildPt, info.name, info.tpe)
-      )
+      printTyping("typedImplicit1 " + typeDebug.ptTree(itree) + ", pt=" + wildPt + ", from implicit " + info.name + ":" + info.tpe)
 
       def fail(reason: String): SearchResult = failure(itree, reason)
       try {
@@ -597,13 +591,11 @@ trait Implicits {
 
         Statistics.incCounter(typedImplicits)
 
-        printTyping("typed implicit %s:%s, pt=%s".format(itree1, itree1.tpe, wildPt))
+        printTyping("typed implicit " + itree1 + ":" + itree1.tpe + ", pt=" + wildPt)
         val itree2 = if (isView) (itree1: @unchecked) match { case Apply(fun, _) => fun }
                      else adapt(itree1, EXPRmode, wildPt)
 
-        printTyping("adapted implicit %s:%s to %s".format(
-          itree1.symbol, itree2.tpe, wildPt)
-        )
+          printTyping("adapted implicit " + itree1.symbol + ":" + itree2.tpe + " to " + wildPt)
 
         def hasMatchingSymbol(tree: Tree): Boolean = (tree.symbol == info.sym) || {
           tree match {
@@ -617,17 +609,16 @@ trait Implicits {
         if (context.hasErrors)
           fail("hasMatchingSymbol reported threw error(s)")
         else if (isLocal && !hasMatchingSymbol(itree1))
-          fail("candidate implicit %s is shadowed by %s".format(
-            info.sym.fullLocationString, itree1.symbol.fullLocationString))
+          fail("candidate implicit " + info.sym.fullLocationString + " is shadowed by " + itree1.symbol.fullLocationString)
         else {
           val tvars = undetParams map freshVar
           def ptInstantiated = pt.instantiateTypeParams(undetParams, tvars)
 
-          printInference("[search] considering %s (pt contains %s) trying %s against pt=%s".format(
-            if (undetParams.isEmpty) "no tparams" else undetParams.map(_.name).mkString(", "),
-            typeVarsInType(ptInstantiated) filterNot (_.isGround) match { case Nil => "no tvars" ; case tvs => tvs.mkString(", ") },
-            itree2.tpe, pt
-          ))
+          printInference("[search] considering " +
+            (if (undetParams.isEmpty) "no tparams" else undetParams.map(_.name).mkString(", ")) +
+            " (pt contains " +
+            (typeVarsInType(ptInstantiated) filterNot (_.isGround) match { case Nil => "no tvars" ; case tvs => tvs.mkString(", ") }) +
+            ") trying " + itree2.tpe + " against pt=" + pt)
 
           if (matchesPt(itree2.tpe, ptInstantiated, undetParams)) {
             if (tvars.nonEmpty)
@@ -679,11 +670,11 @@ trait Implicits {
             else {
               val result = new SearchResult(itree2, subst)
               Statistics.incCounter(foundImplicits)
-              printInference("[success] found %s for pt %s".format(result, ptInstantiated))
+              printInference("[success] found " + result + " for pt " + ptInstantiated)
               result
             }
           }
-          else fail("incompatible: %s does not match expected type %s".format(itree2.tpe, ptInstantiated))
+          else fail("incompatible: " + itree2.tpe + " does not match expected type " + ptInstantiated)
         }
       }
       catch {
@@ -813,10 +804,7 @@ trait Implicits {
         matches sortBy (x => if (isView) -x.useCountView else -x.useCountArg)
       }
       if (eligible.nonEmpty)
-        printInference("[search%s] %s with pt=%s in %s, eligible:\n  %s".format(
-          if (isView) " view" else "",
-          tree, pt, context.owner.enclClass, eligible.mkString("\n  "))
-        )
+        printInference("[search" + (if (isView) " view" else "") + "] " + tree + " with pt=" + pt + " in " + context.owner.enclClass + ", eligible:\n  " + eligible.mkString("\n  "))
 
       /** Faster implicit search.  Overall idea:
        *   - prune aggressively
@@ -1168,7 +1156,7 @@ trait Implicits {
           // giving up and reporting all macro exceptions regardless of their source
           // this might lead to an avalanche of errors if one of your implicit macros misbehaves
           if (isMacroException(msg)) context.error(pos, msg)
-          failure(arg, "failed to typecheck the materialized tag: %n%s".format(msg), pos)
+          failure(arg, "failed to typecheck the materialized tag: \n" + msg, pos)
         }
 
         try {
@@ -1210,7 +1198,7 @@ trait Implicits {
       )
       // todo. migrate hardcoded materialization in Implicits to corresponding implicit macros
       var materializer = atPos(pos.focus)(gen.mkMethodCall(TagMaterializers(tagClass), List(tp), List(prefix)))
-      if (settings.XlogImplicits.value) println("materializing requested %s.%s[%s] using %s".format(pre, tagClass.name, tp, materializer))
+      if (settings.XlogImplicits.value) println("materializing requested " + pre + "." + tagClass.name + "[" + tp + "] using " + materializer)
       if (context.macrosEnabled) success(materializer)
       // don't call `failure` here. if macros are disabled, we just fail silently
       // otherwise -Xlog-implicits will spam the long with zillions of "macros are disabled"
