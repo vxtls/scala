@@ -278,6 +278,7 @@ GROUP5=(
   v2.10.0-RC4-bootstrap
   v2.10.0-RC5-bootstrap
   v2.10.0-bootstrap
+  v2.10.1-RC1-bootstrap
 )
 
 declare -A GROUP4_PREV=(
@@ -428,6 +429,11 @@ declare -A GROUP5_PREV=(
   [v2.10.0-RC4-bootstrap]=v2.10.0-RC3-bootstrap
   [v2.10.0-RC5-bootstrap]=v2.10.0-RC4-bootstrap
   [v2.10.0-bootstrap]=v2.10.0-RC5-bootstrap
+  [v2.10.1-RC1-bootstrap]=v2.10.0-bootstrap
+)
+
+declare -A GROUP5_VERSION=(
+  [v2.10.1-RC1-bootstrap]=2.10.1
 )
 
 declare -A GROUP5_MODE=(
@@ -534,6 +540,7 @@ declare -A GROUP5_MODE=(
   [v2.10.0-RC4-bootstrap]=build
   [v2.10.0-RC5-bootstrap]=build
   [v2.10.0-bootstrap]=build
+  [v2.10.1-RC1-bootstrap]=build
 )
 
 EXPECTED_ERROR2=(
@@ -1019,7 +1026,7 @@ build_group5() {
     fi
 
     mode="${GROUP5_MODE[$branch]:-all}"
-    run "$SCRIPT_DIR/build-scala.sh" "$(pwd)" "$(absolute_path "$(stage_path "$effective_prev")")" "$mode" "$branch"
+    run "$SCRIPT_DIR/build-scala.sh" "$(pwd)" "$(absolute_path "$(stage_path "$effective_prev")")" "$mode" "${GROUP5_VERSION[$branch]:-$branch}"
 
     mark_built "$branch"
 
