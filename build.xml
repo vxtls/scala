@@ -197,6 +197,7 @@ PROPERTIES
   <property name="copyright.string" value="Copyright 2002-2011, LAMP/EPFL"/>
   <property name="partest.version.number" value="0.9.2"/>
   <property name="partest.javacmd" value="${java.home}/bin/java"/>
+  <property name="partest.debug.javacmd" value="${partest.javacmd}"/>
 
   <!-- These are NOT the flags used to run SuperSabbus, but the ones written
        into the script runners created with scala.tools.ant.ScalaTool -->
@@ -1778,6 +1779,26 @@ BOOTRAPING TEST AND TEST SUITE
     </partest>
   </target>
 
+  <target name="test.icode.java8" depends="pack.done">
+    <property name="partest.srcdir" value="files" />
+    <partest showlog="yes" erroronfailed="yes" javacmd="${partest.debug.javacmd}"
+             timeout="2400000"
+             srcdir="${partest.srcdir}"
+             scalacopts="${scalac.args.all}">
+      <compilationpath>
+        <path refid="pack.classpath"/>
+        <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
+        <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
+      </compilationpath>
+      <runtests dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala">
+        <containsregexp expression="extends[ \t]+IcodeTest"/>
+      </runtests>
+      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala">
+        <containsregexp expression="extends[ \t]+IcodeTest"/>
+      </jvmtests>
+    </partest>
+  </target>
+
   <target name="test.suite.no-buildmanager" depends="pack.done">
     <property name="partest.srcdir" value="files" />
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
@@ -1791,8 +1812,16 @@ BOOTRAPING TEST AND TEST SUITE
       </compilationpath>
       <postests  dir="${partest.dir}/${partest.srcdir}/pos" includes="*.scala"/>
       <negtests  dir="${partest.dir}/${partest.srcdir}/neg" includes="*.scala"/>
-      <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala" excludes="t5293-map.scala"/>
-      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala"/>
+      <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala" excludes="t5293-map.scala">
+        <not>
+          <containsregexp expression="extends[ \t]+IcodeTest"/>
+        </not>
+      </runtests>
+      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala">
+        <not>
+          <containsregexp expression="extends[ \t]+IcodeTest"/>
+        </not>
+      </jvmtests>
       <scalaptests dir="${partest.dir}/${partest.srcdir}/scalap" includes="**/*.scala"/>
       <specializedtests dir="${partest.dir}/${partest.srcdir}/specialized">
         <include name="*.scala"/>
