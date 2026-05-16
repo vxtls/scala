@@ -21,11 +21,15 @@ rm -rf "$work_dir"
 mkdir -p "$work_dir/runtime" "$work_dir/buildmanager"
 
 (cd "$work_dir/runtime" && jar xf "$legacy_stubs_jar" \
+  'java/io/ObjectInputStream$GetField.class' \
+  java/io/ObjectInputStream.class \
+  java/io/ObjectStreamClass.class \
   java/lang/CharSequence.class \
   java/lang/Iterable.class \
   java/lang/reflect/AnnotatedElement.class \
   java/util/Comparator.class \
-  java/util/Iterator.class)
+  java/util/Iterator.class \
+  java/util/concurrent/ConcurrentMap.class)
 
 cp -R "$work_dir/runtime/." "$work_dir/buildmanager/"
 (cd "$work_dir/buildmanager" && jar xf "$legacy_stubs_jar" \
