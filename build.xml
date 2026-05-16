@@ -1781,6 +1781,15 @@ BOOTRAPING TEST AND TEST SUITE
 
   <target name="test.icode.java8" depends="pack.done">
     <property name="partest.srcdir" value="files" />
+    <property name="java8-partest.dir" value="${build.dir}/java8-partest"/>
+    <delete dir="${java8-partest.dir}/files/run" includeemptydirs="yes" quiet="yes" failonerror="no"/>
+    <mkdir dir="${java8-partest.dir}/files/run"/>
+    <copy todir="${java8-partest.dir}/files/run">
+      <fileset dir="${partest.dir}/files/run">
+        <include name="inline-ex-handlers.scala"/>
+        <include name="inline-ex-handlers.check"/>
+      </fileset>
+    </copy>
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.debug.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
@@ -1790,7 +1799,7 @@ BOOTRAPING TEST AND TEST SUITE
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
-      <runtests dir="${partest.dir}/${partest.srcdir}/run" includes="inline-ex-handlers.scala"/>
+      <runtests dir="${java8-partest.dir}/${partest.srcdir}/run" includes="inline-ex-handlers.scala"/>
     </partest>
   </target>
 
