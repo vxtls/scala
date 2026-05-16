@@ -92,6 +92,7 @@ run_ant() {
     -Dlegacy.beans.meta.jar="$legacy_beans_meta_jar" \
     ${prev_forkjoin_arg:+"$prev_forkjoin_arg"} \
     -Dscalac.args="$scalac_args" \
+    -Djava8.partest.scalac.args="-javabootclasspath $java_bootclasspath" \
     -Dpartest.javacmd="$partest_java_cmd" \
     -Dpartest.debug.javacmd="$partest_debug_java_cmd" \
     "$@")
