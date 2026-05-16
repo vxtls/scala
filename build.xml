@@ -197,7 +197,6 @@ PROPERTIES
   <property name="copyright.string" value="Copyright 2002-2011, LAMP/EPFL"/>
   <property name="partest.version.number" value="0.9.2"/>
   <property name="partest.javacmd" value="${java.home}/bin/java"/>
-  <property name="partest.debug.javacmd" value="${partest.javacmd}"/>
   <property name="java8.partest.scalac.args" value=""/>
 
   <!-- These are NOT the flags used to run SuperSabbus, but the ones written
@@ -1791,7 +1790,7 @@ BOOTRAPING TEST AND TEST SUITE
         <include name="inline-ex-handlers.check"/>
       </fileset>
     </copy>
-    <partest showlog="yes" erroronfailed="yes" javacmd="${partest.debug.javacmd}"
+    <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
              scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
