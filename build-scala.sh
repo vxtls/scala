@@ -46,6 +46,7 @@ legacy_reflect_beans_jar="$stage_dir/build/legacy-reflect-beans.jar"
 legacy_beans_meta_jar="$stage_dir/build/legacy-beans-meta.jar"
 java_bootclasspath="$java8_override_jar:$java8_legacy_stubs_jar:$java8_filtered_stubs_jar:$rt_jar"
 partest_java_cmd="$stage_dir/build/partest-java"
+partest_icode_java_cmd="$stage_dir/build/partest-icode-java"
 scalac_args="-javabootclasspath $java_bootclasspath"
 
 if grep -q 'name="scalac.args" value="-Xmacros"' "$stage_dir/build.xml"; then
@@ -60,6 +61,7 @@ run_ant() {
   local ant_runtime_opts="$ant_opts"
   local runtime_mode="${1:-no}"
   local prev_forkjoin_arg=""
+  local current_partest_java_cmd="$partest_java_cmd"
   shift || true
 
   if [[ "$runtime_mode" == "active" ]]; then
@@ -68,7 +70,10 @@ run_ant() {
   if [[ "$runtime_mode" == "boot" && -f "$java8_buildmanager_boot_stubs_jar" ]]; then
     ant_runtime_opts="$ant_runtime_opts -Xbootclasspath/p:$java8_buildmanager_boot_stubs_jar"
   fi
-  ant_runtime_opts="$ant_runtime_opts -Dpartest.javacmd=$partest_java_cmd"
+  if [[ "$runtime_mode" == "icode" ]]; then
+    current_partest_java_cmd="$partest_icode_java_cmd"
+  fi
+  ant_runtime_opts="$ant_runtime_opts -Dpartest.javacmd=$current_partest_java_cmd"
 
   if needs_previous_forkjoin_jar; then
     if [[ ! -f "$prev_forkjoin_jar" && -f "$fallback_forkjoin_stage_dir/build/libs/forkjoin.jar" ]]; then
@@ -92,7 +97,7 @@ run_ant() {
     ${prev_forkjoin_arg:+"$prev_forkjoin_arg"} \
     -Dscalac.args="$scalac_args" \
     -Djava8.partest.scalac.args="-javabootclasspath $java_bootclasspath" \
-    -Dpartest.javacmd="$partest_java_cmd" \
+    -Dpartest.javacmd="$current_partest_java_cmd" \
     "$@")
 }
 
@@ -120,11 +125,31 @@ build_deps() {
     build_transition_bootstrap_compiler
   fi
   mkdir -p "$stage_dir/build"
-cat > "$partest_java_cmd" <<EOF
+cat > "$partest_java_cmd" <<'EOF'
 #!/usr/bin/env bash
-exec "$JAVA_HOME/bin/java" "-noverify" "-Xbootclasspath/p:$java8_partest_boot_stubs_jar" "\$@"
+set -e
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+java_home="${JAVA_HOME:?JAVA_HOME must point at a JDK 8 installation}"
+exec "$java_home/bin/java" \
+  "-noverify" \
+  "-Xbootclasspath/p:$script_dir/java8-partest-boot-stubs.jar" \
+  "$@"
 EOF
   chmod +x "$partest_java_cmd"
+cat > "$partest_icode_java_cmd" <<'EOF'
+#!/usr/bin/env bash
+set -e
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+java_home="${JAVA_HOME:?JAVA_HOME must point at a JDK 8 installation}"
+rt_jar="$java_home/jre/lib/rt.jar"
+java_bootclasspath="$script_dir/java8-charbuffer-overrides.jar:$script_dir/java8-legacy-stubs.jar:$script_dir/java8-filtered-stubs.jar:$rt_jar"
+exec "$java_home/bin/java" \
+  "-noverify" \
+  "-Xbootclasspath/p:$script_dir/java8-buildmanager-boot-stubs.jar" \
+  "-Dpartest.debug.settings=-javabootclasspath $java_bootclasspath" \
+  "$@"
+EOF
+  chmod +x "$partest_icode_java_cmd"
 }
 
 needs_transition_bootstrap_compiler() {
@@ -339,7 +364,7 @@ if [[ "$mode" == "test" || "$mode" == "all" ]]; then
   build_test_deps
   if grep -q 'name="test.suite.no-buildmanager"' "$stage_dir/build.xml"; then
     run_ant no test.t5293-map.java8
-    run_ant no test.icode.java8
+    run_ant icode test.icode.java8
     run_ant no test.suite.no-buildmanager test.continuations.suite
     run_ant boot test.scaladoc
     run_ant boot test.resident.java8

@@ -30,7 +30,8 @@ mkdir -p "$work_dir/runtime" "$work_dir/buildmanager"
 cp -R "$work_dir/runtime/." "$work_dir/buildmanager/"
 (cd "$work_dir/buildmanager" && jar xf "$legacy_stubs_jar" \
   'java/io/ObjectInputStream$GetField.class' \
-  java/io/ObjectInputStream.class)
+  java/io/ObjectInputStream.class \
+  java/io/ObjectStreamClass.class)
 
 jar cf "$out_jar" -C "$work_dir/runtime" .
 jar cf "$buildmanager_out_jar" -C "$work_dir/buildmanager" .
