@@ -46,7 +46,6 @@ legacy_reflect_beans_jar="$stage_dir/build/legacy-reflect-beans.jar"
 legacy_beans_meta_jar="$stage_dir/build/legacy-beans-meta.jar"
 java_bootclasspath="$java8_override_jar:$java8_legacy_stubs_jar:$java8_filtered_stubs_jar:$rt_jar"
 partest_java_cmd="$stage_dir/build/partest-java"
-partest_debug_java_cmd="$stage_dir/build/partest-debug-java"
 scalac_args="-javabootclasspath $java_bootclasspath"
 
 if grep -q 'name="scalac.args" value="-Xmacros"' "$stage_dir/build.xml"; then
@@ -94,7 +93,6 @@ run_ant() {
     -Dscalac.args="$scalac_args" \
     -Djava8.partest.scalac.args="-javabootclasspath $java_bootclasspath" \
     -Dpartest.javacmd="$partest_java_cmd" \
-    -Dpartest.debug.javacmd="$partest_debug_java_cmd" \
     "$@")
 }
 
@@ -126,12 +124,7 @@ cat > "$partest_java_cmd" <<EOF
 #!/usr/bin/env bash
 exec "$JAVA_HOME/bin/java" "-noverify" "-Xbootclasspath/p:$java8_partest_boot_stubs_jar" "\$@"
 EOF
-cat > "$partest_debug_java_cmd" <<EOF
-#!/usr/bin/env bash
-exec "$JAVA_HOME/bin/java" "-noverify" "-Xbootclasspath/p:$java8_partest_boot_stubs_jar" "-Dpartest.debug.settings=-javabootclasspath $java_bootclasspath" "\$@"
-EOF
   chmod +x "$partest_java_cmd"
-  chmod +x "$partest_debug_java_cmd"
 }
 
 needs_transition_bootstrap_compiler() {
