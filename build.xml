@@ -1803,6 +1803,40 @@ BOOTRAPING TEST AND TEST SUITE
     </partest>
   </target>
 
+  <target name="test.repl-java8" depends="pack.done">
+    <property name="partest.srcdir" value="files" />
+    <property name="java8-repl-partest.dir" value="${build.dir}/java8-repl-partest"/>
+    <delete dir="${java8-repl-partest.dir}/files" includeemptydirs="yes" quiet="yes" failonerror="no"/>
+    <mkdir dir="${java8-repl-partest.dir}/files/run"/>
+    <mkdir dir="${java8-repl-partest.dir}/files/jvm"/>
+    <copy todir="${java8-repl-partest.dir}/files/run">
+      <fileset dir="${partest.dir}/files/run">
+        <include name="repl-power.scala"/>
+        <include name="repl-power.check"/>
+      </fileset>
+    </copy>
+    <copy todir="${java8-repl-partest.dir}/files/jvm">
+      <fileset dir="${partest.dir}/files/jvm">
+        <include name="interpreter.scala"/>
+        <include name="interpreter.check"/>
+        <include name="xml05.scala"/>
+        <include name="xml05.check"/>
+      </fileset>
+    </copy>
+    <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
+             timeout="2400000"
+             srcdir="${partest.srcdir}"
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
+      <compilationpath>
+        <path refid="pack.classpath"/>
+        <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
+        <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
+      </compilationpath>
+      <runtests dir="${java8-repl-partest.dir}/${partest.srcdir}/run" includes="repl-power.scala"/>
+      <jvmtests dir="${java8-repl-partest.dir}/${partest.srcdir}/jvm" includes="interpreter.scala,xml05.scala"/>
+    </partest>
+  </target>
+
   <target name="test.suite.no-buildmanager" depends="pack.done">
     <property name="partest.srcdir" value="files" />
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
@@ -1816,8 +1850,8 @@ BOOTRAPING TEST AND TEST SUITE
       </compilationpath>
       <postests  dir="${partest.dir}/${partest.srcdir}/pos" includes="*.scala"/>
       <negtests  dir="${partest.dir}/${partest.srcdir}/neg" includes="*.scala"/>
-      <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala" excludes="t5293-map.scala,inline-ex-handlers.scala"/>
-      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala"/>
+      <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala" excludes="t5293-map.scala,inline-ex-handlers.scala,repl-power.scala"/>
+      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala" excludes="interpreter.scala,xml05.scala"/>
       <scalaptests dir="${partest.dir}/${partest.srcdir}/scalap" includes="**/*.scala"/>
       <specializedtests dir="${partest.dir}/${partest.srcdir}/specialized">
         <include name="*.scala"/>
