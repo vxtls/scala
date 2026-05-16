@@ -46,6 +46,7 @@ legacy_reflect_beans_jar="$stage_dir/build/legacy-reflect-beans.jar"
 legacy_beans_meta_jar="$stage_dir/build/legacy-beans-meta.jar"
 java_bootclasspath="$java8_override_jar:$java8_legacy_stubs_jar:$java8_filtered_stubs_jar:$rt_jar"
 partest_java_cmd="$stage_dir/build/partest-java"
+partest_debug_java_cmd="$stage_dir/build/partest-debug-java"
 partest_icode_java_cmd="$stage_dir/build/partest-icode-java"
 scalac_args="-javabootclasspath $java_bootclasspath"
 
@@ -69,6 +70,9 @@ run_ant() {
   fi
   if [[ "$runtime_mode" == "boot" && -f "$java8_buildmanager_boot_stubs_jar" ]]; then
     ant_runtime_opts="$ant_runtime_opts -Xbootclasspath/p:$java8_buildmanager_boot_stubs_jar"
+  fi
+  if [[ "$runtime_mode" == "debug" ]]; then
+    current_partest_java_cmd="$partest_debug_java_cmd"
   fi
   if [[ "$runtime_mode" == "icode" ]]; then
     current_partest_java_cmd="$partest_icode_java_cmd"
@@ -133,10 +137,22 @@ java_home="${JAVA_HOME:?JAVA_HOME must point at a JDK 8 installation}"
 exec "$java_home/bin/java" \
   "-noverify" \
   "-Xbootclasspath/p:$script_dir/java8-partest-boot-stubs.jar" \
-  "-Dpartest.debug.settings=-javabootclasspath \"$script_dir/java8-charbuffer-overrides.jar:$script_dir/java8-legacy-stubs.jar:$script_dir/java8-filtered-stubs.jar:$java_home/jre/lib/rt.jar\"" \
   "$@"
 EOF
   chmod +x "$partest_java_cmd"
+cat > "$partest_debug_java_cmd" <<'EOF'
+#!/usr/bin/env bash
+set -e
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+java_home="${JAVA_HOME:?JAVA_HOME must point at a JDK 8 installation}"
+java_bootclasspath="$script_dir/java8-charbuffer-overrides.jar:$script_dir/java8-legacy-stubs.jar:$script_dir/java8-filtered-stubs.jar:$java_home/jre/lib/rt.jar"
+exec "$java_home/bin/java" \
+  "-noverify" \
+  "-Xbootclasspath/p:$script_dir/java8-partest-boot-stubs.jar" \
+  "-Dpartest.debug.settings=-javabootclasspath \"$java_bootclasspath\"" \
+  "$@"
+EOF
+  chmod +x "$partest_debug_java_cmd"
 cat > "$partest_icode_java_cmd" <<'EOF'
 #!/usr/bin/env bash
 set -e
@@ -367,6 +383,7 @@ if [[ "$mode" == "test" || "$mode" == "all" ]]; then
     run_ant no test.t5293-map.java8
     run_ant icode test.icode.java8
     run_ant no test.suite.no-buildmanager test.continuations.suite
+    run_ant debug test.repl-java8
     run_ant boot test.scaladoc
     run_ant boot test.resident.java8
     run_ant boot test.buildmanager.java8
