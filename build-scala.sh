@@ -133,6 +133,7 @@ java_home="${JAVA_HOME:?JAVA_HOME must point at a JDK 8 installation}"
 exec "$java_home/bin/java" \
   "-noverify" \
   "-Xbootclasspath/p:$script_dir/java8-partest-boot-stubs.jar" \
+  "-Dpartest.debug.settings=-javabootclasspath $script_dir/java8-charbuffer-overrides.jar:$script_dir/java8-legacy-stubs.jar:$script_dir/java8-filtered-stubs.jar:$java_home/jre/lib/rt.jar" \
   "$@"
 EOF
   chmod +x "$partest_java_cmd"
