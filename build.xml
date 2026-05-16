@@ -198,6 +198,7 @@ PROPERTIES
   <property name="partest.version.number" value="0.9.2"/>
   <property name="partest.javacmd" value="${java.home}/bin/java"/>
   <property name="partest.debug.javacmd" value="${partest.javacmd}"/>
+  <property name="java8.partest.scalac.args" value=""/>
 
   <!-- These are NOT the flags used to run SuperSabbus, but the ones written
        into the script runners created with scala.tools.ant.ScalaTool -->
@@ -1692,7 +1693,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="1200000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1707,7 +1708,7 @@ BOOTRAPING TEST AND TEST SUITE
     <property name="partest.srcdir" value="files" />
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1722,7 +1723,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1737,7 +1738,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1752,7 +1753,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1769,7 +1770,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1793,7 +1794,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.debug.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.optimise}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1808,7 +1809,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1833,7 +1834,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all}">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
       <compilationpath>
         <path refid="pack.classpath"/>
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
@@ -1864,7 +1865,7 @@ BOOTRAPING TEST AND TEST SUITE
     <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
              timeout="2400000"
              srcdir="${partest.srcdir}"
-             scalacopts="${scalac.args.all} -Xplugin-require:continuations -Xpluginsdir ${build-quick.dir}/misc/scala-devel/plugins">
+             scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args} -Xplugin-require:continuations -Xpluginsdir ${build-quick.dir}/misc/scala-devel/plugins">
       <compilationpath>
         <path refid="pack.classpath"/>
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
@@ -1875,7 +1876,7 @@ BOOTRAPING TEST AND TEST SUITE
   </target>
 
   <target name="test.scaladoc" depends="pack.done">
-    <partest erroronfailed="yes" scalacopts="${scalac.args.all}" showlog="yes">
+    <partest erroronfailed="yes" scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}" showlog="yes">
       <compilationpath>
         <path refid="pack.classpath"/>
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
