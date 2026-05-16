@@ -1790,12 +1790,7 @@ BOOTRAPING TEST AND TEST SUITE
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
-      <runtests dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala">
-        <containsregexp expression="extends[ \t]+IcodeTest"/>
-      </runtests>
-      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala">
-        <containsregexp expression="extends[ \t]+IcodeTest"/>
-      </jvmtests>
+      <runtests dir="${partest.dir}/${partest.srcdir}/run" includes="inline-ex-handlers.scala"/>
     </partest>
   </target>
 
@@ -1812,16 +1807,8 @@ BOOTRAPING TEST AND TEST SUITE
       </compilationpath>
       <postests  dir="${partest.dir}/${partest.srcdir}/pos" includes="*.scala"/>
       <negtests  dir="${partest.dir}/${partest.srcdir}/neg" includes="*.scala"/>
-      <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala" excludes="t5293-map.scala">
-        <not>
-          <containsregexp expression="extends[ \t]+IcodeTest"/>
-        </not>
-      </runtests>
-      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala">
-        <not>
-          <containsregexp expression="extends[ \t]+IcodeTest"/>
-        </not>
-      </jvmtests>
+      <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala" excludes="t5293-map.scala,inline-ex-handlers.scala"/>
+      <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala"/>
       <scalaptests dir="${partest.dir}/${partest.srcdir}/scalap" includes="**/*.scala"/>
       <specializedtests dir="${partest.dir}/${partest.srcdir}/specialized">
         <include name="*.scala"/>
