@@ -134,10 +134,25 @@ cat > "$partest_java_cmd" <<'EOF'
 set -e
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 java_home="${JAVA_HOME:?JAVA_HOME must point at a JDK 8 installation}"
+clean_args=()
+skip_next=0
+for arg in "$@"; do
+  if [[ "$skip_next" == "1" ]]; then
+    skip_next=0
+    continue
+  fi
+  case "$arg" in
+    -Dpartest.debug.settings=-javabootclasspath)
+      skip_next=1
+      ;;
+    -Dpartest.debug.settings*) ;;
+    *) clean_args+=("$arg") ;;
+  esac
+done
 exec "$java_home/bin/java" \
   "-noverify" \
   "-Xbootclasspath/p:$script_dir/java8-partest-boot-stubs.jar" \
-  "$@"
+  "${clean_args[@]}"
 EOF
   chmod +x "$partest_java_cmd"
 cat > "$partest_debug_java_cmd" <<'EOF'
