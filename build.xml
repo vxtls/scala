@@ -1811,12 +1811,10 @@ BOOTRAPING TEST AND TEST SUITE
     <mkdir dir="${java8-repl-partest.dir}/files/jvm"/>
     <copy todir="${java8-repl-partest.dir}/files/run">
       <fileset dir="${partest.dir}/files/run">
-        <include name="code.scala"/>
         <include name="repl-power.scala"/>
         <include name="repl-power.check"/>
       </fileset>
     </copy>
-    <copy file="${partest.dir}/files/run/code-java8.check" tofile="${java8-repl-partest.dir}/files/run/code.check"/>
     <copy todir="${java8-repl-partest.dir}/files/jvm">
       <fileset dir="${partest.dir}/files/jvm">
         <include name="interpreter.scala"/>
@@ -1834,7 +1832,7 @@ BOOTRAPING TEST AND TEST SUITE
         <pathelement location="${pack.dir}/lib/scala-swing.jar"/>
         <fileset dir="${partest.dir}/files/lib" includes="*.jar" />
       </compilationpath>
-      <runtests dir="${java8-repl-partest.dir}/${partest.srcdir}/run" includes="code.scala,repl-power.scala"/>
+      <runtests dir="${java8-repl-partest.dir}/${partest.srcdir}/run" includes="repl-power.scala"/>
       <jvmtests dir="${java8-repl-partest.dir}/${partest.srcdir}/jvm" includes="interpreter.scala,xml05.scala"/>
     </partest>
   </target>
@@ -1852,7 +1850,7 @@ BOOTRAPING TEST AND TEST SUITE
       </compilationpath>
       <postests  dir="${partest.dir}/${partest.srcdir}/pos" includes="*.scala"/>
       <negtests  dir="${partest.dir}/${partest.srcdir}/neg" includes="*.scala"/>
-      <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala" excludes="code.scala,t5293-map.scala,inline-ex-handlers.scala,repl-power.scala"/>
+      <runtests  dir="${partest.dir}/${partest.srcdir}/run" includes="*.scala" excludes="t5293-map.scala,inline-ex-handlers.scala,repl-power.scala"/>
       <jvmtests dir="${partest.dir}/${partest.srcdir}/jvm" includes="*.scala" excludes="interpreter.scala,xml05.scala"/>
       <scalaptests dir="${partest.dir}/${partest.srcdir}/scalap" includes="**/*.scala"/>
       <specializedtests dir="${partest.dir}/${partest.srcdir}/specialized">
