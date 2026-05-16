@@ -47,6 +47,7 @@ legacy_beans_meta_jar="$stage_dir/build/legacy-beans-meta.jar"
 java_bootclasspath="$java8_override_jar:$java8_legacy_stubs_jar:$java8_filtered_stubs_jar:$rt_jar"
 partest_java_cmd="$stage_dir/build/partest-java"
 partest_debug_java_cmd="$stage_dir/build/partest-debug-java"
+partest_boot_java_cmd="$stage_dir/build/partest-boot-java"
 partest_icode_java_cmd="$stage_dir/build/partest-icode-java"
 scalac_args="-javabootclasspath $java_bootclasspath"
 
@@ -70,6 +71,9 @@ run_ant() {
   fi
   if [[ "$runtime_mode" == "boot" && -f "$java8_buildmanager_boot_stubs_jar" ]]; then
     ant_runtime_opts="$ant_runtime_opts -Xbootclasspath/p:$java8_buildmanager_boot_stubs_jar"
+  fi
+  if [[ "$runtime_mode" == "java8boot" ]]; then
+    current_partest_java_cmd="$partest_boot_java_cmd"
   fi
   if [[ "$runtime_mode" == "debug" ]]; then
     current_partest_java_cmd="$partest_debug_java_cmd"
@@ -155,6 +159,17 @@ exec "$java_home/bin/java" \
   "${clean_args[@]}"
 EOF
   chmod +x "$partest_java_cmd"
+cat > "$partest_boot_java_cmd" <<'EOF'
+#!/usr/bin/env bash
+set -e
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+java_home="${JAVA_HOME:?JAVA_HOME must point at a JDK 8 installation}"
+exec "$java_home/bin/java" \
+  "-noverify" \
+  "-Xbootclasspath/p:$script_dir/java8-buildmanager-boot-stubs.jar" \
+  "$@"
+EOF
+  chmod +x "$partest_boot_java_cmd"
 cat > "$partest_debug_java_cmd" <<'EOF'
 #!/usr/bin/env bash
 set -e
@@ -398,7 +413,7 @@ if [[ "$mode" == "test" || "$mode" == "all" ]]; then
     run_ant no test.t5293-map.java8
     run_ant icode test.icode.java8
     run_ant no test.suite.no-buildmanager test.continuations.suite
-    run_ant debug test.repl-java8
+    run_ant java8boot test.repl-java8
     run_ant boot test.scaladoc
     run_ant boot test.resident.java8
     run_ant boot test.buildmanager.java8
