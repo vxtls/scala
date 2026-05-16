@@ -1790,7 +1790,7 @@ BOOTRAPING TEST AND TEST SUITE
         <include name="inline-ex-handlers.check"/>
       </fileset>
     </copy>
-    <partest showlog="yes" erroronfailed="yes" javacmd="${partest.javacmd}"
+    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
              timeout="2400000"
              srcdir="${partest.srcdir}"
              scalacopts="${scalac.args.optimise} ${java8.partest.scalac.args}">
