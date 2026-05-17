@@ -421,6 +421,9 @@ if [[ "$mode" == "test" || "$mode" == "all" ]]; then
       run_ant icode test.icode.java8
     fi
     run_ant no test.suite.no-buildmanager test.continuations.suite
+    if has_ant_target "test.java8-isolated"; then
+      run_ant java8boot test.java8-isolated
+    fi
     if has_ant_target "test.repl-java8"; then
       run_ant java8boot test.repl-java8
     fi
