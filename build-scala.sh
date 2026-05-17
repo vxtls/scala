@@ -234,6 +234,10 @@ needs_previous_forkjoin_jar() {
     || [[ "$version_number" == "v2.10.0-M3+5acac4d-bootstrap" ]]
 }
 
+has_ant_target() {
+  grep -q "target name=\"$1\"" "$stage_dir/build.xml"
+}
+
 build_anyval_class_transition() {
   build_compiler_first_transition
 }
@@ -410,14 +414,26 @@ if [[ "$mode" == "test" || "$mode" == "all" ]]; then
   build_deps
   build_test_deps
   if grep -q 'name="test.suite.no-buildmanager"' "$stage_dir/build.xml"; then
-    run_ant no test.t5293-map.java8
-    run_ant icode test.icode.java8
+    if has_ant_target "test.t5293-map.java8"; then
+      run_ant no test.t5293-map.java8
+    fi
+    if has_ant_target "test.icode.java8"; then
+      run_ant icode test.icode.java8
+    fi
     run_ant no test.suite.no-buildmanager test.continuations.suite
-    run_ant java8boot test.repl-java8
+    if has_ant_target "test.repl-java8"; then
+      run_ant java8boot test.repl-java8
+    fi
     run_ant boot test.scaladoc
-    run_ant boot test.resident.java8
-    run_ant boot test.buildmanager.java8
-    run_ant active test.scalacheck.java8
+    if has_ant_target "test.resident.java8"; then
+      run_ant boot test.resident.java8
+    fi
+    if has_ant_target "test.buildmanager.java8"; then
+      run_ant boot test.buildmanager.java8
+    fi
+    if has_ant_target "test.scalacheck.java8"; then
+      run_ant active test.scalacheck.java8
+    fi
   else
     run_ant no test.suite test.continuations.suite
     run_ant boot test.scaladoc
