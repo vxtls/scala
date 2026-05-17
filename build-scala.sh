@@ -124,7 +124,7 @@ build_deps() {
   "$script_dir/deps/build-java8-charbuffer-overrides.sh" "$stage_dir" "$base_java8_stubs"
   "$script_dir/deps/build-java8-partest-boot-stubs.sh" "$stage_dir" "$java8_legacy_stubs_jar"
   if [[ -d "$stage_dir/src/msil" ]] \
-    && rg -q 'ch\.epfl\.lamp\.compiler\.msil' "$stage_dir/src/compiler"; then
+    && grep -R -q 'ch\.epfl\.lamp\.compiler\.msil' "$stage_dir/src/compiler"; then
     "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number"
   fi
   if needs_transition_bootstrap_compiler; then
