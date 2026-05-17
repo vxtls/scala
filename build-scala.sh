@@ -242,10 +242,16 @@ build_anyval_class_transition() {
 }
 
 build_bootstrap_lib_jars() {
+  local forkjoin_target="forkjoin.done"
+
+  if needs_previous_forkjoin_jar; then
+    forkjoin_target=""
+  fi
+
   if grep -q 'target name="libs.fjbgpack"' "$stage_dir/build.xml"; then
-    run_ant no jline.done forkjoin.done libs.fjbgpack
+    run_ant no jline.done $forkjoin_target libs.fjbgpack
   else
-    run_ant no jline.done forkjoin.done fjbg.done
+    run_ant no jline.done $forkjoin_target fjbg.done
   fi
 }
 
