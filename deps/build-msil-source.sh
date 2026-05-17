@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ $# -ne 5 ]]; then
-  echo "usage: $0 <scala-stage-dir> <starr-lib-jar> <starr-compiler-jar> <java-bootclasspath> <scala-version>" >&2
+if [[ $# -lt 5 || $# -gt 6 ]]; then
+  echo "usage: $0 <scala-stage-dir> <starr-lib-jar> <starr-compiler-jar> <java-bootclasspath> <scala-version> [starr-reflect.jar]" >&2
   exit 2
 fi
 
@@ -11,6 +11,7 @@ starr_lib_jar="$2"
 starr_comp_jar="$3"
 java_bootclasspath="$4"
 scala_version="$5"
+starr_reflect_jar="${6:-}"
 src_dir="$stage_dir/src/msil"
 work_dir="$stage_dir/build/source-deps/msil-source"
 classes_dir="$work_dir/classes"
@@ -19,6 +20,9 @@ out_jar="$out_dir/msil-source.jar"
 javac_bin="${JAVA_HOME:+$JAVA_HOME/bin/}javac"
 java_bin="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 compiler_cp="$starr_comp_jar:$starr_lib_jar"
+if [[ -n "$starr_reflect_jar" && -f "$starr_reflect_jar" ]]; then
+  compiler_cp="$compiler_cp:$starr_reflect_jar"
+fi
 
 [[ -d "$src_dir" ]] || {
   echo "vendored MSIL sources not found: $src_dir" >&2

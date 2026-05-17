@@ -125,7 +125,7 @@ build_deps() {
   "$script_dir/deps/build-java8-partest-boot-stubs.sh" "$stage_dir" "$java8_legacy_stubs_jar"
   if [[ -d "$stage_dir/src/msil" ]] \
     && grep -R -q 'ch\.epfl\.lamp\.compiler\.msil' "$stage_dir/src/compiler"; then
-    "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number"
+    "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number" "$starr_reflect"
   fi
   if needs_transition_bootstrap_compiler; then
     run_ant no jline.done forkjoin.done libs.fjbgpack
@@ -366,7 +366,8 @@ build_transition_bootstrap_compiler() {
     "$java_bootclasspath" \
     "$legacy_reflect_beans_jar" \
     "$legacy_beans_meta_jar" \
-    "$ant_jar"
+    "$ant_jar" \
+    "$starr_reflect"
   active_starr_comp="$stage_dir/build/transition-bootstrap-compiler/classes"
 }
 

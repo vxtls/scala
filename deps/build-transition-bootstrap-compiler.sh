@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ $# -ne 7 ]]; then
-  echo "usage: $0 <scala-stage-dir> <starr-library.jar> <starr-compiler.jar> <java-bootclasspath> <legacy-reflect-beans.jar> <legacy-beans-meta.jar> <ant.jar>" >&2
+if [[ $# -lt 7 || $# -gt 8 ]]; then
+  echo "usage: $0 <scala-stage-dir> <starr-library.jar> <starr-compiler.jar> <java-bootclasspath> <legacy-reflect-beans.jar> <legacy-beans-meta.jar> <ant.jar> [starr-reflect.jar]" >&2
   exit 2
 fi
 
@@ -13,6 +13,7 @@ java_bootclasspath="$4"
 legacy_reflect_beans="$5"
 legacy_beans_meta="$6"
 ant_jar="$7"
+starr_reflect="${8:-}"
 
 java_bin="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 out_dir="$stage_dir/build/transition-bootstrap-compiler/classes"
@@ -53,7 +54,12 @@ for item in "${classpath_items[@]}"; do
   fi
 done
 
-"$java_bin" -Xmx1536M -cp "$starr_comp:$starr_lib" scala.tools.nsc.Main \
+scalac_boot_cp="$starr_comp:$starr_lib"
+if [[ -n "$starr_reflect" && -e "$starr_reflect" ]]; then
+  scalac_boot_cp="$scalac_boot_cp:$starr_reflect"
+fi
+
+"$java_bin" -Xmx1536M -cp "$scalac_boot_cp" scala.tools.nsc.Main \
   -javabootclasspath "$java_bootclasspath" \
   -classpath "$classpath" \
   -d "$out_dir" \
