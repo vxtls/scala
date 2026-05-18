@@ -124,7 +124,8 @@ build_deps() {
   "$script_dir/deps/build-java8-charbuffer-overrides.sh" "$stage_dir" "$base_java8_stubs"
   "$script_dir/deps/build-java8-partest-boot-stubs.sh" "$stage_dir" "$java8_legacy_stubs_jar"
   if [[ -d "$stage_dir/src/msil" ]] \
-    && grep -R -q 'ch\.epfl\.lamp\.compiler\.msil' "$stage_dir/src/compiler"; then
+    && grep -R -q 'ch\.epfl\.lamp\.compiler\.msil' "$stage_dir/src/compiler" \
+    && ! locker_comp_excludes_msil; then
     "$script_dir/deps/build-msil-source.sh" "$stage_dir" "$starr_lib" "$starr_comp" "$java_bootclasspath" "$version_number" "$starr_reflect"
   fi
   if needs_transition_bootstrap_compiler; then
@@ -231,6 +232,16 @@ needs_previous_forkjoin_jar() {
     || [[ "$version_number" == "v2.10.0-M3+bc5f42f-bootstrap" ]] \
     || [[ "$version_number" == "v2.10.0-M3+bc5f42f+5acac4d-bootstrap" ]] \
     || [[ "$version_number" == "v2.10.0-M3+5acac4d-bootstrap" ]]
+}
+
+locker_comp_excludes_msil() {
+  awk '
+    BEGIN { in_target = 0; found = 0; done = 0 }
+    /<target name="locker\.comp"/ { in_target = 1 }
+    in_target && /MSILPlatform\.scala/ { found = 1 }
+    in_target && /<\/target>/ { done = 1; exit }
+    END { exit(done && found ? 0 : 1) }
+  ' "$stage_dir/build.xml"
 }
 
 has_ant_target() {
