@@ -98,8 +98,10 @@ run_ant() {
     -Dversion.number="$version_number" \
     -Djava6.home="$JAVA_HOME" \
     -Dlib.starr.jar="$starr_lib" \
+    -Dlibrary.starr.jar="$starr_lib" \
     ${starr_reflect:+"-Dreflect.starr.jar=$starr_reflect"} \
     -Dcomp.starr.jar="$active_starr_comp" \
+    -Dcompiler.starr.jar="$active_starr_comp" \
     -Dlegacy.reflect.beans.jar="$legacy_reflect_beans_jar" \
     -Dlegacy.beans.meta.jar="$legacy_beans_meta_jar" \
     ${prev_forkjoin_arg:+"$prev_forkjoin_arg"} \
@@ -110,11 +112,17 @@ run_ant() {
 }
 
 build_deps() {
+  if grep -q 'net/sf/antcontrib/antlib.xml' "$stage_dir/build.xml"; then
+    "$script_dir/deps/build-ant-contrib-minimal.sh" "$stage_dir"
+  fi
   "$script_dir/deps/build-jansi-1.4.sh" "$stage_dir"
   if grep -q 'typesafe-config-0.4.0.jar' "$stage_dir/build.xml"; then
     "$script_dir/deps/build-typesafe-config-0.4.0.sh" "$stage_dir"
   else
     "$script_dir/deps/build-typesafe-config-0.3.0.sh" "$stage_dir"
+  fi
+  if grep -q 'diffutils' "$stage_dir/build.xml"; then
+    "$script_dir/deps/build-diffutils-1.3.0.sh" "$stage_dir"
   fi
   "$script_dir/deps/build-legacy-reflect-beans.sh" "$stage_dir" "$starr_lib"
   "$script_dir/deps/build-legacy-beans-meta.sh" "$stage_dir" "$starr_lib"
