@@ -290,6 +290,7 @@ GROUP5=(
   v2.10.3-RC3-bootstrap
   v2.10.3-bootstrap
   v2.10.4-RC1-bootstrap
+  v2.10.4-RC2-bootstrap
 )
 
 declare -A GROUP4_PREV=(
@@ -452,6 +453,7 @@ declare -A GROUP5_PREV=(
   [v2.10.3-RC3-bootstrap]=v2.10.3-RC2-bootstrap
   [v2.10.3-bootstrap]=v2.10.3-RC3-bootstrap
   [v2.10.4-RC1-bootstrap]=v2.10.3-bootstrap
+  [v2.10.4-RC2-bootstrap]=v2.10.4-RC1-bootstrap
 )
 
 declare -A GROUP5_VERSION=(
@@ -467,6 +469,7 @@ declare -A GROUP5_VERSION=(
   [v2.10.3-RC3-bootstrap]=2.10.3
   [v2.10.3-bootstrap]=2.10.3
   [v2.10.4-RC1-bootstrap]=2.10.4
+  [v2.10.4-RC2-bootstrap]=2.10.4
 )
 
 declare -A GROUP5_MODE=(
@@ -584,6 +587,7 @@ declare -A GROUP5_MODE=(
   [v2.10.3-RC3-bootstrap]=build
   [v2.10.3-bootstrap]=build
   [v2.10.4-RC1-bootstrap]=build
+  [v2.10.4-RC2-bootstrap]=build
   [v2.10.1-bootstrap]=build
 )
 
